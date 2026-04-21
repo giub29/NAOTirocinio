@@ -150,7 +150,8 @@ def main():
                         descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
                         voce.parla(u"Vedo: " + descrizione)
                         try:
-                            os.remove("visione_nao.jpg")
+                            #os.remove("visione_nao.jpg")
+                            pass
                         except:
                             pass
                     else:
