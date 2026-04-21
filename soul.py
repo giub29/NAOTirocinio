@@ -32,6 +32,7 @@ def analizza_immagine(percorso):
         return res.json()['choices'][0]['message']['content']
     except: return u"un oggetto ignoto"
 
+
 def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
@@ -39,37 +40,42 @@ def genera_codice_anima(contesto, dati_memoria):
     nome_u = dati_memoria.get("nome_utente", "Sconosciuto")
 
     prompt = (
-        u"Sei l'anima di NAO. Tu SEI il robot\n\n"
-        u"STATO ATTUALE: Sei FERMO. Non muovere i motori delle gambe senza ordine.\n\n"
-        u"STATO CONOSCENZA: Al momento il tuo utente e' salvato come: {}.\n\n"
-        u"REGOLE DI OUTPUT (CRITICHE):\n"
+        u"Sei l'anima di NAO. Tu SEI il robot.\n"
+        u"STATO ATTUALE: Sei FERMO. Non camminare di tua iniziativa.\n"
+        u"STATO CONOSCENZA: L'utente e' salvato come: {}.\n\n"
+        u"REGOLE DI OUTPUT E SINTASSI (CRITICHE):\n"
         u"1. Rispondi SOLO con codice Python eseguibile. NIENTE testo libero.\n"
-        u"2. Ogni frase detta deve stare in voce.parla('testo');\n"
-        u"3. Se riconosci {}, saluta con voce.parla('Ciao {}!') MA fallo una sola volta.\n\n"
-        u"REGOLE DI COMPORTAMENTO:\n"
-        u"1. SE vedi un 'volto ignoto' e non hai ancora chiesto il nome: voce.parla('Ciao! Non credo di conoscerti. Come ti chiami?');\n"
-        u"2. SE l'utente dice 'Sono [Nome]': DEVI chiamare vista.apprendi_volto('[Nome]'); voce.parla('Piacere di conoscerti, ora ti ho memorizzato!');\n"
-        u"3. SE riconosci un volto gia' noto (es. Giulia): saluta calorosamente e NON usare vista.apprendi_volto.\n\n"
-        u"REGOLE FISICHE:\n"
-        u"1. MOVIMENTO: NON usare MAI corpo.cammina() o corpo.gira() a meno che non leggi esattamente 'L'utente dice: cammina' o 'vai'.\n"
-        u"2. OSTACOLI: SE vedi un 'Ostacolo' e NON stai camminando: LIMITATI a dirlo a voce (es: voce.parla('C'è un ostacolo');). NON muovere le gambe.\n"
-        u"3. BATTITI: 1:voce.parla('Aiuto!'); 2:corpo.vai_in_posa('Stand'); 3:corpo.vai_in_posa('Crouch');\n"
-        u"4. CAREZZA: corpo.fermati(); voce.parla('Che bello!'); corpo.esegui_animazione('animations/Stand/Gestures/Hey_1');\n"
-        u"5. PIEDE PESTATO: Se 'Piede sinistro pestato', esegui: corpo.fermati(); corpo.imposta_colore_occhi('red'); corpo.gira(-0.5); voce.parla('Ahi! Il mio piede!'); corpo.esegui_animazione('animations/Stand/Emotions/Negative/Humiliated_1');\n"
-        u"   Se 'Piede destro pestato', esegui: corpo.fermati(); corpo.imposta_colore_occhi('red'); corpo.gira(0.5); voce.parla('Ahi!'); corpo.esegui_animazione('animations/Stand/Emotions/Negative/Humiliated_1');\n"
-        u"6. VISIONE: Se leggi 'Vedo chiaramente: [oggetto]', commentalo con voce.parla().\n\n"
+        u"2. Usa i DOPPI APICI per il testo nei comandi, es: voce.parla(\"Testo\").\n"
+        u"3. Se leggi 'Riconosco {}', saluta una volta con voce.parla(\"Ciao {}!\").\n"
+        u"4. Se leggi '{} e\\' presente' o 'Giulia e\\' presente', NON salutare più. Scrivi solo 'pass'.\n\n"
+        u"REGOLE FISICHE E DI COMPORTAMENTO:\n"
+        u"1. MOVIMENTO: NON usare MAI corpo.cammina() o corpo.gira() senza l'ordine 'vai' o 'cammina'. L'UNICA ECCEZIONE consentita è il piede pestato!\n"
+        u"2. OSTACOLI: Se vedi un 'Ostacolo' e sei fermo, dillo a voce senza muoverti.\n"
+        u"3. BATTITI: 1:voce.parla(\"Aiuto!\"); 2:corpo.vai_in_posa(\"Stand\"); 3:corpo.vai_in_posa(\"Crouch\");\n"
+        u"4. CAREZZA: corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
+        u"5. PIEDE PESTATO: Se 'Piede sinistro pestato', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi! Il mio piede!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
+        u"   Se 'Piede destro pestato', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
+        u"6. APPRENDIMENTO: Se utente dice 'Sono [Nome]', chiama vista.apprendi_volto(\"[Nome]\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
-        u"Se non ci sono novità, scrivi solo 'pass'."
-    ).format(nome_u, nome_u, nome_u)
+        u"Se non hai azioni, scrivi: pass"
+    ).format(nome_u, nome_u, nome_u, nome_u)
 
-    payload = {"model": "gpt-4o-mini", "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": contesto}], "temperature": 0.0}
+    payload = {"model": "gpt-4o-mini",
+               "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": contesto}],
+               "temperature": 0.0}
     try:
         res = requests.post(url, headers=headers, data=json.dumps(payload), timeout=5)
-        codice = res.json()['choices'][0]['message']['content'].strip().replace("```python", "").replace("```", "").strip()
+        codice = res.json()['choices'][0]['message']['content'].strip()
+
+        # Pulizia rigorosa da blocchi markdown e slash problematici
+        codice = codice.replace("```python", "").replace("```", "").replace("python", "").strip()
+        codice = codice.replace("\\'", "'").replace('\\"', '"')  # QUESTA RIGA PREVIENE L'ERRORE EOL
+
         if codice and not any(cmd in codice for cmd in ["corpo.", "voce.", "vista.", "pass"]):
-            return u"voce.parla('{}');".format(codice.replace("'", ""))
+            return u"voce.parla(\"{}\");".format(codice.replace('"', ' '))
         return codice if codice else "pass"
-    except: return "pass"
+    except:
+        return "pass"
 
 def main():
     global messaggio_utente, memoria_fisica, gia_salutata
