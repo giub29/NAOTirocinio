@@ -55,10 +55,13 @@ class NaoSenses:
         if self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value") > 0:
             eventi.append(u"Sento una carezza sulla testa.")
 
-        # 5. PIEDI (Distanziati per la rotazione)
-        if self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value") > 0:
-            eventi.append(u"Ahi! Piede sinistro pestato!")
-        elif self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value") > 0:
-            eventi.append(u"Ahi! Piede destro pestato!")
+        # 5. PARAURTI TATTILI (Foot Bumpers - Anticollisione di emergenza)
+        lb_left = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value")
+        lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
+        rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
+        rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
+
+        if lb_left > 0 or lb_right > 0 or rb_left > 0 or rb_right > 0:
+            eventi.append(u"URTO TATTILE! Ostacolo invisibile colpito.")
 
         return u"REPORT: " + u" ".join(eventi)

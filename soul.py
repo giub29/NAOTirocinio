@@ -68,8 +68,7 @@ def genera_codice_anima(contesto, dati_memoria):
         u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', esegui: corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo evitato, riprendo la marcia.\");\n\n"
         u"REAZIONI FISICHE (ASSOLUTE):\n"
         u"- CAREZZA: corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
-        u"- PIEDE SINISTRO: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
-        u"- PIEDE DESTRO: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n\n"
+        u"- URTO TATTILE: corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
     )
