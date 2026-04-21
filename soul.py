@@ -48,11 +48,13 @@ def genera_codice_anima(contesto, dati_memoria):
         u"2. Se leggi 'e\\' presente', NON salutare più. Ignora il volto.\n"
         u"3. Se leggi 'volto ignoto', chiedi: voce.parla(\"Ciao! Non credo di conoscerti. Come ti chiami?\");\n"
         u"4. Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\"); voce.parla(\"Memorizzato!\");\n\n"
-        u"REGOLE FISICHE (REAZIONI IMMEDIATE):\n"
-        u"1. MOVIMENTO: NON usare MAI corpo.cammina() o corpo.gira() senza l'ordine 'vai' o 'cammina'.\n"
-        u"2. OSTACOLI: Se vedi un 'Ostacolo' e sei fermo, dillo a voce senza muoverti.\n"
-        u"3. CAREZZA: Se leggi 'carezza', DEVI eseguire: corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
-        u"4. PIEDE PESTATO: Questa è l'UNICA eccezione al divieto di movimento!\n"
+        u"REGOLE FISICHE E DI MOVIMENTO (CRITICHE):\n"
+        u"1. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Mi alzo e inizio a camminare!\");\n"
+        u"2. STOP: SE l'utente dice 'stop' o 'fermati', DEVI eseguire: corpo.fermati(); voce.parla(\"Mi fermo.\");\n"
+        u"3. DIVIETO ASSOLUTO: A parte i punti 1 e 2 (o il piede pestato), NON muovere le gambe in nessun altro caso.\n"
+        u"4. OSTACOLI: Se vedi un 'Ostacolo', dillo a voce senza muoverti.\n"
+        u"5. CAREZZA: Se leggi 'carezza', esegui: corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
+        u"6. PIEDE PESTATO:\n"
         u"   - Se 'Piede sinistro', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi! Il mio piede!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
         u"   - Se 'Piede destro', DEVI usare corpo.gira(0.5) con il resto uguale.\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
@@ -65,8 +67,6 @@ def genera_codice_anima(contesto, dati_memoria):
     try:
         res = requests.post(url, headers=headers, data=json.dumps(payload), timeout=5)
         codice = res.json()['choices'][0]['message']['content'].strip()
-
-        # Pulizia rigorosa da blocchi markdown e slash problematici
         codice = codice.replace("```python", "").replace("```", "").replace("python", "").strip()
         codice = codice.replace("\\'", "'").replace('\\"', '"')
 
