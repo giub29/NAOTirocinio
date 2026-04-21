@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import requests, json, time, threading, base64, os
+import requests, json, time, threading, base64, os, re
 from hardware_control import NaoBody
 from sensi import NaoSenses
 from voice_interaction import NaoVoice
@@ -11,7 +11,8 @@ CHIAVE_PRIVATA = "sk-proj-mVkErEUsfK2a4KQtJ8v3LYhGv4p9qKtUU4kjz7tNtaHNwHm2lhlj_q
 
 messaggio_utente = ""
 memoria_fisica = {}
-gia_salutata = False
+volti_salutati = []        # Lista dinamica di chi ha già salutato
+timeout_volto_ignoto = 0   # Timer per non impazzire con i volti nuovi
 
 def carica_memoria():
     try:
@@ -78,7 +79,7 @@ def genera_codice_anima(contesto, dati_memoria):
         return "pass"
 
 def main():
-    global messaggio_utente, memoria_fisica, gia_salutata
+    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto
     memoria_fisica = carica_memoria()
     corpo = None; vista = None
     try:
@@ -109,9 +110,19 @@ def main():
                 mondo = mondo.replace(u"Ostacolo a sinistra.", u"C'è qualcosa a sinistra.")
                 mondo = mondo.replace(u"Ostacolo a destra.", u"C'è qualcosa a destra.")
 
-            if gia_salutata:
-                mondo = mondo.replace(u"Riconosco Giulia.", u"Giulia e' presente.")
-                mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
+            # --- SISTEMA SOCIALE MULTI-VOLTO ---
+            # ATTENZIONE: Questo blocco ora è ALLINEATO con l'if precedente, non dentro!
+            # 1. Nascondiamo solo le persone che ha già salutato (ignorando maiuscole/minuscole)
+            for nome in volti_salutati:
+                mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
+
+            if u"Vedo un volto ignoto." in mondo:
+                if time.time() - timeout_volto_ignoto < 15:
+                    mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
+                else:
+                    timeout_volto_ignoto = time.time()  # Resetta il timer e lascia passare il report
+
+            mondo = mondo.replace(u"  ", u" ").strip()
 
             if messaggio_utente:
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
@@ -119,7 +130,7 @@ def main():
 
             if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
                 corpo.fermati()
-                tempo_ultima_foto = time.time()  # Aggiorna il timer
+                tempo_ultima_foto = time.time()
                 if corpo.scatta_foto():
                     mondo += u" Vedo chiaramente: {}.".format(analizza_immagine("visione_nao.jpg"))
                     try:
@@ -127,15 +138,20 @@ def main():
                     except:
                         pass
 
-            if mondo != stato_precedente and mondo != "REPORT: ":
+            if mondo != stato_precedente and mondo.strip() != "REPORT:":
                 print(u"\n[SENSORI]: " + mondo)
                 azione = genera_codice_anima(mondo, memoria_fisica)
                 if azione != "pass":
                     print(u"[ANIMA]: " + azione)
-                    if "Ciao" in azione: gia_salutata = True
-                    try: exec (azione, {"corpo": corpo, "voce": voce, "vista": vista, "sistema": sistema, "True": True, "False": False})
-                    except Exception as e: print(u"Errore: " + str(e))
-                stato_precedente = mondo
+                    if "Ciao" in azione:
+                        match = re.search(r'Ciao (.*?)!', azione)
+                        if match:
+                            volti_salutati.append(match.group(1))
+                    try:
+                        exec (azione, {"corpo": corpo, "voce": voce, "vista": vista, "sistema": sistema, "True": True,
+                                       "False": False})
+                    except Exception as e:
+                        print(u"Errore: " + str(e))
             time.sleep(0.1)
     except KeyboardInterrupt: pass
     finally:
