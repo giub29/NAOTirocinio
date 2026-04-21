@@ -39,9 +39,10 @@ class NaoBody:
     def cammina(self, x, gira):
         self.motion.moveToward(x, 0.0, gira)
 
-    def gira(self, velocita):
-        """Fa ruotare il robot (velocità da -1.0 a 1.0)"""
-        self.motion.moveToward(0.0, 0.0, velocita)
+    def gira(self, angolo):
+        """Fa ruotare il robot di un angolo fisso (in radianti) e si FERMA da solo"""
+        self.motion.setStiffnesses("Body", 1.0)
+        self.motion.moveTo(0.0, 0.0, angolo)
 
     def sta_camminando(self):
         return self.motion.moveIsActive()

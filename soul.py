@@ -32,7 +32,6 @@ def analizza_immagine(percorso):
         return res.json()['choices'][0]['message']['content']
     except: return u"un oggetto ignoto"
 
-
 def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
@@ -44,21 +43,21 @@ def genera_codice_anima(contesto, dati_memoria):
         u"1. Rispondi SOLO con codice Python eseguibile. NIENTE testo libero.\n"
         u"2. Usa i DOPPI APICI per il testo, es: voce.parla(\"Testo\").\n\n"
         u"REGOLE SOCIALI:\n"
-        u"1. Se 'Riconosco [Nome]', saluta con voce.parla(\"Ciao [Nome]!\"). Se leggi 'e\\' presente', NON salutare più.\n"
-        u"2. Se 'volto ignoto', chiedi chi è. Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\");\n\n"
-        u"REGOLE DI SCHIVATA E NAVIGAZIONE (AUTONOMA):\n"
-        u"1. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio l'esplorazione!\");\n"
-        u"2. STOP: SE l'utente dice 'stop' o 'fermati', DEVI eseguire: corpo.fermati(); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo e mi riposo.\");\n"
+        u"1. SALUTO: Se 'Riconosco [Nome]', saluta con voce.parla(\"Ciao [Nome]!\") restando FERMO. Non muovere le gambe mentre parli.\n"
+        u"2. Se leggi 'e\\' presente', NON salutare più. Ignora il volto.\n"
+        u"3. Se 'volto ignoto', chiedi chi è. Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\");\n\n"
+        u"REGOLE DI SCHIVATA E NAVIGAZIONE (GERARCHIA RIGIDA):\n"
+        u"1. EMERGENZA UTENTE: SE leggi 'stop', 'fermati' o simili, IGNORA TUTTO: corpo.fermati(); corpo.guarda(0.0, 0.0); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo.\");\n"
+        u"2. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio l'esplorazione!\");\n"
         u"3. SCHIVATA LATERALE: SE stai camminando e leggi:\n"
-        u"   - 'Ostacolo a sinistra': DEVI curvare a destra con corpo.cammina(0.2, -0.4); voce.parla(\"Devio a destra.\");\n"
-        u"   - 'Ostacolo a destra': DEVI curvare a sinistra con corpo.cammina(0.2, 0.4); voce.parla(\"Devio a sinistra.\");\n"
-        u"4. FINE OSTACOLO: SE stavi curvando e il report NON mostra più ostacoli, DEVI rimetterti dritto: corpo.cammina(0.3, 0.0);\n"
-        u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', significa che ti sei fermato davanti a un muro/oggetto. DEVI aggirarlo ripartendo così: corpo.gira(1.0); corpo.cammina(0.3, 0.0); voce.parla(\"Cerco di aggirare questo ostacolo.\");\n"
-        u"6. SICUREZZA: Se sei FERMO, NON muovere mai le gambe per schivare ostacoli.\n\n"
-        u"REAZIONI FISICHE:\n"
-        u"- CAREZZA: esegui corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
-        u"- PIEDE SINISTRO: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi!\");\n"
-        u"- PIEDE DESTRO: corpo.gira(0.5) con il resto uguale.\n\n"
+        u"   - 'Ostacolo a sinistra': DEVI curvare a destra con corpo.cammina(0.2, -0.4);\n"
+        u"   - 'Ostacolo a destra': DEVI curvare a sinistra con corpo.cammina(0.2, 0.4);\n"
+        u"4. FINE OSTACOLO: SE E SOLO SE stavi già camminando in avanti e il report torna pulito, rimetterti dritto: corpo.cammina(0.3, 0.0). SE ERI FERMO, NON CAMMINARE.\n"
+        u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', esegui: corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo evitato, riprendo la marcia.\");\n\n"
+        u"REAZIONI FISICHE (ASSOLUTE):\n"
+        u"- CAREZZA: corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
+        u"- PIEDE SINISTRO: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
+        u"- PIEDE DESTRO: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
     )
@@ -100,6 +99,7 @@ def main():
         voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO e sono ai tuoi ordini.".format(memoria_fisica["nome_utente"]))
         stato_precedente = ""
 
+        tempo_ultima_foto = 0
         while True:
             mondo = sensi.ottieni_report_semantico()
 
@@ -117,13 +117,15 @@ def main():
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                 messaggio_utente = ""
 
-            if u"Ostacolo frontale" in mondo and corpo.sta_camminando():
+            if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
                 corpo.fermati()
+                tempo_ultima_foto = time.time()  # Aggiorna il timer
                 if corpo.scatta_foto():
                     mondo += u" Vedo chiaramente: {}.".format(analizza_immagine("visione_nao.jpg"))
-                    try: os.remove("visione_nao.jpg")
-                    except: pass
-                time.sleep(2.0)
+                    try:
+                        os.remove("visione_nao.jpg")
+                    except:
+                        pass
 
             if mondo != stato_precedente and mondo != "REPORT: ":
                 print(u"\n[SENSORI]: " + mondo)
