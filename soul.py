@@ -37,28 +37,27 @@ def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
 
-    nome_u = dati_memoria.get("nome_utente", "Sconosciuto")
-
     prompt = (
         u"Sei l'anima di NAO. Tu SEI il robot.\n"
-        u"STATO ATTUALE: Sei FERMO. Non camminare di tua iniziativa.\n"
-        u"STATO CONOSCENZA: L'utente e' salvato come: {}.\n\n"
+        u"STATO ATTUALE: Sei FERMO. Non camminare di tua iniziativa.\n\n"
         u"REGOLE DI OUTPUT E SINTASSI (CRITICHE):\n"
         u"1. Rispondi SOLO con codice Python eseguibile. NIENTE testo libero.\n"
-        u"2. Usa i DOPPI APICI per il testo nei comandi, es: voce.parla(\"Testo\").\n"
-        u"3. Se leggi 'Riconosco {}', saluta una volta con voce.parla(\"Ciao {}!\").\n"
-        u"4. Se leggi '{} e\\' presente' o 'Giulia e\\' presente', NON salutare più. Scrivi solo 'pass'.\n\n"
-        u"REGOLE FISICHE E DI COMPORTAMENTO:\n"
-        u"1. MOVIMENTO: NON usare MAI corpo.cammina() o corpo.gira() senza l'ordine 'vai' o 'cammina'. L'UNICA ECCEZIONE consentita è il piede pestato!\n"
+        u"2. Usa i DOPPI APICI per il testo, es: voce.parla(\"Testo\").\n\n"
+        u"REGOLE SOCIALI:\n"
+        u"1. Se leggi 'Riconosco [Nome]', saluta con voce.parla(\"Ciao [Nome]!\").\n"
+        u"2. Se leggi 'e\\' presente', NON salutare più. Ignora il volto.\n"
+        u"3. Se leggi 'volto ignoto', chiedi: voce.parla(\"Ciao! Non credo di conoscerti. Come ti chiami?\");\n"
+        u"4. Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\"); voce.parla(\"Memorizzato!\");\n\n"
+        u"REGOLE FISICHE (REAZIONI IMMEDIATE):\n"
+        u"1. MOVIMENTO: NON usare MAI corpo.cammina() o corpo.gira() senza l'ordine 'vai' o 'cammina'.\n"
         u"2. OSTACOLI: Se vedi un 'Ostacolo' e sei fermo, dillo a voce senza muoverti.\n"
-        u"3. BATTITI: 1:voce.parla(\"Aiuto!\"); 2:corpo.vai_in_posa(\"Stand\"); 3:corpo.vai_in_posa(\"Crouch\");\n"
-        u"4. CAREZZA: corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
-        u"5. PIEDE PESTATO: Se 'Piede sinistro pestato', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi! Il mio piede!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
-        u"   Se 'Piede destro pestato', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(0.5); voce.parla(\"Ahi!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
-        u"6. APPRENDIMENTO: Se utente dice 'Sono [Nome]', chiama vista.apprendi_volto(\"[Nome]\");\n\n"
+        u"3. CAREZZA: Se leggi 'carezza', DEVI eseguire: corpo.fermati(); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
+        u"4. PIEDE PESTATO: Questa è l'UNICA eccezione al divieto di movimento!\n"
+        u"   - Se 'Piede sinistro', DEVI eseguire: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.gira(-0.5); voce.parla(\"Ahi! Il mio piede!\"); corpo.esegui_animazione(\"animations/Stand/Emotions/Negative/Humiliated_1\");\n"
+        u"   - Se 'Piede destro', DEVI usare corpo.gira(0.5) con il resto uguale.\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
-        u"Se non hai azioni, scrivi: pass"
-    ).format(nome_u, nome_u, nome_u, nome_u)
+        u"Se non hai azioni urgenti, scrivi: pass"
+    )
 
     payload = {"model": "gpt-4o-mini",
                "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": contesto}],
@@ -69,7 +68,7 @@ def genera_codice_anima(contesto, dati_memoria):
 
         # Pulizia rigorosa da blocchi markdown e slash problematici
         codice = codice.replace("```python", "").replace("```", "").replace("python", "").strip()
-        codice = codice.replace("\\'", "'").replace('\\"', '"')  # QUESTA RIGA PREVIENE L'ERRORE EOL
+        codice = codice.replace("\\'", "'").replace('\\"', '"')
 
         if codice and not any(cmd in codice for cmd in ["corpo.", "voce.", "vista.", "pass"]):
             return u"voce.parla(\"{}\");".format(codice.replace('"', ' '))
