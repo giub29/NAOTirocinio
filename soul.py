@@ -67,8 +67,8 @@ def genera_codice_anima(contesto, dati_memoria):
         u"4. FINE OSTACOLO: SE E SOLO SE stavi già camminando in avanti e il report torna pulito, rimetterti dritto: corpo.cammina(0.3, 0.0). SE ERI FERMO, NON CAMMINARE.\n"
         u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', esegui: corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo evitato, riprendo la marcia.\");\n\n"
         u"REAZIONI FISICHE (ASSOLUTE):\n"
-        u"- CAREZZA: corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n"
-        u"- URTO TATTILE: corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n\n"
+        u"- SE IL REPORT CONTIENE 'URTO TATTILE': corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n"
+        u"- SE IL REPORT CONTIENE 'carezza sulla testa': corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
     )
