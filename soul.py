@@ -127,7 +127,7 @@ def main():
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
             if u"Vedo un volto ignoto." in mondo:
-                if time.time() - timeout_volto_ignoto < 15:
+                if time.time() - timeout_volto_ignoto < 30:
                     mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
                 else:
                     timeout_volto_ignoto = time.time()  # Resetta il timer e lascia passare il report
@@ -137,13 +137,16 @@ def main():
             if messaggio_utente:
                 cmd = messaggio_utente.lower().strip()
                 if cmd in ["cosa vedi", "descrivi la stanza", "cosa vedi?"]:
+                    # 1. MEMORIZZA LO STATO: Stava camminando prima che glielo chiedessi?
+                    stava_camminando = corpo.sta_camminando()
+
                     print(u"\n[Comando Esplorazione Ricevuto]")
                     corpo.fermati()
-                    corpo.guarda(0.0, -0.3)  # Look slightly up for a good view
-                    voce.parla("Un momento, sto analizzando l'ambiente.")
-                    time.sleep(1)  # Let the head settle
+                    corpo.guarda(0.0, -0.3)  # Guarda leggermente in alto
+                    voce.parla("Un momento, guardo cosa c'è intorno a me.")
+                    time.sleep(1)  # Aspetta che la testa si fermi
 
-                    if corpo.scatta_foto(camera_id=0):  # Use Top Camera
+                    if corpo.scatta_foto(camera_id=0):  # Usa la Camera Top
                         descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
                         voce.parla(u"Vedo: " + descrizione)
                         try:
@@ -153,9 +156,14 @@ def main():
                     else:
                         voce.parla("Scusa, ho un problema con i sensori visivi.")
 
-                    corpo.guarda(0.0, 0.0)  # Reset head
-                    messaggio_utente = ""  # Clear command so it doesn't loop
-                    mondo = "REPORT: "  # Skip normal processing for this cycle
+                    corpo.guarda(0.0, 0.0)  # Rimette la testa dritta
+                    messaggio_utente = ""
+                    mondo = "REPORT: "
+
+                    # 2. RIPARTENZA AUTONOMA: Se camminava prima, riparte ora!
+                    if stava_camminando:
+                        voce.parla("Riprendo l'esplorazione.")
+                        corpo.cammina(0.3, 0.0)
                 else:
                     mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                     messaggio_utente = ""
