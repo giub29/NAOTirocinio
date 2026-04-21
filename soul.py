@@ -11,9 +11,8 @@ CHIAVE_PRIVATA = "sk-proj-mVkErEUsfK2a4KQtJ8v3LYhGv4p9qKtUU4kjz7tNtaHNwHm2lhlj_q
 
 messaggio_utente = ""
 memoria_fisica = {}
-volti_salutati = []        # Lista dinamica di chi ha già salutato
-timeout_volto_ignoto = 0   # Timer per non impazzire con i volti nuovi
-
+volti_salutati = []
+timeout_volto_ignoto = 0
 def carica_memoria():
     try:
         with open('memoria.json', 'r') as f:
@@ -114,7 +113,6 @@ def main():
         while True:
             mondo = sensi.ottieni_report_semantico()
 
-            # Se NAO è fermo, rendiamo gli ostacoli meno "urgenti" per l'Anima
             if not corpo.sta_camminando():
                 mondo = mondo.replace(u"Ostacolo frontale molto vicino.", u"Vedo un ostacolo vicino, ma sono fermo.")
                 mondo = mondo.replace(u"Ostacolo a sinistra.", u"C'è qualcosa a sinistra.")
@@ -136,16 +134,17 @@ def main():
             if messaggio_utente:
                 cmd = messaggio_utente.lower().strip()
                 if cmd in ["cosa vedi", "descrivi la stanza", "cosa vedi?"]:
+
                     # 1. MEMORIZZA LO STATO: Stava camminando prima che glielo chiedessi?
                     stava_camminando = corpo.sta_camminando()
 
                     print(u"\n[Comando Esplorazione Ricevuto]")
                     corpo.fermati()
-                    corpo.guarda(0.0, -0.3)  # Guarda leggermente in alto
+                    corpo.guarda(0.0, -0.3)
                     voce.parla("Un momento, guardo cosa c'è intorno a me.")
                     time.sleep(1)  # Aspetta che la testa si fermi
 
-                    if corpo.scatta_foto(camera_id=0):  # Usa la Camera Top
+                    if corpo.scatta_foto(camera_id=0):
                         descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
                         voce.parla(u"Vedo: " + descrizione)
                         try:
@@ -156,7 +155,7 @@ def main():
                     else:
                         voce.parla("Scusa, ho un problema con i sensori visivi.")
 
-                    corpo.guarda(0.0, 0.0)  # Rimette la testa dritta
+                    corpo.guarda(0.0, 0.0)
                     messaggio_utente = ""
                     mondo = "REPORT: "
 
