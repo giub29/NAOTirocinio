@@ -23,8 +23,15 @@ class NaoBody:
         self.posture.goToPosture(posa, 0.5)
 
     def esegui_animazione(self, percorso):
+        # Induriamo i motori prima dell'animazione
+        self.motion.setStiffnesses("Body", 1.0)
         anim_proxy = ALProxy("ALAnimationPlayer", self.ip, self.port)
         anim_proxy.run(percorso)
+
+    def gira(self, velocita):
+        """Fa ruotare il robot attivando i motori"""
+        self.motion.setStiffnesses("Body", 1.0)
+        self.motion.moveToward(0.0, 0.0, velocita)
 
     def imposta_colore_occhi(self, colore):
         self.leds.fadeRGB("FaceLeds", colore, 0.1)

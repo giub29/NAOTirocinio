@@ -54,3 +54,13 @@ class NaoVision:
     def cancella_volti(self):
         """Pulisce il database dei volti memorizzati (opzionale)"""
         self.face_det.clearDatabase()
+
+    def disattiva_inseguimento_volto(self):
+        """Smette di seguire i volti e resetta la posizione della testa"""
+        try:
+            tracker = ALProxy("ALTracker", self.ip, self.port)
+            tracker.stopTracker()
+            tracker.unregisterAllTargets()
+            print("--- INSEGUIMENTO VOLTO DISATTIVATO ---")
+        except:
+            pass
