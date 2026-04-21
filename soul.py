@@ -21,17 +21,28 @@ def carica_memoria():
     except:
         return {"nome_utente": "Sconosciuto", "fatti_importanti": {"batteria": 100}}
 
-def analizza_immagine(percorso):
+
+def analizza_immagine(percorso, contesto="ostacolo"):
     try:
         with open(percorso, "rb") as f:
             img = base64.b64encode(f.read()).decode('utf-8')
         headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
+
+        # Decide the prompt based on context
+        if contesto == "stanza":
+            testo_prompt = "Descrivi l'ambiente che vedi davanti a te in una frase breve e naturale."
+            max_tok = 80
+        else:
+            testo_prompt = "Cosa vedi? Max 10 parole."
+            max_tok = 50
+
         payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": [
-            {"type": "text", "text": "Cosa vedi? Max 10 parole."},
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + img}}]}], "max_tokens": 50}
+            {"type": "text", "text": testo_prompt},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + img}}]}], "max_tokens": max_tok}
         res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=10)
         return res.json()['choices'][0]['message']['content']
-    except: return u"un oggetto ignoto"
+    except:
+        return u"un oggetto ignoto"
 
 def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
@@ -111,7 +122,6 @@ def main():
                 mondo = mondo.replace(u"Ostacolo a destra.", u"C'è qualcosa a destra.")
 
             # --- SISTEMA SOCIALE MULTI-VOLTO ---
-            # ATTENZIONE: Questo blocco ora è ALLINEATO con l'if precedente, non dentro!
             # 1. Nascondiamo solo le persone che ha già salutato (ignorando maiuscole/minuscole)
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
@@ -125,19 +135,41 @@ def main():
             mondo = mondo.replace(u"  ", u" ").strip()
 
             if messaggio_utente:
-                mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
-                messaggio_utente = ""
+                cmd = messaggio_utente.lower().strip()
+                if cmd in ["cosa vedi", "descrivi la stanza", "cosa vedi?"]:
+                    print(u"\n[Comando Esplorazione Ricevuto]")
+                    corpo.fermati()
+                    corpo.guarda(0.0, -0.3)  # Look slightly up for a good view
+                    voce.parla("Un momento, sto analizzando l'ambiente.")
+                    time.sleep(1)  # Let the head settle
+
+                    if corpo.scatta_foto(camera_id=0):  # Use Top Camera
+                        descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
+                        voce.parla(u"Vedo: " + descrizione)
+                        try:
+                            os.remove("visione_nao.jpg")
+                        except:
+                            pass
+                    else:
+                        voce.parla("Scusa, ho un problema con i sensori visivi.")
+
+                    corpo.guarda(0.0, 0.0)  # Reset head
+                    messaggio_utente = ""  # Clear command so it doesn't loop
+                    mondo = "REPORT: "  # Skip normal processing for this cycle
+                else:
+                    mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
+                    messaggio_utente = ""
 
             if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
                 corpo.fermati()
                 tempo_ultima_foto = time.time()
-                if corpo.scatta_foto():
-                    mondo += u" Vedo chiaramente: {}.".format(analizza_immagine("visione_nao.jpg"))
+                if corpo.scatta_foto(camera_id=1):
+                    mondo += u" Vedo chiaramente: {}.".format(analizza_immagine("visione_nao.jpg", contesto="ostacolo"))
                     try:
-                        os.remove("visione_nao.jpg")
+                        # os.remove("visione_nao.jpg")
+                        pass
                     except:
                         pass
-
             if mondo != stato_precedente and mondo.strip() != "REPORT:":
                 print(u"\n[SENSORI]: " + mondo)
                 azione = genera_codice_anima(mondo, memoria_fisica)
