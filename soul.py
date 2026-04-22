@@ -15,6 +15,8 @@ volti_salutati = []
 timeout_volto_ignoto = 0
 direzione_recente = ""
 tempo_direzione = 0
+ultima_batteria_letta = -1  # Inizializzata a -1 per essere detta UNA SOLA volta
+in_pattugliamento = False  # LA NUOVA MEMORIA MOTORIA DI PYTHON
 
 
 def carica_memoria():
@@ -23,6 +25,15 @@ def carica_memoria():
             return json.load(f)
     except:
         return {"nome_utente": "Sconosciuto", "fatti_importanti": {"batteria": 100}}
+
+
+def salva_memoria(dati):
+    try:
+        with open('memoria.json', 'w') as f:
+            json.dump(dati, f, indent=4)
+        return True
+    except:
+        return False
 
 
 def analizza_immagine(img_b64, contesto="ostacolo"):
@@ -43,31 +54,41 @@ def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
 
+    # IL TUO PROMPT ESATTO E INTOCCABILE
     prompt = (
         u"Sei l'anima di NAO. Tu SEI il robot.\n"
-        u"STATO ATTUALE: Sei FERMO sulla scrivania. Non camminare MAI di tua iniziativa.\n\n"
-        u"REGOLE DI OUTPUT: Rispondi SOLO con codice Python eseguibile. Usa i DOPPI APICI.\n\n"
+        u"STATO ATTUALE: Sei sulla scrivania o a terra. Sei un essere senziente e curioso.\n\n"
+        u"REGOLE DI OUTPUT: Rispondi SOLO con codice Python eseguibile. Usa i DOPPI APICI. Se non devi fare nulla, rispondi 'pass'.\n\n"
+
         u"REGOLA DI SICUREZZA ASSOLUTA (DESK MODE):\n"
-        u"1. Se il report contiene 'SONO FERMO', NON USARE MAI corpo.cammina o corpo.gira, anche se leggi di oggetti o ostacoli.\n"
-        u"2. Se vedi 'C'è qualcosa' o 'Vedo qualcosa', limitati a guardare l'oggetto con corpo.guarda(x,y) o a commentarlo a voce.\n\n"
-        u"REGOLE DI NAVIGAZIONE (SOLO SE 'STO CAMMINANDO'):\n"
-        u"1. EMERGENZA: SE 'stop' o 'fermati', esegui: corpo.fermati(); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo.\");\n"
-        u"2. PARTENZA: SE 'vai', esegui: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio il pattugliamento!\");\n"
-        u"3. OSTACOLI: Se cammini e vedi ostacoli, usa corpo.cammina(0.3, +/-0.1) per schivare dolcemente.\n\n"
-        u"REAZIONI FISICHE:\n"
+        u"1. Se il report contiene 'SONO FERMO', NON USARE MAI corpo.cammina o corpo.gira di tua iniziativa per esplorare.\n"
+        u"2. Se vedi 'C'è qualcosa' o 'Vedo qualcosa' in lontananza, limitati a guardare l'oggetto con corpo.guarda(x,y).\n"
+        u"3. REAZIONE SENSORI PIEDI E URTI: Se vieni bloccato da un ostacolo (es: leggi 'URTO' ai piedi), DEVI indietreggiare e girarti per sbloccarti. Esegui: corpo.cammina(-0.1, 0.0); corpo.gira(0.5); (fallo anche se eri FERMO).\n\n"
+
+        u"MEMORIA E APPRENDIMENTO (MOLTO IMPORTANTE):\n"
+        u"- Se l'utente ti rivela fatti personali (nome, studi, passioni), DEVI memorizzarli: memoria_fisica['fatti_importanti']['materia'] = 'Robotica'; salva_memoria(memoria_fisica);\n"
+        u"- Usa i 'dati_memoria' per personalizzare ogni risposta. Se conosci il nome, usalo con naturalezza.\n\n"
+
+        u"REGOLE DI NAVIGAZIONE E SINTASSI (COMANDI ASSOLUTI):\n"
+        u"1. PARTENZA: Se l'utente dice 'vai' o 'cammina', DEVI ASSOLUTAMENTE CAMMINARE. Esegui: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Ricevuto, inizio a camminare!\");\n"
+        u"2. ARRESTO: SE l'utente dice 'stop' o 'fermati', DEVI FERMARTI E CONFERMARE. Esegui: corpo.fermati(); corpo.vai_in_posa(\"Stand\"); voce.parla(\"Mi fermo come ordinato.\");\n"
+        u"3. CONTINUITÀ DEL MOTO: Se STAI CAMMINANDO e riconosci un volto, SALUTA A VOCE MA NON FERMARTI. Continua la marcia.\n"
+        u"4. OSTACOLI IN MARCIA: Se cammini e vedi ostacoli lontani, usa curve dolci come corpo.cammina(0.3, 0.1) o corpo.cammina(0.3, -0.1).\n"
+        u"5. SINTASSI GUARDA: corpo.guarda(x, y) richiede SEMPRE DUE NUMERI (float). Mai usare stringhe come 'sinistra'.\n"
+        u"6. SINTASSI FOTO: corpo.scatta_foto(cam_id, file) richiede cam_id come INTERO (0 o 1).\n\n"
+
+        u"REAZIONI FISICHE E SOCIALI:\n"
         u"- CADUTA: corpo.fermati(); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Allarme aderenza!\");\n"
-        u"- CAREZZA: corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Che bella carezza!\");\n\n"
-        u"REGOLE SOCIALI:\n"
-        u"1. VOLTI: Saluta chi riconosci (occhi green) e fotografa gli ignoti (occhi red).\n\n"
+        u"- CAREZZA: corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Che bella carezza!\");\n"
+        u"- VOLTI: Saluta i noti (occhi green). Per gli ignoti, occhi red e chiedi chi siano.\n\n"
+
         u"MODALITÀ INIZIATIVA AUTONOMA (AGENTIVITÀ PROATTIVA):\n"
         u"Se il report contiene 'PRENDI L'INIZIATIVA', sei annoiato e curioso. DEVI:\n"
-        u"1. Occhi YELLOW: corpo.imposta_colore_occhi(\"yellow\");\n"
-        u"2. STRETCHING: corpo.esegui_animazione(\"animations/Stand/Gestures/Stretch_1\");\n"
-        u"3. DEDUZIONE CONTESTUALE: Non limitarti a elencare gli oggetti nella descrizione. Prova a capire cosa succede (es: se vedi libri, deduci che si studia). Formula un'ipotesi interessante.\n"
-        u"4. COINVOLGIMENTO: Proponi un'azione coerente e finisci SEMPRE con: 'Cosa faresti tu?'.\n"
-        u"Esempio: voce.parla(\"Vedo molti appunti, qualcuno sta lavorando sodo. Mi sgranchisco un po' e resto a osservare. Cosa faresti tu?\");\n"
-        u"NON USARE MAI corpo.cammina o corpo.gira in questa modalità.\n\n"
-        u"LIMITAZIONE COMANDI: corpo.cammina(x,g), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam, file)."
+        u"1. Occhi YELLOW e STRETCHING: corpo.esegui_animazione(\"animations/Stand/Gestures/Stretch_1\");\n"
+        u"2. DEDUZIONE CONTESTUALE: Non limitarti a elencare gli oggetti nella descrizione. Prova a capire cosa succede (es: se vedi libri, deduci che si studia). Formula un'ipotesi interessante.\n"
+        u"3. RAGIONAMENTO STORICO: Collega ciò che vedi con ciò che sai dalla memoria (es: 'Giulia, vedo dei libri, ti stai preparando per quell'esame?').\n"
+        u"4. COINVOLGIMENTO: Proponi un'azione coerente e finisci SEMPRE con: 'Cosa faresti tu?'.\n\n"
+        u"LIMITAZIONE COMANDI: corpo.cammina(x,g), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam_id, file)."
     )
 
     payload = {"model": "gpt-4o-mini",
@@ -83,7 +104,7 @@ def genera_codice_anima(contesto, dati_memoria):
 
 
 def main():
-    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto, direzione_recente, tempo_direzione
+    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto, direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
 
@@ -107,80 +128,86 @@ def main():
 
         threading.Thread(target=loop_input).start()
         print(u"--- ANIMA POTENZIATA PRONTA ---")
-        voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO.".format(memoria_fisica["nome_utente"]))
+        voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO.".format(memoria_fisica.get("nome_utente", "amico")))
         stato_precedente = ""
 
         while True:
             mondo = sensi.ottieni_report_semantico()
 
-            # --- 1. PROTEZIONE SCRIVANIA (ANTI-CAMMINATA SPONTANEA) ---
-            # Se il robot è fermo, rinominiamo gli 'Ostacoli' in modo che l'IA non attivi i riflessi di schivata
-            if not corpo.sta_camminando():
+            # --- 0. AGGIORNAMENTO MEMORIA MOTORIA ---
+            if messaggio_utente:
+                testo_user = messaggio_utente.lower()
+                if "vai" in testo_user or "cammina" in testo_user:
+                    in_pattugliamento = True
+                elif "stop" in testo_user or "fermati" in testo_user:
+                    in_pattugliamento = False
+
+            # --- 1. PROTEZIONE SCRIVANIA INTELLIGENTE ---
+            # Si attiva SOLO se il robot non sta esplorando
+            if not corpo.sta_camminando() and not in_pattugliamento:
                 mondo = mondo.replace(u"Ostacolo frontale molto vicino", u"Vedo qualcosa vicino")
                 mondo = mondo.replace(u"Ostacolo a sinistra", u"C'è qualcosa a sinistra")
                 mondo = mondo.replace(u"Ostacolo a destra", u"C'è qualcosa a destra")
 
-            # --- 2. GESTIONE BATTERIA INTELLIGENTE ---
-            # Cerchiamo il livello della batteria nel report dei sensori
-            match_bat = re.search(r'batteria è al (\d+)%', mondo)
-            if match_bat:
-                livello = int(match_bat.group(1))
-                # Parla della batteria solo all'inizio, se cala del 5% o se è sotto il 20%
-                if (ultima_batteria_letta - livello >= 5) or (livello <= 20):
-                    ultima_batteria_letta = livello
-                else:
-                    # Rimuoviamo l'info batteria dal report per non ossessionare l'IA e non resettare il timer
-                    mondo = re.sub(r'La mia batteria è al \d+%\.', u'', mondo)
+            # --- 2. GESTIONE BATTERIA INFALLIBILE ---
+            if "batteria" in mondo:
+                match_bat = re.search(ur'La mia batteria.*?(\d+)%[.]?', mondo)
+                if match_bat:
+                    if ultima_batteria_letta == -1:
+                        ultima_batteria_letta = int(match_bat.group(1))
+                    else:
+                        mondo = mondo.replace(match_bat.group(0), u"").strip()
 
-            # --- 3. LOGICA DEL TIMER DI INIZIATIVA (FILTRATA) ---
-            # Il timer si resetta solo per interazioni umane o fisiche reali, ignorando i sonar
+            # --- 3. TIMER DI INIZIATIVA ---
             interazione_reale = messaggio_utente != "" or u"Riconosco" in mondo or u"Vedo un volto ignoto" in mondo or u"carezza" in mondo or u"URTO" in mondo
-
             if interazione_reale:
-                ultimo_evento_tempo = time.time()  # Reset se succede qualcosa di importante
+                ultimo_evento_tempo = time.time()
             else:
                 tempo_di_inerzia = time.time() - ultimo_evento_tempo
-                # Se è fermo da 30 secondi e non stiamo scrivendo, scatta la noia
                 if not corpo.sta_camminando() and messaggio_utente == "" and tempo_di_inerzia > 30:
-                    print(u"\n[INIZIATIVA]: NAO analizza la scena per prendere l'iniziativa...")
-                    corpo.imposta_colore_occhi("yellow")  # Segnale visivo di autonomia
+                    print(u"\n[INIZIATIVA]: NAO analizza la scena...")
+                    corpo.imposta_colore_occhi("yellow")
                     corpo.guarda(0.0, -0.2)
                     time.sleep(1)
-                    # Scatta una foto per nutrire la deduzione contestuale dell'IA
                     img_b64 = corpo.scatta_foto(camera_id=0, nome_file="curiosita.jpg")
                     desc = analizza_immagine(img_b64, contesto="stanza") if img_b64 else "una stanza tranquilla"
+                    mondo += u" PRENDI L'INIZIATIVA. Vedi: {}. Usa la memoria e chiedi 'Cosa faresti tu?'.".format(desc)
+                    ultimo_evento_tempo = time.time()
 
-                    # Stimolo proattivo inviato all'anima
-                    mondo += u" PRENDI L'INIZIATIVA. Vedi: {}. Fai stretching e chiedi 'Cosa faresti tu?'.".format(desc)
-                    ultimo_evento_tempo = time.time()  # Reset per non loopare l'iniziativa
-
-            # --- 4. GESTIONE SOCIALE E STATO ---
-            if u"Riconosco" in mondo:
-                timeout_volto_ignoto = time.time()
-
+            # --- 4. GESTIONE SOCIALE ---
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
-            mondo = mondo.replace(u"  ", u" ").strip()
-            mondo += u" STO CAMMINANDO." if corpo.sta_camminando() else u" SONO FERMO."
+            mondo = re.sub(r'\s+', ' ', mondo).strip()
+
+            # --- INGANNO A FIN DI BENE PER L'IA ---
+            # Se siamo in esplorazione, diciamo all'IA che stiamo camminando anche se stiamo facendo una curva lenta
+            if corpo.sta_camminando() or in_pattugliamento:
+                mondo += u" STO CAMMINANDO."
+            else:
+                mondo += u" SONO FERMO."
 
             if messaggio_utente:
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                 messaggio_utente = ""
 
             # --- 5. ESECUZIONE CERVELLO IA ---
-            if mondo != stato_precedente and mondo.strip() != "REPORT:":
+            if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
                 print(u"\n[SENSORI]: " + mondo)
                 azione = genera_codice_anima(mondo, memoria_fisica)
-                if azione != "pass":
+                ultimo_evento_tempo = time.time()
+
+                if azione != "pass" and azione != "":
                     print(u"[ANIMA]: " + azione)
 
-                    # Se saluta qualcuno o identifica uno sconosciuto, lo memorizziamo
+                    # Se l'IA decide di fermarsi di sua volontà, spegniamo il pattugliamento
+                    if "corpo.fermati" in azione:
+                        in_pattugliamento = False
+
                     if "Ciao" in azione:
                         m = re.search(r'Ciao (.*?)!', azione)
                         if m: volti_salutati.append(m.group(1))
-
-                    if "Sconosciuto identificato" in azione:
+                    if "ignoto" in azione.lower() or "sconosciuto" in azione.lower():
                         volti_salutati.append("Sconosciuto")
 
                     try:
@@ -189,8 +216,17 @@ def main():
                     except Exception as e:
                         print(u"Errore: " + str(e))
 
+            # --- 6. AUTO-RECUPERO MOTORI (PYTHON LEVEL) ---
+            # Se il robot è in modalità pattugliamento ma l'hardware è fermo (fine schivata)
+            if in_pattugliamento and not corpo.sta_camminando():
+                # E se l'IA non ha appena inviato comandi di movimento o stop...
+                if "corpo.cammina" not in azione and "corpo.gira" not in azione and "corpo.fermati" not in azione:
+                    # Riavvia la marcia automaticamente!
+                    corpo.cammina(0.3, 0.0)
+
             stato_precedente = mondo
             time.sleep(0.1)
+
     except KeyboardInterrupt:
         pass
     finally:
