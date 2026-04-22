@@ -49,9 +49,12 @@ class NaoSenses:
         # 3. SONAR (Ostacoli)
         dist_l = self.memory.getData("Device/SubDeviceList/US/Left/Sensor/Value")
         dist_r = self.memory.getData("Device/SubDeviceList/US/Right/Sensor/Value")
-        if dist_l < 0.6 and dist_r < 0.6: eventi.append(u"Ostacolo frontale molto vicino.")
-        elif dist_l < 0.6: eventi.append(u"Ostacolo a sinistra.")
-        elif dist_r < 0.6: eventi.append(u"Ostacolo a destra.")
+        if dist_l < 0.6 and dist_r < 0.6:
+            eventi.append(u"Ostacolo frontale molto vicino.")
+        elif dist_l < 0.55:
+            eventi.append(u"Ostacolo a sinistra.")
+        elif dist_r < 0.55:
+            eventi.append(u"Ostacolo a destra.")
 
         # 4. TESTA (Carezza)
         if self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value") > 0:
@@ -66,6 +69,18 @@ class NaoSenses:
         if lb_left > 0 or lb_right > 0 or rb_left > 0 or rb_right > 0:
             if tempo_attuale - self.ultimo_urto > 5:  # Ignora altri urti per 5 secondi!
                 eventi.append(u"URTO TATTILE! Ostacolo invisibile colpito.")
+                self.ultimo_urto = tempo_attuale
+
+        # 6. SENSORI DI PESO A TERRA (FSR - Rilevamento vuoto o sollevamento)
+        peso_sx = self.memory.getData("Device/SubDeviceList/LFoot/FSR/TotalWeight/Sensor/Value")
+        peso_dx = self.memory.getData("Device/SubDeviceList/RFoot/FSR/TotalWeight/Sensor/Value")
+        peso_totale = peso_sx + peso_dx
+
+        # Se il peso totale scende sotto 1 kg, il robot ha perso aderenza col suolo
+        # (gradino in discesa, buca, o è stato sollevato)
+        if peso_totale < 0.4:
+            if tempo_attuale - self.ultimo_urto > 4:
+                eventi.append(u"PERICOLO CADUTA! Pavimento mancante o sollevamento.")
                 self.ultimo_urto = tempo_attuale
 
         return u"REPORT: " + u" ".join(eventi)

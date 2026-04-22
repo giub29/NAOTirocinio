@@ -13,6 +13,8 @@ messaggio_utente = ""
 memoria_fisica = {}
 volti_salutati = []
 timeout_volto_ignoto = 0
+direzione_recente = ""
+tempo_direzione = 0
 
 
 def carica_memoria():
@@ -54,19 +56,20 @@ def genera_codice_anima(contesto, dati_memoria):
         u"1. Rispondi SOLO con codice Python eseguibile. NIENTE testo libero.\n"
         u"2. Usa i DOPPI APICI per il testo, es: voce.parla(\"Testo\").\n\n"
         u"REGOLE DI SCHIVATA E NAVIGAZIONE (GERARCHIA RIGIDA):\n"
-        u"1. EMERGENZA UTENTE: SE leggi 'stop', 'fermati' o simili, IGNORA TUTTO: corpo.fermati(); corpo.guarda(0.0, 0.0); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo.\");\n"
+        u"1. EMERGENZA UTENTE: SE leggi 'stop', 'fermati' (anche ripetuto come 'fermatifermati'), IGNORA TUTTO: corpo.fermati(); corpo.guarda(0.0, 0.0); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo.\");\n"
         u"2. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.guarda(0.0, -0.3); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio l'esplorazione!\");\n"
         u"3. SCHIVATA LATERALE: SE stai camminando e leggi:\n"
-        u"   - 'Ostacolo a sinistra': DEVI curvare a destra con corpo.cammina(0.2, -0.4);\n"
-        u"   - 'Ostacolo a destra': DEVI curvare a sinistra con corpo.cammina(0.2, 0.4);\n"
-        u"4. FINE OSTACOLO: SE E SOLO SE stavi già camminando in avanti e il report torna pulito, rimetterti dritto: corpo.cammina(0.3, 0.0). SE ERI FERMO, NON CAMMINARE.\n"
-        u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', esegui: corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo evitato, riprendo la marcia.\");\n\n"
+        u"   - 'Ostacolo a sinistra': Fai una curva molto dolce a destra: corpo.cammina(0.3, -0.1);\n"
+        u"   - 'Ostacolo a destra': Fai una curva molto dolce a sinistra: corpo.cammina(0.3, 0.1);\n"
+        u"4. FINE OSTACOLO: SE il report torna pulito e non leggi ostacoli, rimetterti dritto: corpo.cammina(0.3, 0.0);\n"
+        u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', gira SOLO di 45 gradi (0.8 radianti) per non perdere la direzione: Se l'ultimo era a 'sinistra', esegui corpo.gira(-0.8); altrimenti corpo.gira(0.8); poi corpo.cammina(0.3, 0.0); voce.parla(\"Schivo e proseguo.\");\n\n"
         u"REAZIONI FISICHE (GERARCHIA ASSOLUTA E INCONDIZIONATA):\n"
+        u"- SE IL REPORT CONTIENE 'PERICOLO CADUTA': corpo.fermati(); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Allarme aderenza! Mi metto in sicurezza.\");\n"
         u"- SE IL REPORT CONTIENE 'URTO TATTILE': corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n"
         u"- SE IL REPORT CONTIENE 'carezza sulla testa': corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n\n"
-        u"REGOLE SOCIALI (PER ESAME E PROFESSORE):\n"
-        u"1. VOLTO NOTO: Se 'Riconosco [Nome]', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"green\"); voce.parla(\"Ciao [Nome]!\"); corpo.cammina(0.3, 0.0);\n"
-        u"2. VOLTO IGNOTO: Se 'Vedo un volto ignoto', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.scatta_foto(0, \"sconosciuto.jpg\"); voce.parla(\"Sconosciuto rilevato. Procedo.\"); corpo.cammina(0.3, 0.0);\n"
+        u"REGOLE SOCIALI:\n"
+        u"1. VOLTO NOTO: Se 'Riconosco [Nome]', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"green\"); voce.parla(\"Ciao [Nome]!\"); Se il report contiene 'STO CAMMINANDO', aggiungi corpo.cammina(0.3, 0.0);\n"
+        u"2. VOLTO IGNOTO: Se 'Vedo un volto ignoto', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.scatta_foto(0, \"sconosciuto.jpg\"); voce.parla(\"Sconosciuto identificato. Procedo.\"); Se il report contiene 'STO CAMMINANDO', aggiungi corpo.cammina(0.3, 0.0);\n"
         u"3. APPRENDIMENTO: Se l'utente dice 'Sono [Nome]', esegui: corpo.fermati(); vista.apprendi_volto(\"[Nome]\"); corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Piacere di conoscerti [Nome].\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam, file).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
@@ -89,7 +92,7 @@ def genera_codice_anima(contesto, dati_memoria):
 
 
 def main():
-    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto
+    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto, direzione_recente, tempo_direzione
     memoria_fisica = carica_memoria()
     corpo = None;
     vista = None
@@ -136,7 +139,7 @@ def main():
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
-            # 3. Gestione Sconosciuti protetta dal timer
+            # 3. Gestione Sconosciuti
             if u"Vedo un volto ignoto." in mondo:
                 if time.time() - timeout_volto_ignoto < 30:
                     mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
@@ -144,6 +147,24 @@ def main():
                     timeout_volto_ignoto = time.time()
 
             mondo = mondo.replace(u"  ", u" ").strip()
+
+            # --- CONSAPEVOLEZZA DEL MOVIMENTO ---
+            if corpo.sta_camminando():
+                mondo += u" STO CAMMINANDO."
+            else:
+                mondo += u" SONO FERMO."
+
+            # --- MEMORIA SPAZIALE (Anti-Incastro) ---
+            if u"Ostacolo a sinistra" in mondo:
+                direzione_recente = "sinistra"
+                tempo_direzione = time.time()
+            elif u"Ostacolo a destra" in mondo:
+                direzione_recente = "destra"
+                tempo_direzione = time.time()
+
+            # Se si ricorda un ostacolo nei 6 secondi precedenti, lo sussurra all'IA
+            if time.time() - tempo_direzione < 6 and direzione_recente != "":
+                mondo += u" [MEMORIA LOCALE: Ultimo ostacolo schivato a {}.]".format(direzione_recente)
 
             # --- COMANDI UTENTE ---
             if messaggio_utente:
@@ -188,9 +209,16 @@ def main():
                 azione = genera_codice_anima(mondo, memoria_fisica)
                 if azione != "pass":
                     print(u"[ANIMA]: " + azione)
+
+                    # LOGICA DI SALVATAGGIO VOLTO AUTOMATICA
                     if "Ciao" in azione:
                         match = re.search(r'Ciao (.*?)!', azione)
                         if match: volti_salutati.append(match.group(1))
+
+                    # Se ha identificato uno sconosciuto, lo aggiungiamo alla lista 'Sconosciuto'
+                    if "Sconosciuto identificato" in azione:
+                        volti_salutati.append("Sconosciuto")
+
                     try:
                         exec (azione, {"corpo": corpo, "voce": voce, "vista": vista, "sistema": sistema, "True": True,
                                        "False": False})
