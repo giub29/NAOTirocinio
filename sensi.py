@@ -8,13 +8,14 @@ class NaoSenses:
         self.ultimo_timestamp_audio = 0
         self.contatore_battiti = 0
         self.ultimo_battito_rilevato = 0
-        self.finestra_ascolto = 1.5 # Tempo per finire di contare i battiti
+        self.finestra_ascolto = 1.5  # Tempo per finire di contare i battiti
         self.ultimo_urto = 0
 
         try:
             self.sonar = ALProxy("ALSonar", ip, port)
             self.sonar.subscribe("SensiAnima")
-        except: pass
+        except:
+            pass
 
     def ottieni_report_semantico(self):
         eventi = []
@@ -35,7 +36,6 @@ class NaoSenses:
         # 2. GESTIONE BATTITI (Suoni 1-2-3)
         dati_audio = self.memory.getData("SoundDetected")
         if dati_audio and len(dati_audio) > 0:
-            # Calcoliamo il timestamp del suono
             timestamp_audio = dati_audio[0][0] + dati_audio[0][1] * 1e-6
             if timestamp_audio > self.ultimo_timestamp_audio:
                 self.ultimo_timestamp_audio = timestamp_audio
@@ -46,7 +46,7 @@ class NaoSenses:
             eventi.append(u"Sento {} battiti di mani.".format(self.contatore_battiti))
             self.contatore_battiti = 0
 
-        # 3. SONAR (Ostacoli)
+        # 3. SONAR (Ostacoli frontali e diagonali)
         dist_l = self.memory.getData("Device/SubDeviceList/US/Left/Sensor/Value")
         dist_r = self.memory.getData("Device/SubDeviceList/US/Right/Sensor/Value")
         if dist_l < 0.6 and dist_r < 0.6:
@@ -56,19 +56,28 @@ class NaoSenses:
         elif dist_r < 0.55:
             eventi.append(u"Ostacolo a destra.")
 
-        # 4. TESTA (Carezza)
+        # 4. TESTA E BRACCIA LATERALI (Carezze e incastri)
         if self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value") > 0:
             eventi.append(u"Sento una carezza sulla testa.")
 
-        # 5. PARAURTI TATTILI (Foot Bumpers - Anticollisione di emergenza)
+        # --- NUOVO: SENSORI MANI (Funzionano da "paraurti" laterali per le braccia) ---
+        mano_sx = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
+        mano_dx = self.memory.getData("Device/SubDeviceList/RHand/Touch/Back/Sensor/Value")
+        if mano_sx > 0 or mano_dx > 0:
+            if tempo_attuale - self.ultimo_urto > 5:
+                lato = "sinistra" if mano_sx > 0 else "destra"
+                eventi.append(u"URTO LATERALE a {}! Braccio bloccato.".format(lato))
+                self.ultimo_urto = tempo_attuale
+
+        # 5. PARAURTI TATTILI (Foot Bumpers - Anticollisione di emergenza piedi)
         lb_left = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value")
         lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
         rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
         rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
 
         if lb_left > 0 or lb_right > 0 or rb_left > 0 or rb_right > 0:
-            if tempo_attuale - self.ultimo_urto > 5:  # Ignora altri urti per 5 secondi!
-                eventi.append(u"URTO TATTILE! Ostacolo invisibile colpito.")
+            if tempo_attuale - self.ultimo_urto > 5:
+                eventi.append(u"URTO TATTILE! Ostacolo ai piedi.")
                 self.ultimo_urto = tempo_attuale
 
         # 6. SENSORI DI PESO A TERRA (FSR - Rilevamento vuoto o sollevamento)
@@ -76,8 +85,6 @@ class NaoSenses:
         peso_dx = self.memory.getData("Device/SubDeviceList/RFoot/FSR/TotalWeight/Sensor/Value")
         peso_totale = peso_sx + peso_dx
 
-        # Se il peso totale scende sotto 1 kg, il robot ha perso aderenza col suolo
-        # (gradino in discesa, buca, o è stato sollevato)
         if peso_totale < 0.4:
             if tempo_attuale - self.ultimo_urto > 4:
                 eventi.append(u"PERICOLO CADUTA! Pavimento mancante o sollevamento.")
