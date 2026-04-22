@@ -65,9 +65,9 @@ def genera_codice_anima(contesto, dati_memoria):
         u"- SE IL REPORT CONTIENE 'URTO TATTILE': corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n"
         u"- SE IL REPORT CONTIENE 'carezza sulla testa': corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n\n"
         u"REGOLE SOCIALI (PER ESAME E PROFESSORE):\n"
-        u"1. VOLTO NOTO: Se 'Riconosco [Nome]', FERMATI (se camminavi), esegui corpo.imposta_colore_occhi(\"green\"); voce.parla(\"Ciao [Nome]!\").\n"
-        u"2. VOLTO IGNOTO: Se 'Vedo un volto ignoto', FERMATI (se camminavi), esegui corpo.imposta_colore_occhi(\"red\"); corpo.scatta_foto(0, \"sconosciuto.jpg\"); voce.parla(\"Chi sei?\").\n"
-        u"3. APPRENDIMENTO: Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\"); corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Piacere di conoscerti [Nome].\");\n\n"
+        u"1. VOLTO NOTO: Se 'Riconosco [Nome]', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"green\"); voce.parla(\"Ciao [Nome]!\"); corpo.cammina(0.3, 0.0);\n"
+        u"2. VOLTO IGNOTO: Se 'Vedo un volto ignoto', esegui: corpo.fermati(); corpo.imposta_colore_occhi(\"red\"); corpo.scatta_foto(0, \"sconosciuto.jpg\"); voce.parla(\"Sconosciuto rilevato. Procedo.\"); corpo.cammina(0.3, 0.0);\n"
+        u"3. APPRENDIMENTO: Se l'utente dice 'Sono [Nome]', esegui: corpo.fermati(); vista.apprendi_volto(\"[Nome]\"); corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Piacere di conoscerti [Nome].\");\n\n"
         u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam, file).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
     )
@@ -128,9 +128,15 @@ def main():
                 mondo = mondo.replace(u"Ostacolo a destra.", u"C'è qualcosa a destra.")
 
             # --- SISTEMA SOCIALE MULTI-VOLTO ---
+            # 1. Se riconosco un amico, azzero il timer degli sconosciuti per non allarmarmi subito dopo!
+            if u"Riconosco" in mondo:
+                timeout_volto_ignoto = time.time()
+
+            # 2. Nascondiamo le persone che ha già salutato
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
+            # 3. Gestione Sconosciuti protetta dal timer
             if u"Vedo un volto ignoto." in mondo:
                 if time.time() - timeout_volto_ignoto < 30:
                     mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
@@ -168,14 +174,13 @@ def main():
                     mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                     messaggio_utente = ""
 
-                    # --- GESTIONE OSTACOLO FRONTALE ---
-                    if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (
-                            time.time() - tempo_ultima_foto > 15):
-                        corpo.fermati()
-                        tempo_ultima_foto = time.time()
-                        img_b64 = corpo.scatta_foto(camera_id=1)  # Scatta dalla bocca in RAM!
-                        if img_b64:
-                            mondo += u" Vedo chiaramente: {}.".format(analizza_immagine(img_b64, contesto="ostacolo"))
+            # --- GESTIONE OSTACOLO FRONTALE ---
+            if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
+                corpo.fermati()
+                tempo_ultima_foto = time.time()
+                img_b64 = corpo.scatta_foto(camera_id=1)  # Scatta dalla bocca in RAM!
+                if img_b64:
+                    mondo += u" Vedo chiaramente: {}.".format(analizza_immagine(img_b64, contesto="ostacolo"))
 
             # --- ESECUZIONE CERVELLO IA ---
             if mondo != stato_precedente and mondo.strip() != "REPORT:":
