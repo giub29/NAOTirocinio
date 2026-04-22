@@ -62,17 +62,17 @@ def genera_codice_anima(contesto, dati_memoria):
         u"REGOLA DI SICUREZZA ASSOLUTA (DESK MODE):\n"
         u"1. Se il report contiene 'SONO FERMO', NON USARE MAI corpo.cammina o corpo.gira di tua iniziativa per esplorare.\n"
         u"2. Se vedi 'C'è qualcosa' o 'Vedo qualcosa' in lontananza, limitati a guardare l'oggetto con corpo.guarda(x,y).\n"
-        u"3. REAZIONE URTI E INCASTRI: Se leggi 'URTO TATTILE' ai piedi o 'URTO LATERALE' alle braccia, DEVI indietreggiare e girarti per sbloccarti. Esegui: corpo.cammina(-0.1, 0.0); corpo.gira(0.25); (fallo anche se eri FERMO).\n\n"
+        u"3. REAZIONE URTI E INCASTRI: Se leggi 'URTO TATTILE' ai piedi o 'URTO LATERALE' alle braccia, DEVI fare una micro-schivata per sbloccarti. Esegui: corpo.cammina(-0.1, 0.0); corpo.gira(0.1); (fallo anche se eri FERMO).\n\n"
 
         u"MEMORIA E APPRENDIMENTO (MOLTO IMPORTANTE):\n"
-        u"- Se l'utente ti rivela fatti personali (nome, studi, passioni), DEVI memorizzarli: memoria_fisica['fatti_importanti']['materia'] = 'Robotica'; salva_memoria(memoria_fisica);\n"
-        u"- Usa i 'dati_memoria' per personalizzare ogni risposta. Se conosci il nome, usalo con naturalezza.\n\n"
+        u"- Se l'utente ti rivela fatti personali, DEVI memorizzarli: memoria_fisica['fatti_importanti']['materia'] = 'Robotica'; salva_memoria(memoria_fisica);\n"
+        u"- Usa i 'dati_memoria' per personalizzare ogni risposta.\n\n"
 
         u"REGOLE DI NAVIGAZIONE E SINTASSI (COMANDI ASSOLUTI):\n"
         u"1. PARTENZA: Se l'utente dice 'vai' o 'cammina', DEVI ASSOLUTAMENTE CAMMINARE. Esegui: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Ricevuto, inizio a camminare!\");\n"
         u"2. ARRESTO: SE l'utente dice 'stop' o 'fermati', DEVI FERMARTI E CONFERMARE. Esegui: corpo.fermati(); corpo.vai_in_posa(\"Stand\"); voce.parla(\"Mi fermo come ordinato.\");\n"
-        u"3. CONTINUITÀ DEL MOTO: Se STAI CAMMINANDO e riconosci un volto, SALUTA A VOCE MA NON FERMARTI. Continua la marcia.\n"
-        u"4. OSTACOLI IN MARCIA: Se cammini e leggi 'Ostacolo a sinistra', curva eseguendo corpo.cammina(0.3, -0.2). Se leggi 'Ostacolo a destra', esegui corpo.cammina(0.3, 0.2). Se leggi 'Ostacolo frontale', indietreggia e gira: corpo.cammina(-0.1, 0.0); corpo.gira(0.5).\n"
+        u"3. CONTINUITÀ DEL MOTO: Se STAI CAMMINANDO e riconosci un volto, SALUTA A VOCE MA NON FERMARTI.\n"
+        u"4. OSTACOLI IN MARCIA (MICRO-CORREZIONI): Se cammini e leggi 'Ostacolo a sinistra', mantieni la traiettoria deviando appena di un soffio: corpo.cammina(0.3, -0.05). Se leggi 'Ostacolo a destra', devia appena: corpo.cammina(0.3, 0.05). Se leggi 'Ostacolo frontale', fai un piccolo passo indietro e scarta: corpo.cammina(-0.1, 0.0); corpo.gira(0.1).\n"
         u"5. SINTASSI GUARDA E FOTO: corpo.guarda(x,y) richiede DUE NUMERI. corpo.scatta_foto(cam_id, file) richiede cam_id come INTERO (0 o 1).\n\n"
 
         u"REAZIONI FISICHE E SOCIALI:\n"
@@ -143,9 +143,9 @@ def main():
                     in_pattugliamento = True
                 elif "stop" in testo_user or "fermati" in testo_user:
                     in_pattugliamento = False
-                    corpo.fermati()  # <-- FRENO A MANO ISTANTANEO PYTHON! Non aspetta l'IA.
+                    corpo.fermati()
 
-            # --- 1. PROTEZIONE SCRIVANIA INTELLIGENTE ---
+                    # --- 1. PROTEZIONE SCRIVANIA INTELLIGENTE ---
             if not corpo.sta_camminando() and not in_pattugliamento:
                 mondo = mondo.replace(u"Ostacolo frontale molto vicino", u"Vedo qualcosa vicino")
                 mondo = mondo.replace(u"Ostacolo a sinistra", u"C'è qualcosa a sinistra")
