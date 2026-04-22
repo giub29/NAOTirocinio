@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from naoqi import ALProxy
-import vision_definitions
+import os
+import io
+import base64
 from PIL import Image
 
 class NaoBody:
@@ -58,25 +60,45 @@ class NaoBody:
             self.motion.angleInterpolationWithSpeed("HeadPitch", y, 0.2)
         except: pass
 
-    def scatta_foto(self, camera_id=0, nome_file="visione_nao.jpg"):
+    def scatta_foto(self, camera_id=0, nome_file=None):
         name_id = ""
         try:
             cam_proxy = ALProxy("ALVideoDevice", self.ip, self.port)
-            try: cam_proxy.setParam(18, camera_id)
-            except: pass
+            try:
+                cam_proxy.setParam(18, camera_id)
+            except:
+                pass
 
             name_id = cam_proxy.subscribeCamera("Anima_Vision", camera_id, 2, 11, 5)
             nao_image = cam_proxy.getImageRemote(name_id)
             if nao_image:
-                width = nao_image[0]; height = nao_image[1]; array = nao_image[6]
+                width = nao_image[0];
+                height = nao_image[1];
+                array = nao_image[6]
                 im = Image.frombytes("RGB", (width, height), array)
-                im.save(nome_file) # Salva con il nome fornito (es. sconosciuto.jpg)
-                print("--- FOTO SALVATA: {} ---".format(nome_file))
-                return True
-            return False
+
+                # Elaborazione in RAM (sempre attiva)
+                buffer = io.BytesIO()
+                im.save(buffer, format="JPEG")
+                img_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+                # Salvataggio fisico ordinato
+                if nome_file:
+                    # 1. Crea la cartella 'foto' se non esiste
+                    cartella = "foto"
+                    if not os.path.exists(cartella):
+                        os.makedirs(cartella)
+
+                    # 2. Crea il percorso completo (es: foto/sconosciuto.jpg)
+                    percorso_completo = os.path.join(cartella, nome_file)
+                    im.save(percorso_completo)
+                    print("--- FOTO ARCHIVIATA IN: {} ---".format(percorso_completo))
+
+                return img_b64
+            return None
         except Exception as e:
             print("Errore foto: " + str(e))
-            return False
+            return None
         finally:
             if name_id != "":
                 cam_proxy.unsubscribe(name_id)

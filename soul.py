@@ -23,10 +23,8 @@ def carica_memoria():
         return {"nome_utente": "Sconosciuto", "fatti_importanti": {"batteria": 100}}
 
 
-def analizza_immagine(percorso, contesto="ostacolo"):
+def analizza_immagine(img_b64, contesto="ostacolo"):
     try:
-        with open(percorso, "rb") as f:
-            img = base64.b64encode(f.read()).decode('utf-8')
         headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
 
         if contesto == "stanza":
@@ -38,7 +36,7 @@ def analizza_immagine(percorso, contesto="ostacolo"):
 
         payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": [
             {"type": "text", "text": testo_prompt},
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + img}}]}], "max_tokens": max_tok}
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + img_b64}}]}], "max_tokens": max_tok}
         res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=10)
         return res.json()['choices'][0]['message']['content']
     except:
@@ -152,14 +150,10 @@ def main():
                     voce.parla("Un momento, guardo cosa c'è intorno a me.")
                     time.sleep(1)
 
-                    if corpo.scatta_foto(camera_id=0):
-                        descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
+                    img_b64 = corpo.scatta_foto(camera_id=0, nome_file="visione_nao.jpg")
+                    if img_b64:
+                        descrizione = analizza_immagine(img_b64, contesto="stanza")
                         voce.parla(u"Vedo: " + descrizione)
-                        try:
-                            # os.remove("visione_nao.jpg")
-                            pass
-                        except:
-                            pass
                     else:
                         voce.parla("Scusa, ho un problema con i sensori visivi.")
 
@@ -174,17 +168,14 @@ def main():
                     mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                     messaggio_utente = ""
 
-            # --- GESTIONE OSTACOLO FRONTALE ---
-            if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
-                corpo.fermati()
-                tempo_ultima_foto = time.time()
-                if corpo.scatta_foto(camera_id=1):
-                    mondo += u" Vedo chiaramente: {}.".format(analizza_immagine("visione_nao.jpg", contesto="ostacolo"))
-                    try:
-                        # os.remove("visione_nao.jpg")
-                        pass
-                    except:
-                        pass
+                    # --- GESTIONE OSTACOLO FRONTALE ---
+                    if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (
+                            time.time() - tempo_ultima_foto > 15):
+                        corpo.fermati()
+                        tempo_ultima_foto = time.time()
+                        img_b64 = corpo.scatta_foto(camera_id=1)  # Scatta dalla bocca in RAM!
+                        if img_b64:
+                            mondo += u" Vedo chiaramente: {}.".format(analizza_immagine(img_b64, contesto="ostacolo"))
 
             # --- ESECUZIONE CERVELLO IA ---
             if mondo != stato_precedente and mondo.strip() != "REPORT:":
