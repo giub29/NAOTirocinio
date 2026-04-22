@@ -83,4 +83,8 @@ class NaoSenses:
                 eventi.append(u"PERICOLO CADUTA! Pavimento mancante o sollevamento.")
                 self.ultimo_urto = tempo_attuale
 
+        # 7. MONITORAGGIO BATTERIA
+        carica = self.memory.getData("Device/SubDeviceList/Battery/Charge/Sensor/Value") * 100
+        eventi.append(u"La mia batteria è al {}%.".format(int(carica)))
+
         return u"REPORT: " + u" ".join(eventi)
