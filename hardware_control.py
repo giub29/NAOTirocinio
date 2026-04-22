@@ -58,35 +58,25 @@ class NaoBody:
             self.motion.angleInterpolationWithSpeed("HeadPitch", y, 0.2)
         except: pass
 
-    def scatta_foto(self, camera_id=0):
+    def scatta_foto(self, camera_id=0, nome_file="visione_nao.jpg"):
         name_id = ""
         try:
             cam_proxy = ALProxy("ALVideoDevice", self.ip, self.port)
-            # Switch camera based on parameter
-            try:
-                cam_proxy.setParam(18, camera_id)
-            except:
-                pass
+            try: cam_proxy.setParam(18, camera_id)
+            except: pass
 
             name_id = cam_proxy.subscribeCamera("Anima_Vision", camera_id, 2, 11, 5)
             nao_image = cam_proxy.getImageRemote(name_id)
             if nao_image:
-                width = nao_image[0];
-                height = nao_image[1];
-                array = nao_image[6]
+                width = nao_image[0]; height = nao_image[1]; array = nao_image[6]
                 im = Image.frombytes("RGB", (width, height), array)
-                im.save("visione_nao.jpg")
-                print("--- FOTO SCATTATA (Camera {}): visione_nao.jpg ---".format(camera_id))
+                im.save(nome_file) # Salva con il nome fornito (es. sconosciuto.jpg)
+                print("--- FOTO SALVATA: {} ---".format(nome_file))
                 return True
             return False
         except Exception as e:
-            print("Errore scatto foto: " + str(e))
+            print("Errore foto: " + str(e))
             return False
         finally:
             if name_id != "":
-                try:
-                    cam_proxy.unsubscribe(name_id)
-                    # Always reset to Top Camera for face tracking
-                    cam_proxy.setParam(18, 0)
-                except:
-                    pass
+                cam_proxy.unsubscribe(name_id)

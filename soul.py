@@ -13,6 +13,8 @@ messaggio_utente = ""
 memoria_fisica = {}
 volti_salutati = []
 timeout_volto_ignoto = 0
+
+
 def carica_memoria():
     try:
         with open('memoria.json', 'r') as f:
@@ -27,7 +29,6 @@ def analizza_immagine(percorso, contesto="ostacolo"):
             img = base64.b64encode(f.read()).decode('utf-8')
         headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
 
-        # Decide the prompt based on context
         if contesto == "stanza":
             testo_prompt = "Descrivi l'ambiente che vedi davanti a te in una frase breve e naturale."
             max_tok = 80
@@ -43,6 +44,7 @@ def analizza_immagine(percorso, contesto="ostacolo"):
     except:
         return u"un oggetto ignoto"
 
+
 def genera_codice_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
@@ -53,22 +55,22 @@ def genera_codice_anima(contesto, dati_memoria):
         u"REGOLE DI OUTPUT E SINTASSI (CRITICHE):\n"
         u"1. Rispondi SOLO con codice Python eseguibile. NIENTE testo libero.\n"
         u"2. Usa i DOPPI APICI per il testo, es: voce.parla(\"Testo\").\n\n"
-        u"REGOLE SOCIALI:\n"
-        u"1. SALUTO: Se 'Riconosco [Nome]', saluta con voce.parla(\"Ciao [Nome]!\") restando FERMO. Non muovere le gambe mentre parli.\n"
-        u"2. Se leggi 'e\\' presente', NON salutare più. Ignora il volto.\n"
-        u"3. Se 'volto ignoto', chiedi chi è. Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\");\n\n"
         u"REGOLE DI SCHIVATA E NAVIGAZIONE (GERARCHIA RIGIDA):\n"
         u"1. EMERGENZA UTENTE: SE leggi 'stop', 'fermati' o simili, IGNORA TUTTO: corpo.fermati(); corpo.guarda(0.0, 0.0); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Mi fermo.\");\n"
-        u"2. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio l'esplorazione!\");\n"
+        u"2. PARTENZA: SE l'utente dice 'vai' o 'cammina', DEVI eseguire: corpo.vai_in_posa(\"Stand\"); corpo.guarda(0.0, -0.3); corpo.cammina(0.3, 0.0); voce.parla(\"Inizio l'esplorazione!\");\n"
         u"3. SCHIVATA LATERALE: SE stai camminando e leggi:\n"
         u"   - 'Ostacolo a sinistra': DEVI curvare a destra con corpo.cammina(0.2, -0.4);\n"
         u"   - 'Ostacolo a destra': DEVI curvare a sinistra con corpo.cammina(0.2, 0.4);\n"
         u"4. FINE OSTACOLO: SE E SOLO SE stavi già camminando in avanti e il report torna pulito, rimetterti dritto: corpo.cammina(0.3, 0.0). SE ERI FERMO, NON CAMMINARE.\n"
         u"5. OSTACOLO FRONTALE: SE leggi 'Vedo chiaramente: [oggetto]', esegui: corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo evitato, riprendo la marcia.\");\n\n"
-        u"REAZIONI FISICHE (ASSOLUTE):\n"
+        u"REAZIONI FISICHE (GERARCHIA ASSOLUTA E INCONDIZIONATA):\n"
         u"- SE IL REPORT CONTIENE 'URTO TATTILE': corpo.fermati(); corpo.gira(1.5); corpo.cammina(0.3, 0.0); voce.parla(\"Ostacolo invisibile colpito! Cambio direzione.\");\n"
         u"- SE IL REPORT CONTIENE 'carezza sulla testa': corpo.fermati(); corpo.guarda(0.0, 0.0); voce.parla(\"Che bello!\"); corpo.esegui_animazione(\"animations/Stand/Gestures/Hey_1\");\n\n"
-        u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p).\n"
+        u"REGOLE SOCIALI (PER ESAME E PROFESSORE):\n"
+        u"1. VOLTO NOTO: Se 'Riconosco [Nome]', FERMATI (se camminavi), esegui corpo.imposta_colore_occhi(\"green\"); voce.parla(\"Ciao [Nome]!\").\n"
+        u"2. VOLTO IGNOTO: Se 'Vedo un volto ignoto', FERMATI (se camminavi), esegui corpo.imposta_colore_occhi(\"red\"); corpo.scatta_foto(0, \"sconosciuto.jpg\"); voce.parla(\"Chi sei?\").\n"
+        u"3. APPRENDIMENTO: Se l'utente dice 'Sono [Nome]', esegui: vista.apprendi_volto(\"[Nome]\"); corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Piacere di conoscerti [Nome].\");\n\n"
+        u"LIMITAZIONE COMANDI: corpo.cammina(x,gira), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam, file).\n"
         u"Se non hai azioni urgenti, scrivi: pass"
     )
 
@@ -87,15 +89,23 @@ def genera_codice_anima(contesto, dati_memoria):
     except:
         return "pass"
 
+
 def main():
     global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto
     memoria_fisica = carica_memoria()
-    corpo = None; vista = None
+    corpo = None;
+    vista = None
     try:
-        corpo = NaoBody(IP_ROBOT); sensi = NaoSenses(IP_ROBOT); voce = NaoVoice(IP_ROBOT)
-        vista = NaoVision(IP_ROBOT); sistema = NaoSystem(IP_ROBOT)
+        corpo = NaoBody(IP_ROBOT);
+        sensi = NaoSenses(IP_ROBOT);
+        voce = NaoVoice(IP_ROBOT)
+        vista = NaoVision(IP_ROBOT);
+        sistema = NaoSystem(IP_ROBOT)
 
-        sistema.set_vita_autonoma(False); corpo.abilita_motori(); corpo.vai_in_posa("Crouch"); corpo.disabilita_motori()
+        # IL ROBOT ORA PARTE IN PIEDI E ATTIVA SUBITO IL TRACKING E I MOTORI
+        sistema.set_vita_autonoma(False);
+        corpo.abilita_motori()
+        corpo.vai_in_posa("Stand")
         vista.attiva_inseguimento_volto()
 
         def loop_input():
@@ -103,13 +113,14 @@ def main():
             while True:
                 t = raw_input()
                 if t: messaggio_utente = t.decode('utf-8')
+
         threading.Thread(target=loop_input).start()
 
         print(u"--- ANIMA POTENZIATA PRONTA ---")
         voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO e sono ai tuoi ordini.".format(memoria_fisica["nome_utente"]))
         stato_precedente = ""
-
         tempo_ultima_foto = 0
+
         while True:
             mondo = sensi.ottieni_report_semantico()
 
@@ -119,7 +130,6 @@ def main():
                 mondo = mondo.replace(u"Ostacolo a destra.", u"C'è qualcosa a destra.")
 
             # --- SISTEMA SOCIALE MULTI-VOLTO ---
-            # 1. Nascondiamo solo le persone che ha già salutato (ignorando maiuscole/minuscole)
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
@@ -127,28 +137,26 @@ def main():
                 if time.time() - timeout_volto_ignoto < 30:
                     mondo = mondo.replace(u"Vedo un volto ignoto.", u"")
                 else:
-                    timeout_volto_ignoto = time.time()  # Resetta il timer e lascia passare il report
+                    timeout_volto_ignoto = time.time()
 
             mondo = mondo.replace(u"  ", u" ").strip()
 
+            # --- COMANDI UTENTE ---
             if messaggio_utente:
                 cmd = messaggio_utente.lower().strip()
                 if cmd in ["cosa vedi", "descrivi la stanza", "cosa vedi?"]:
-
-                    # 1. MEMORIZZA LO STATO: Stava camminando prima che glielo chiedessi?
                     stava_camminando = corpo.sta_camminando()
-
                     print(u"\n[Comando Esplorazione Ricevuto]")
                     corpo.fermati()
                     corpo.guarda(0.0, -0.3)
                     voce.parla("Un momento, guardo cosa c'è intorno a me.")
-                    time.sleep(1)  # Aspetta che la testa si fermi
+                    time.sleep(1)
 
                     if corpo.scatta_foto(camera_id=0):
                         descrizione = analizza_immagine("visione_nao.jpg", contesto="stanza")
                         voce.parla(u"Vedo: " + descrizione)
                         try:
-                            #os.remove("visione_nao.jpg")
+                            # os.remove("visione_nao.jpg")
                             pass
                         except:
                             pass
@@ -159,7 +167,6 @@ def main():
                     messaggio_utente = ""
                     mondo = "REPORT: "
 
-                    # 2. RIPARTENZA AUTONOMA: Se camminava prima, riparte ora!
                     if stava_camminando:
                         voce.parla("Riprendo l'esplorazione.")
                         corpo.cammina(0.3, 0.0)
@@ -167,6 +174,7 @@ def main():
                     mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                     messaggio_utente = ""
 
+            # --- GESTIONE OSTACOLO FRONTALE ---
             if u"Ostacolo frontale" in mondo and corpo.sta_camminando() and (time.time() - tempo_ultima_foto > 15):
                 corpo.fermati()
                 tempo_ultima_foto = time.time()
@@ -177,6 +185,8 @@ def main():
                         pass
                     except:
                         pass
+
+            # --- ESECUZIONE CERVELLO IA ---
             if mondo != stato_precedente and mondo.strip() != "REPORT:":
                 print(u"\n[SENSORI]: " + mondo)
                 azione = genera_codice_anima(mondo, memoria_fisica)
@@ -184,27 +194,33 @@ def main():
                     print(u"[ANIMA]: " + azione)
                     if "Ciao" in azione:
                         match = re.search(r'Ciao (.*?)!', azione)
-                        if match:
-                            volti_salutati.append(match.group(1))
+                        if match: volti_salutati.append(match.group(1))
                     try:
                         exec (azione, {"corpo": corpo, "voce": voce, "vista": vista, "sistema": sistema, "True": True,
                                        "False": False})
                     except Exception as e:
                         print(u"Errore: " + str(e))
+
+            stato_precedente = mondo
             time.sleep(0.1)
-    except KeyboardInterrupt: pass
+
+    except KeyboardInterrupt:
+        pass
     finally:
         if vista:
             try:
                 from naoqi import ALProxy
                 t = ALProxy("ALTracker", IP_ROBOT, 9559)
-                t.stopTracker(); t.unregisterAllTargets()
-            except: pass
+                t.stopTracker();
+                t.unregisterAllTargets()
+            except:
+                pass
         if corpo:
             try:
                 corpo.fermati()
                 corpo.disabilita_motori()
             except:
                 pass
+
 
 if __name__ == "__main__": main()
