@@ -6,12 +6,14 @@ NAO Robot Soul - Sistema di controllo principale del robot NAO.
 import json
 import time
 import threading
-import os
+import os 
 import re
 import logging
 import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
+
+if sys.version_info[0] < 3:
+    reload(sys)
+    sys.setdefaultencoding('utf-8')
 
 from modules.vision_perception import NaoVision
 from modules.voice_interaction import NaoVoice
@@ -42,10 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 IP_ROBOT = "172.16.165.86"
-CHIAVE_PRIVATA = os.getenv(
-    "OPENAI_API_KEY",
-    "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"
-)
+CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY")
 
 TEMPO_INERZIA_INIZIATIVA = 30
 LUNGHEZZA_MAX_RICORDI = 20

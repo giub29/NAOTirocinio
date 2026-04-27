@@ -5,7 +5,7 @@ Caricatore di condizioni Python generate.
 
 import os
 import logging
-import imp
+import imp 
 
 logger = logging.getLogger(__name__)
 

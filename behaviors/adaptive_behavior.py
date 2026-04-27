@@ -6,14 +6,13 @@ Gestione comportamento adattivo:
 - se non lo trova, chiede al LLM;
 - salva il nuovo comportamento generato.
 """
-
 import os
 import time
 import json
 import logging
 import requests
-
-logger = logging.getLogger(__name__)
+if not isinstance(testo, unicode):
+    testo = unicode(testo, "utf-8", "ignore")
 
 GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
 
@@ -45,11 +44,12 @@ def nessuna_condizione_nota(mondo, ultima_decisione):
 
     azioni = ultima_decisione.get("azioni", [])
     return not azioni
+"""
 
 def _assicura_cartella_generated():
     if not os.path.exists(GENERATED_DIR):
         os.makedirs(GENERATED_DIR)
-"""
+
 
 def _estrai_json(testo):
     try:
@@ -97,7 +97,7 @@ def salva_comportamento_generato(mondo, decisione):
             "decisione": decisione
         }
 
-        with open(path_file, "w") as f:
+        with open(path_file, "wb") as f:
             f.write(json.dumps(dati, ensure_ascii=False, indent=2).encode("utf-8"))
 
         logger.info(u"[ADAPTIVE] Comportamento salvato in {}".format(path_file))
@@ -121,7 +121,7 @@ def carica_comportamenti_generati():
             path_file = os.path.join(GENERATED_DIR, nome_file)
 
             try:
-                with open(path_file, "r") as f:
+                with open(path_file, "rb") as f:
                     dati = json.loads(f.read().decode("utf-8"))
 
                 if "mondo" in dati and "decisione" in dati:
@@ -141,8 +141,8 @@ def carica_comportamenti_generati():
 
 def _normalizza_unicode(testo):
     try:
-        if isinstance(testo, str):
-            testo = testo.decode("utf-8", "ignore")
+        if not isinstance(testo, unicode):
+            testo = unicode(testo, "utf-8", "ignore")
     except:
         pass
 
