@@ -11,6 +11,9 @@ CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY", "sk-proj-mVkErEUsfK2a4KQtJ8v3LYhGv4
 
 messaggio_utente = ""
 attesa_nome = False
+riprendi_dopo_nome = False
+ultimo_volto_noto_tempo = 0
+ultimo_nome_riconosciuto = ""
 memoria_fisica = {}
 volti_salutati = []
 timeout_volto_ignoto = 0
@@ -314,13 +317,21 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema):
             print(u"[ERRORE AZIONE {}]: {}".format(tipo, str(e)))
 
 def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
-    global memoria_fisica, volti_salutati, in_pattugliamento
+    global memoria_fisica, volti_salutati, in_pattugliamento, attesa_nome, riprendi_dopo_nome
+    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto
 
     # Caso 1: volto già conosciuto
     match = re.search(ur"Riconosco ([^\.]+)\.", mondo)
 
     if match:
         nome = match.group(1)
+
+        ultimo_volto_noto_tempo = time.time()
+        ultimo_nome_riconosciuto = nome
+
+        if attesa_nome:
+            attesa_nome = False
+            riprendi_dopo_nome = False
 
         if nome not in volti_salutati:
             corpo.imposta_colore_occhi("green")
@@ -331,7 +342,9 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
 
     # Caso 2: volto ignoto
     if u"Vedo un volto ignoto" in mondo:
-        global attesa_nome
+        if time.time() - ultimo_volto_noto_tempo < 8:
+            print(u"[VOLTO]: ignoro volto ignoto, probabilmente è ancora {}".format(ultimo_nome_riconosciuto))
+            return True
 
         # evita loop continuo
         if attesa_nome:
@@ -340,12 +353,20 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
         corpo.imposta_colore_occhi("red")
 
         stava_camminando = corpo.sta_camminando() or in_pattugliamento
+        riprendi_dopo_nome = stava_camminando
 
         if stava_camminando:
+            in_pattugliamento = False
             corpo.fermati()
             time.sleep(1.0)
 
-        voce.parla(u"Non ti conosco. Come ti chiami?")
+        corpo.guarda(0.0, -0.1)
+        time.sleep(1.0)
+
+        corpo.scatta_foto(camera_id=0, nome_file="sconosciuto.jpg")
+
+        voce.parla(u"Non ti conosco. Ho scattato una foto. Come ti chiami?")
+        print(u"\n--- INSERISCI IL NOME E PREMI INVIO ---")
         attesa_nome = True
 
         return True
@@ -354,7 +375,8 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
 
 def main():
     global messaggio_utente, attesa_nome, memoria_fisica, volti_salutati, timeout_volto_ignoto
-    global direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento
+    global direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento, riprendi_dopo_nome
+    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto
 
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
@@ -393,19 +415,89 @@ def main():
         while True:
             mondo = sensi.ottieni_report_semantico()
 
+            # PRIORITÀ ASSOLUTA: sicurezza fisica
+            if u"URTO TATTILE" in mondo or u"URTO LATERALE" in mondo:
+                corpo.fermati()
+                in_pattugliamento = False
+                attesa_nome = False
+                riprendi_dopo_nome = False
+                corpo.cammina(-0.1, 0.0)
+                time.sleep(0.8)
+                corpo.gira(0.15)
+                time.sleep(0.8)
+                corpo.fermati()
+                voce.parla(u"Ho sentito un ostacolo, mi sposto.")
+                continue
+
+            if u"PERICOLO CADUTA" in mondo:
+                corpo.fermati()
+                in_pattugliamento = False
+                attesa_nome = False
+                riprendi_dopo_nome = False
+                corpo.vai_in_posa("Stand")
+                voce.parla(u"Mi fermo, rischio di cadere.")
+                continue
+
+            # PRIORITÀ ALTA: ostacoli sonar mentre cammina
+            if corpo.sta_camminando() or in_pattugliamento:
+
+                if u"Ostacolo frontale molto vicino" in mondo:
+                    corpo.cammina(-0.1, 0.0)
+                    time.sleep(0.6)
+                    corpo.gira(0.15)
+                    time.sleep(0.6)
+                    corpo.fermati()
+                    time.sleep(0.2)
+                    corpo.cammina(0.3, 0.0)
+                    continue
+
+                elif u"Ostacolo a sinistra" in mondo:
+                    corpo.cammina(0.3, -0.08)
+                    continue
+
+                elif u"Ostacolo a destra" in mondo:
+                    corpo.cammina(0.3, 0.08)
+                    continue
+
             if attesa_nome and messaggio_utente:
-                nome = messaggio_utente.strip()
+                testo = messaggio_utente.strip()
+                testo_lower = testo.lower()
+
+                # Comandi da NON interpretare come nome
+                if testo_lower in ["fermati", "stop", "basta", "annulla"]:
+                    attesa_nome = False
+                    riprendi_dopo_nome = False
+                    in_pattugliamento = False
+                    messaggio_utente = ""
+                    corpo.fermati()
+                    voce.parla(u"Va bene, annullo il riconoscimento e mi fermo.")
+                    continue
+
+                if testo_lower in ["vai", "cammina", "va", "i"] or "vai" in testo_lower:
+                    voce.parla(u"Sto aspettando un nome. Scrivi per esempio: nome Giulia.")
+                    messaggio_utente = ""
+                    continue
+
+                # Accetta: "nome X", "mi chiamo X" oppure solo "X"
+                nome = ""
+                if testo_lower.startswith("nome "):
+                    nome = testo[5:].strip()
+                elif testo_lower.startswith("mi chiamo "):
+                    nome = testo[10:].strip()
+                else:
+                    nome = testo.strip()
+
+                if len(nome) < 2:
+                    voce.parla(u"Il nome è troppo corto. Riprova.")
+                    messaggio_utente = ""
+                    continue
 
                 corpo.imposta_colore_occhi("yellow")
                 voce.parla(u"Piacere {}.".format(nome))
 
                 corpo.guarda(0.0, -0.1)
                 time.sleep(1.0)
-
-                nome_file = "foto/" + nome + ".jpg"
-                corpo.scatta_foto(camera_id=0, nome_file=nome_file)
-
-                riuscito = vista.apprendi_volto(nome)
+                riuscito = vista.apprendi_volto(str(nome))
 
                 if riuscito:
                     voce.parla(u"Ti ho memorizzato, {}!".format(nome))
@@ -417,6 +509,17 @@ def main():
 
                 attesa_nome = False
                 messaggio_utente = ""
+
+                if riprendi_dopo_nome:
+                    riprendi_dopo_nome = False
+                    in_pattugliamento = True
+                    time.sleep(0.5)
+                    corpo.cammina(0.3, 0.0)
+                else:
+                    riprendi_dopo_nome = False
+                    in_pattugliamento = False
+                    corpo.fermati()
+
                 continue
 
             if messaggio_utente:
@@ -482,25 +585,26 @@ def main():
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                 messaggio_utente = ""
 
-            if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
-                print(u"\n[SENSORI]: " + mondo)
+            if not attesa_nome:
+                if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
+                    print(u"\n[SENSORI]: " + mondo)
 
-                if gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
-                    stato_precedente = mondo
-                    time.sleep(0.1)
-                    continue
+                    if gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
+                        stato_precedente = mondo
+                        time.sleep(0.1)
+                        continue
 
-                decisione = genera_decisione_anima(mondo, memoria_fisica)
-                decisione = valida_decisione(decisione, mondo)
-                ultima_decisione = decisione
+                    decisione = genera_decisione_anima(mondo, memoria_fisica)
+                    decisione = valida_decisione(decisione, mondo)
+                    ultima_decisione = decisione
 
-                ultimo_evento_tempo = time.time()
+                    ultimo_evento_tempo = time.time()
 
-                print(u"[STATO]: " + unicode(decisione.get("stato_interno", "neutro")))
-                print(u"[OBIETTIVO]: " + unicode(decisione.get("obiettivo", "")))
-                print(u"[AZIONI]: " + json.dumps(decisione.get("azioni", []), ensure_ascii=False))
+                    print(u"[STATO]: " + unicode(decisione.get("stato_interno", "neutro")))
+                    print(u"[OBIETTIVO]: " + unicode(decisione.get("obiettivo", "")))
+                    print(u"[AZIONI]: " + json.dumps(decisione.get("azioni", []), ensure_ascii=False))
 
-                esegui_decisione(decisione, corpo, voce, vista, sistema)
+                    esegui_decisione(decisione, corpo, voce, vista, sistema)
 
             if in_pattugliamento and not corpo.sta_camminando():
                 azioni_testo = json.dumps(ultima_decisione.get("azioni", []))
