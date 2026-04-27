@@ -1,0 +1,24 @@
+{
+  "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
+  "timestamp": "2026-04-27 15:21:54", 
+  "decisione": {
+    "azioni": [
+      {
+        "testo": "C'è qualcosa a sinistra, sto osservando.", 
+        "tipo": "parla"
+      }, 
+      {
+        "y": 0.0, 
+        "x": -0.2, 
+        "tipo": "guarda"
+      }, 
+      {
+        "colore": "yellow", 
+        "tipo": "occhi"
+      }
+    ], 
+    "obiettivo": "osservare l'oggetto a sinistra", 
+    "stato_interno": "prudente", 
+    "memoria": []
+  }
+}

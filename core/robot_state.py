@@ -24,7 +24,7 @@ def aggiorna_stato_robot(stato_robot, mondo, corpo, in_pattugliamento, ultimo_no
     else:
         stato_robot["modalita"] = "osservazione"
 
-    match_bat = re.search(ur'La mia batteria.*?(\d+)%', mondo)
+    match_bat = re.search(u'La mia batteria.*?(\d+)%', mondo)
     if match_bat:
         stato_robot["energia"] = int(match_bat.group(1))
 
