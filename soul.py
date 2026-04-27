@@ -12,6 +12,7 @@ CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY", "sk-proj-mVkErEUsfK2a4KQtJ8v3LYhGv4
 messaggio_utente = ""
 attesa_nome = False
 riprendi_dopo_nome = False
+primo_ignoto_tempo = 0
 ultimo_volto_noto_tempo = 0
 ultimo_nome_riconosciuto = ""
 memoria_fisica = {}
@@ -318,7 +319,7 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema):
 
 def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
     global memoria_fisica, volti_salutati, in_pattugliamento, attesa_nome, riprendi_dopo_nome
-    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto
+    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto, primo_ignoto_tempo
 
     # Caso 1: volto già conosciuto
     match = re.search(ur"Riconosco ([^\.]+)\.", mondo)
@@ -342,11 +343,35 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
 
     # Caso 2: volto ignoto
     if u"Vedo un volto ignoto" in mondo:
-        if time.time() - ultimo_volto_noto_tempo < 8:
-            print(u"[VOLTO]: ignoro volto ignoto, probabilmente è ancora {}".format(ultimo_nome_riconosciuto))
+
+        # se sto camminando e ho già riconosciuto qualcuno → NON ri-memorizzare subito
+        if corpo.sta_camminando() or in_pattugliamento:
+            print(u"[VOLTO]: ignoto durante cammino, mi fermo per verificare.")
+            corpo.fermati()
+            in_pattugliamento = True
+            riprendi_dopo_nome = True
+            corpo.guarda(0.0, -0.45)
+            time.sleep(1.5)
+
             return True
 
-        # evita loop continuo
+        # filtro breve (quando fermo)
+        if ultimo_nome_riconosciuto != "" and time.time() - ultimo_volto_noto_tempo < 5:
+            print(u"[VOLTO]: ignoro falso ignoto, probabilmente è ancora {}".format(ultimo_nome_riconosciuto))
+            return True
+
+        # filtro stabilità: non considero subito un ignoto come nuova persona
+        if primo_ignoto_tempo == 0:
+            primo_ignoto_tempo = time.time()
+            print(u"[VOLTO]: volto ignoto rilevato, attendo stabilità...")
+            return True
+
+        if time.time() - primo_ignoto_tempo < 2.0:
+            print(u"[VOLTO]: volto ignoto ancora instabile...")
+            return True
+
+        primo_ignoto_tempo = 0
+
         if attesa_nome:
             return True
 
@@ -360,7 +385,7 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
             corpo.fermati()
             time.sleep(1.0)
 
-        corpo.guarda(0.0, -0.1)
+        corpo.guarda(0.0, -0.45)
         time.sleep(1.0)
 
         corpo.scatta_foto(camera_id=0, nome_file="sconosciuto.jpg")
@@ -376,7 +401,7 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
 def main():
     global messaggio_utente, attesa_nome, memoria_fisica, volti_salutati, timeout_volto_ignoto
     global direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento, riprendi_dopo_nome
-    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto
+    global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto, primo_ignoto_tempo
 
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
@@ -399,8 +424,7 @@ def main():
             while True:
                 try:
                     t = raw_input()
-                    if t:
-                        messaggio_utente = t.decode('utf-8', 'ignore')
+                    messaggio_utente = t.decode('utf-8', 'ignore')
                 except Exception:
                     pass
 
@@ -462,6 +486,25 @@ def main():
             if attesa_nome and messaggio_utente:
                 testo = messaggio_utente.strip()
                 testo_lower = testo.lower()
+
+                # ENTER senza nome → è la stessa persona
+                if testo == "":
+                    voce.parla(u"Va bene, continuo.")
+
+                    attesa_nome = False
+                    messaggio_utente = ""
+
+                    if riprendi_dopo_nome:
+                        riprendi_dopo_nome = False
+                        in_pattugliamento = True
+                        time.sleep(0.5)
+                        corpo.cammina(0.3, 0.0)
+                    else:
+                        riprendi_dopo_nome = False
+                        in_pattugliamento = False
+                        corpo.fermati()
+
+                    continue
 
                 # Comandi da NON interpretare come nome
                 if testo_lower in ["fermati", "stop", "basta", "annulla"]:
@@ -527,6 +570,7 @@ def main():
 
                 if "vai" in testo_user or "cammina" in testo_user:
                     in_pattugliamento = True
+                    corpo.guarda(0.0, -0.35)
 
                 elif "stop" in testo_user or "fermati" in testo_user:
                     in_pattugliamento = False
