@@ -9,6 +9,9 @@ import threading
 import os
 import re
 import logging
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 from modules.vision_perception import NaoVision
 from modules.voice_interaction import NaoVoice
@@ -23,6 +26,7 @@ from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
+from behaviors.condition_manager import valuta_condizioni_generate
 
 from behaviors.adaptive_behavior import (
     nessuna_condizione_nota,
@@ -406,28 +410,15 @@ def main():
                         time.sleep(0.1)
                         continue
 
-                    ultima_decisione = _elabora_decisione(
-                        mondo,
-                        corpo,
-                        voce,
-                        vista,
-                        sistema
-                    )
+                    decisione_condizione = valuta_condizioni_generate(mondo, stato_runtime)
 
-                    # BLOCCO ADATTIVO
-                    if nessuna_condizione_nota(mondo, ultima_decisione):
-                        logger.info(u"[SOUL] Attivo comportamento adattivo")
+                    if decisione_condizione:
+                        logger.info(u"[SOUL] Uso condizione Python generata/caricata")
 
-                        decisione_adattiva = gestisci_comportamento_adattivo(
-                            mondo,
-                            memoria_fisica,
-                            stato_robot,
-                            CHIAVE_PRIVATA
-                        )
-                        decisione_adattiva = valida_decisione(decisione_adattiva, mondo)
+                        decisione_condizione = valida_decisione(decisione_condizione, mondo)
 
                         esegui_decisione(
-                            decisione_adattiva,
+                            decisione_condizione,
                             corpo,
                             voce,
                             vista,
@@ -436,7 +427,41 @@ def main():
                             aggiorna_memoria_callback=aggiorna_memoria_da_decisione
                         )
 
-                        ultima_decisione = decisione_adattiva
+                        ultima_decisione = decisione_condizione
+
+                    else:
+                        ultima_decisione = _elabora_decisione(
+                            mondo,
+                            corpo,
+                            voce,
+                            vista,
+                            sistema
+                        )
+
+                        if nessuna_condizione_nota(mondo, ultima_decisione):
+                            logger.info(u"[SOUL] Attivo comportamento adattivo")
+
+                            decisione_adattiva = gestisci_comportamento_adattivo(
+                                mondo,
+                                memoria_fisica,
+                                stato_robot,
+                                CHIAVE_PRIVATA
+                            )
+
+                            decisione_adattiva = valida_decisione(decisione_adattiva, mondo)
+
+                            esegui_decisione(
+                                decisione_adattiva,
+                                corpo,
+                                voce,
+                                vista,
+                                sistema,
+                                stato_runtime,
+                                aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                            )
+
+                            ultima_decisione = decisione_adattiva
+
                     ultimo_evento_tempo = time.time()
 
             _riprendi_cammino_automatico(corpo, ultima_decisione)
