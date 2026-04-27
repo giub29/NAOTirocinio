@@ -10,11 +10,11 @@ import os
 import re
 import logging
 
-from hardware_control import NaoBody
+from modules.vision_perception import NaoVision
+from modules.voice_interaction import NaoVoice
+from modules.system_manager import NaoSystem
+from modules.hardware_control import NaoBody
 from sensi import NaoSenses
-from voice_interaction import NaoVoice
-from vision_perception import NaoVision
-from system_manager import NaoSystem
 
 from core.memory_manager import carica_memoria, salva_memoria
 from core.robot_state import crea_stato_robot, aggiorna_stato_robot

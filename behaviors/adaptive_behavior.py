@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Gestione comportamento adattivo.
-
-Step 3:
-- se il sistema non sa cosa fare, chiede al LLM un comportamento JSON;
-- NON genera ancora codice Python;
-- restituisce solo azioni nel formato già validato da soul.py.
+Gestione comportamento adattivo:
+- cerca comportamenti JSON già generati;
+- se trova un comportamento simile, lo riusa;
+- se non lo trova, chiede al LLM;
+- salva il nuovo comportamento generato.
 """
+
 import os
 import time
 import json
@@ -15,15 +15,41 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
+
+SOGLIA_SIMILARITA = 1
+
 
 def nessuna_condizione_nota(mondo, ultima_decisione):
+    if u"STO CAMMINANDO" in mondo:
+        return False
+
+    if u"L'utente dice" in mondo:
+        return False
+
+    if u"Riconosco" in mondo or u"Vedo un volto ignoto" in mondo:
+        return False
+
     azioni = ultima_decisione.get("azioni", [])
 
     if not azioni:
         return True
 
-    return True #PER IL TEST LA SETTO A TRUE
+    return False
 
+
+"""#SOLO PER I TEST
+def nessuna_condizione_nota(mondo, ultima_decisione):
+    if u"C'è qualcosa a sinistra" in mondo:
+        return True
+
+    azioni = ultima_decisione.get("azioni", [])
+    return not azioni
+
+def _assicura_cartella_generated():
+    if not os.path.exists(GENERATED_DIR):
+        os.makedirs(GENERATED_DIR)
+"""
 
 def _estrai_json(testo):
     try:
@@ -57,8 +83,157 @@ def _fallback_base():
     }
 
 
-def gestisci_comportamento_adattivo(mondo, dati_memoria, stato_robot, chiave_privata):
-    logger.info(u"[ADAPTIVE] Nessuna condizione nota. Chiedo comportamento JSON al LLM.")
+def salva_comportamento_generato(mondo, decisione):
+    try:
+        _assicura_cartella_generated()
+
+        timestamp_file = time.strftime("%Y%m%d_%H%M%S")
+        nome_file = "adaptive_{}.json".format(timestamp_file)
+        path_file = os.path.join(GENERATED_DIR, nome_file)
+
+        dati = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "mondo": mondo,
+            "decisione": decisione
+        }
+
+        with open(path_file, "w") as f:
+            f.write(json.dumps(dati, ensure_ascii=False, indent=2).encode("utf-8"))
+
+        logger.info(u"[ADAPTIVE] Comportamento salvato in {}".format(path_file))
+        return path_file
+
+    except Exception as e:
+        logger.warning(u"[ADAPTIVE] Errore salvataggio comportamento: {}".format(e))
+        return None
+
+
+def carica_comportamenti_generati():
+    comportamenti = []
+
+    try:
+        _assicura_cartella_generated()
+
+        for nome_file in os.listdir(GENERATED_DIR):
+            if not nome_file.endswith(".json"):
+                continue
+
+            path_file = os.path.join(GENERATED_DIR, nome_file)
+
+            try:
+                with open(path_file, "r") as f:
+                    dati = json.loads(f.read().decode("utf-8"))
+
+                if "mondo" in dati and "decisione" in dati:
+                    comportamenti.append(dati)
+
+            except Exception as e:
+                logger.warning(u"[ADAPTIVE] Impossibile caricare {}: {}".format(
+                    nome_file,
+                    e
+                ))
+
+    except Exception as e:
+        logger.warning(u"[ADAPTIVE] Errore lettura cartella generated: {}".format(e))
+
+    return comportamenti
+
+
+def _normalizza_unicode(testo):
+    try:
+        if isinstance(testo, str):
+            testo = testo.decode("utf-8", "ignore")
+    except:
+        pass
+
+    return testo.lower()
+
+
+def _tokenizza(testo):
+    testo = _normalizza_unicode(testo)
+
+    separatori = [u".", u",", u";", u":", u"!", u"?", u"'", u'"', u"(", u")", u"[", u"]"]
+
+    for sep in separatori:
+        testo = testo.replace(sep, u" ")
+
+    parole = testo.split()
+
+    stopword = set([
+        u"report",
+        u"sono",
+        u"fermo",
+        u"sto",
+        u"camminando",
+        u"la",
+        u"il",
+        u"lo",
+        u"le",
+        u"gli",
+        u"un",
+        u"una",
+        u"di",
+        u"a",
+        u"al",
+        u"in",
+        u"e",
+        u"è",
+        u"c",
+        u"ce",
+        u"qualcosa"
+    ])
+
+    parole_utili = []
+
+    for p in parole:
+        if len(p) < 3:
+            continue
+
+        if p in stopword:
+            continue
+
+        parole_utili.append(p)
+
+    return set(parole_utili)
+
+
+def _similarita_mondo(mondo_a, mondo_b):
+    token_a = _tokenizza(mondo_a)
+    token_b = _tokenizza(mondo_b)
+
+    if not token_a or not token_b:
+        return 0
+
+    comuni = token_a.intersection(token_b)
+    return len(comuni)
+
+
+def trova_comportamento_simile(mondo):
+    comportamenti = carica_comportamenti_generati()
+
+    migliore = None
+    miglior_punteggio = 0
+
+    for comp in comportamenti:
+        mondo_salvato = comp.get("mondo", "")
+        punteggio = _similarita_mondo(mondo, mondo_salvato)
+
+        if punteggio > miglior_punteggio:
+            miglior_punteggio = punteggio
+            migliore = comp
+
+    if migliore and miglior_punteggio >= SOGLIA_SIMILARITA:
+        logger.info(u"[ADAPTIVE] Riuso comportamento salvato. Similarità: {}".format(
+            miglior_punteggio
+        ))
+
+        return migliore.get("decisione", None)
+
+    return None
+
+
+def _genera_comportamento_con_llm(mondo, dati_memoria, stato_robot, chiave_privata):
+    logger.info(u"[ADAPTIVE] Nessun comportamento simile. Chiedo comportamento JSON al LLM.")
 
     prompt = (
         u"Sei un generatore di comportamento adattivo per un robot NAO.\n"
@@ -88,7 +263,6 @@ def gestisci_comportamento_adattivo(mondo, dati_memoria, stato_robot, chiave_pri
         u"- Non usare cammina.\n"
         u"- Non usare gira.\n"
         u"- Non usare fermati, salvo pericolo esplicito.\n"
-        u"- Se il robot è fermo, limita il comportamento a osservare, parlare o cambiare occhi.\n"
         u"- Massimo 3 azioni.\n"
         u"- Se non sei sicuro, fai parlare il robot e fallo osservare.\n\n"
 
@@ -140,38 +314,19 @@ def gestisci_comportamento_adattivo(mondo, dati_memoria, stato_robot, chiave_pri
         logger.warning(u"[ADAPTIVE] Errore LLM adattivo: {}".format(e))
         return _fallback_base()
 
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
 
+def gestisci_comportamento_adattivo(mondo, dati_memoria, stato_robot, chiave_privata):
+    logger.info(u"[ADAPTIVE] Controllo comportamenti già generati.")
 
-def _assicura_cartella_generated():
-    if not os.path.exists(GENERATED_DIR):
-        os.makedirs(GENERATED_DIR)
+    decisione_salvata = trova_comportamento_simile(mondo)
 
+    if decisione_salvata:
+        logger.info(u"[ADAPTIVE] Uso comportamento già appreso.")
+        return decisione_salvata
 
-def salva_comportamento_generato(mondo, decisione):
-    """
-    Salva il comportamento adattivo generato dal LLM come file JSON.
-    Non salva codice Python.
-    """
-    try:
-        _assicura_cartella_generated()
-
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        nome_file = "adaptive_{}.json".format(timestamp)
-        path_file = os.path.join(GENERATED_DIR, nome_file)
-
-        dati = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "mondo": mondo,
-            "decisione": decisione
-        }
-
-        with open(path_file, "w") as f:
-            f.write(json.dumps(dati, ensure_ascii=False, indent=2).encode("utf-8"))
-
-        logger.info(u"[ADAPTIVE] Comportamento salvato in {}".format(path_file))
-        return path_file
-
-    except Exception as e:
-        logger.warning(u"[ADAPTIVE] Errore salvataggio comportamento: {}".format(e))
-        return None
+    return _genera_comportamento_con_llm(
+        mondo,
+        dati_memoria,
+        stato_robot,
+        chiave_privata
+    )

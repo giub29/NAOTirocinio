@@ -1,0 +1,24 @@
+{
+  "mondo": "REPORT: STO CAMMINANDO.", 
+  "timestamp": "2026-04-27 15:43:46", 
+  "decisione": {
+    "azioni": [
+      {
+        "testo": "Attenzione, sto camminando e potrei incontrare ostacoli.", 
+        "tipo": "parla"
+      }, 
+      {
+        "y": -0.2, 
+        "x": 0.0, 
+        "tipo": "guarda"
+      }, 
+      {
+        "colore": "yellow", 
+        "tipo": "occhi"
+      }
+    ], 
+    "obiettivo": "rimanere al sicuro mentre cammino", 
+    "stato_interno": "allerta", 
+    "memoria": []
+  }
+}
