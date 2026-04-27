@@ -6,6 +6,13 @@ import time
 class NaoSenses:
     def __init__(self, ip, port=9559):
         self.memory = ALProxy("ALMemory", ip, port)
+        try:
+            self.face_detection = ALProxy("ALFaceDetection", ip, port)
+            self.face_detection.subscribe("SensiFaceDetection", 500, 0.0)
+            print("--- FACE DETECTION ATTIVA ---")
+        except Exception as e:
+            print("--- ERRORE FACE DETECTION: {} ---".format(e))
+
         self.ultimo_timestamp_audio = 0
         self.contatore_battiti = 0
         self.ultimo_battito_rilevato = 0
@@ -23,16 +30,28 @@ class NaoSenses:
         tempo_attuale = time.time()
 
         # 1. RICONOSCIMENTO VOLTI
-        dati_volto = self.memory.getData("FaceDetected")
+        try:
+            dati_volto = self.memory.getData("FaceDetected")
+        except:
+            dati_volto = None
         nome_riconosciuto = "Sconosciuto"
-        if dati_volto and len(dati_volto) > 1:
-            for volto in dati_volto[1]:
-                if len(volto) > 1 and len(volto[1]) >= 2:
-                    if volto[1][2] != "": nome_riconosciuto = volto[1][2]
-            if nome_riconosciuto != "Sconosciuto":
-                eventi.append(u"Riconosco {}.".format(nome_riconosciuto))
-            else:
-                eventi.append(u"Vedo un volto ignoto.")
+
+        if dati_volto and isinstance(dati_volto, list) and len(dati_volto) > 1:
+            volti = dati_volto[1]
+
+            if volti and isinstance(volti, list):
+                for volto in volti:
+                    try:
+                        info_extra = volto[1]
+                        if len(info_extra) > 2 and info_extra[2] != "":
+                            nome_riconosciuto = info_extra[2]
+                    except:
+                        pass
+
+                if nome_riconosciuto != "Sconosciuto":
+                    eventi.append(u"Riconosco {}.".format(nome_riconosciuto))
+                else:
+                    eventi.append(u"Vedo un volto ignoto.")
 
         # 2. GESTIONE BATTITI
         dati_audio = self.memory.getData("SoundDetected")

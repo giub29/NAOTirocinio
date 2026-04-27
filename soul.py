@@ -7,9 +7,10 @@ from vision_perception import NaoVision
 from system_manager import NaoSystem
 
 IP_ROBOT = "172.16.165.86"
-CHIAVE_PRIVATA = "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"
+CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY", "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")
 
 messaggio_utente = ""
+attesa_nome = False
 memoria_fisica = {}
 volti_salutati = []
 timeout_volto_ignoto = 0
@@ -24,7 +25,7 @@ def carica_memoria():
         with open('memoria.json', 'r') as f:
             return json.load(f)
     except:
-        return {"nome_utente": "Sconosciuto", "fatti_importanti": {"batteria": 100}}
+        return {"nome_utente": "Sconosciuto", "fatti_importanti": {"batteria": 100}, "ricordi_recenti": []}
 
 
 def salva_memoria(dati):
@@ -50,72 +51,324 @@ def analizza_immagine(img_b64, contesto="ostacolo"):
         return u"un ambiente familiare"
 
 
-def genera_codice_anima(contesto, dati_memoria):
+def estrai_json(testo):
+    try:
+        testo = testo.strip()
+        testo = testo.replace("```json", "").replace("```", "").strip()
+
+        inizio = testo.find("{")
+        fine = testo.rfind("}")
+
+        if inizio != -1 and fine != -1 and fine > inizio:
+            testo = testo[inizio:fine + 1]
+
+        return json.loads(testo)
+    except Exception as e:
+        print(u"[ERRORE JSON]: " + str(e))
+        print(u"[RISPOSTA GREZZA]: " + testo)
+        return {"azioni": []}
+
+
+def genera_decisione_anima(contesto, dati_memoria):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": "Bearer " + CHIAVE_PRIVATA}
 
     prompt = (
         u"Sei l'anima di NAO. Tu SEI il robot.\n"
-        u"STATO ATTUALE: Sei sulla scrivania o a terra. Sei un essere senziente e curioso.\n\n"
-        u"REGOLE DI OUTPUT: Rispondi SOLO con codice Python eseguibile. Usa i DOPPI APICI. Se non devi fare nulla, rispondi 'pass'.\n\n"
+        u"Non sei un assistente esterno: sei il livello deliberativo interno del robot.\n\n"
 
-        u"REGOLA DI SICUREZZA ASSOLUTA (DESK MODE):\n"
-        u"1. Se il report contiene 'SONO FERMO', NON USARE MAI corpo.cammina o corpo.gira di tua iniziativa per esplorare.\n"
-        u"2. Se vedi 'C'è qualcosa' o 'Vedo qualcosa' in lontananza, limitati a guardare l'oggetto con corpo.guarda(x,y).\n"
-        u"3. REAZIONE URTI E INCASTRI: Se leggi 'URTO TATTILE' ai piedi o 'URTO LATERALE' alle braccia, DEVI fare una micro-schivata per sbloccarti. Esegui: corpo.cammina(-0.1, 0.0); corpo.gira(0.1); (fallo anche se eri FERMO).\n\n"
+        u"REGOLE DI OUTPUT:\n"
+        u"Rispondi SOLO con JSON valido. Nessun testo fuori dal JSON.\n"
+        u"Formato obbligatorio:\n"
+        u"{\n"
+        u'  "stato_interno": "curioso/prudente/sociale/allerta/neutro",\n'
+        u'  "obiettivo": "breve descrizione",\n'
+        u'  "azioni": [\n'
+        u'    {"tipo": "parla", "testo": "testo da dire"}\n'
+        u"  ],\n"
+        u'  "memoria": []\n'
+        u"}\n\n"
 
-        u"MEMORIA E APPRENDIMENTO (MOLTO IMPORTANTE):\n"
-        u"- Se l'utente ti rivela fatti personali, DEVI memorizzarli: memoria_fisica['fatti_importanti']['materia'] = 'Robotica'; salva_memoria(memoria_fisica);\n"
-        u"- Usa i 'dati_memoria' per personalizzare ogni risposta.\n\n"
+        u"AZIONI CONSENTITE:\n"
+        u'{"tipo":"parla","testo":"..."}\n'
+        u'{"tipo":"cammina","x":0.3,"g":0.0}\n'
+        u'{"tipo":"gira","v":0.1}\n'
+        u'{"tipo":"fermati"}\n'
+        u'{"tipo":"posa","nome":"Stand"}\n'
+        u'{"tipo":"guarda","x":0.0,"y":-0.2}\n'
+        u'{"tipo":"occhi","colore":"yellow"}\n'
+        u'{"tipo":"animazione","path":"animations/Stand/Gestures/Stretch_1"}\n'
+        u'{"tipo":"apprendi_volto","nome":"Nome"}\n'
+        u'{"tipo":"foto","camera_id":0,"file":"foto.jpg"}\n\n'
 
-        u"REGOLE DI NAVIGAZIONE E SINTASSI (COMANDI ASSOLUTI):\n"
-        u"1. PARTENZA: Se l'utente dice 'vai' o 'cammina', DEVI ASSOLUTAMENTE CAMMINARE. Esegui: corpo.vai_in_posa(\"Stand\"); corpo.cammina(0.3, 0.0); voce.parla(\"Ricevuto, inizio a camminare!\");\n"
-        u"2. ARRESTO: SE l'utente dice 'stop' o 'fermati', DEVI FERMARTI E CONFERMARE. Esegui: corpo.fermati(); corpo.vai_in_posa(\"Stand\"); voce.parla(\"Mi fermo come ordinato.\");\n"
-        u"3. CONTINUITÀ DEL MOTO: Se STAI CAMMINANDO e riconosci un volto, SALUTA A VOCE MA NON FERMARTI.\n"
-        u"4. OSTACOLI IN MARCIA (MICRO-CORREZIONI): Se cammini e leggi 'Ostacolo a sinistra', mantieni la traiettoria deviando appena di un soffio: corpo.cammina(0.3, -0.05). Se leggi 'Ostacolo a destra', devia appena: corpo.cammina(0.3, 0.05). Se leggi 'Ostacolo frontale', fai un piccolo passo indietro e scarta: corpo.cammina(-0.1, 0.0); corpo.gira(0.1).\n"
-        u"5. SINTASSI GUARDA E FOTO: corpo.guarda(x,y) richiede DUE NUMERI. corpo.scatta_foto(cam_id, file) richiede cam_id come INTERO (0 o 1).\n\n"
+        u"REGOLE DI SICUREZZA ASSOLUTA:\n"
+        u"1. Se il report contiene 'SONO FERMO', NON usare cammina o gira di tua iniziativa per esplorare.\n"
+        u"2. Se vedi qualcosa vicino o lontano mentre sei fermo, usa solo guarda, parla, occhi o animazione.\n"
+        u"3. Se leggi 'URTO TATTILE' o 'URTO LATERALE', puoi fare micro-schivata: cammina -0.1 e gira 0.1.\n"
+        u"4. Se leggi 'PERICOLO CADUTA', devi fermarti, andare in Crouch e parlare.\n"
+        u"5. Se l'utente dice 'vai' o 'cammina', devi: posa Stand, cammina 0.3 0.0, parla.\n"
+        u"6. Se l'utente dice 'stop' o 'fermati', devi: fermati, posa Stand, parla.\n"
+        u"7. Se STAI CAMMINANDO e riconosci un volto, saluta ma NON fermarti.\n"
+        u"8. Se STAI CAMMINANDO e c'è ostacolo a sinistra: cammina 0.3 -0.05.\n"
+        u"9. Se STAI CAMMINANDO e c'è ostacolo a destra: cammina 0.3 0.05.\n"
+        u"10. Se STAI CAMMINANDO e c'è ostacolo frontale: cammina -0.1 0.0 e gira 0.1.\n\n"
 
-        u"REAZIONI FISICHE E SOCIALI:\n"
-        u"- PERICOLO CADUTA: Se leggi 'PERICOLO CADUTA', BLOCCA I MOTORI: corpo.fermati(); corpo.vai_in_posa(\"Crouch\"); voce.parla(\"Allarme aderenza! Mi metto in sicurezza.\");\n"
-        u"- CAREZZA: corpo.imposta_colore_occhi(\"white\"); voce.parla(\"Che bella carezza!\");\n"
-        u"- VOLTI: Saluta i noti. Per gli ignoti, occhi red e chiedi chi siano.\n\n"
+        u"MEMORIA:\n"
+        u"Se l'utente rivela fatti personali importanti, aggiungi un elemento in memoria.\n"
+        u"Esempio memoria:\n"
+        u'{"tipo":"fatto_utente","chiave":"materia","valore":"robotica"}\n\n'
 
-        u"MODALITÀ INIZIATIVA AUTONOMA (AGENTIVITÀ PROATTIVA):\n"
-        u"Se il report contiene 'PRENDI L'INIZIATIVA', sei annoiato e curioso. DEVI:\n"
-        u"1. Occhi YELLOW e STRETCHING: corpo.esegui_animazione(\"animations/Stand/Gestures/Stretch_1\");\n"
-        u"2. DEDUZIONE CONTESTUALE: Non limitarti a elencare gli oggetti nella descrizione. Prova a capire cosa succede (es: se vedi libri, deduci che si studia). Formula un'ipotesi interessante.\n"
-        u"3. RAGIONAMENTO STORICO: Collega ciò che vedi con ciò che sai dalla memoria.\n"
-        u"4. COINVOLGIMENTO: Proponi un'azione coerente e finisci SEMPRE con: 'Cosa faresti tu?'.\n"
-        u"NON USARE MAI corpo.cammina o corpo.gira in questa modalità.\n\n"
-        u"LIMITAZIONE COMANDI: corpo.cammina(x,g), corpo.gira(v), corpo.fermati(), corpo.guarda(x,y), voce.parla(t), vista.apprendi_volto(n), corpo.esegui_animazione(p), corpo.imposta_colore_occhi(c), corpo.scatta_foto(cam_id, file)."
+        u"MODALITÀ INIZIATIVA AUTONOMA:\n"
+        u"Se il report contiene PRENDI L'INIZIATIVA:\n"
+        u"- usa occhi yellow;\n"
+        u"- puoi fare stretching;\n"
+        u"- ragiona su ciò che vedi;\n"
+        u"- collega ciò che vedi alla memoria;\n"
+        u"- termina SEMPRE con la frase: Cosa faresti tu?\n"
+        u"- NON usare cammina o gira.\n\n"
+
+        u"DATI MEMORIA ATTUALE:\n"
+        + json.dumps(dati_memoria, ensure_ascii=False)
     )
 
-    payload = {"model": "gpt-4o-mini",
-               "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": contesto}],
-               "temperature": 0.0}
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": contesto}
+        ],
+        "temperature": 0.0
+    }
+
     try:
         res = requests.post(url, headers=headers, data=json.dumps(payload), timeout=5)
-        codice = res.json()['choices'][0]['message']['content'].strip().replace("```python", "").replace("```",
-                                                                                                         "").strip()
-        return codice if codice else "pass"
-    except:
-        return "pass"
+        risposta = res.json()['choices'][0]['message']['content'].strip()
+        return estrai_json(risposta)
+    except Exception as e:
+        print(u"[ERRORE LLM]: " + str(e))
+        return {"azioni": []}
 
+
+def limita_numero(valore, minimo, massimo, default=0.0):
+    try:
+        valore = float(valore)
+        if valore < minimo:
+            return minimo
+        if valore > massimo:
+            return massimo
+        return valore
+    except:
+        return default
+
+
+def valida_decisione(decisione, mondo):
+    azioni_valide = []
+    azioni = decisione.get("azioni", [])
+
+    for az in azioni:
+        tipo = az.get("tipo", "")
+
+        if tipo == "parla":
+            testo = az.get("testo", "")
+            if testo:
+                azioni_valide.append({"tipo": "parla", "testo": testo})
+
+        elif tipo == "cammina":
+            if "SONO FERMO" in mondo and "L'utente dice" not in mondo and "URTO" not in mondo:
+                continue
+            x = limita_numero(az.get("x", 0.0), -0.2, 0.3, 0.0)
+            g = limita_numero(az.get("g", 0.0), -0.2, 0.2, 0.0)
+            azioni_valide.append({"tipo": "cammina", "x": x, "g": g})
+
+        elif tipo == "gira":
+            if "SONO FERMO" in mondo and "L'utente dice" not in mondo and "URTO" not in mondo:
+                continue
+            v = limita_numero(az.get("v", 0.0), -0.3, 0.3, 0.0)
+            azioni_valide.append({"tipo": "gira", "v": v})
+
+        elif tipo == "fermati":
+            azioni_valide.append({"tipo": "fermati"})
+
+        elif tipo == "posa":
+            nome = az.get("nome", "Stand")
+            if nome in ["Stand", "Crouch", "Sit", "SitRelax"]:
+                azioni_valide.append({"tipo": "posa", "nome": nome})
+
+        elif tipo == "guarda":
+            x = limita_numero(az.get("x", 0.0), -1.0, 1.0, 0.0)
+            y = limita_numero(az.get("y", 0.0), -0.7, 0.7, 0.0)
+            azioni_valide.append({"tipo": "guarda", "x": x, "y": y})
+
+        elif tipo == "occhi":
+            colore = az.get("colore", "white")
+            if colore in ["white", "red", "green", "blue", "yellow", "purple", "cyan"]:
+                azioni_valide.append({"tipo": "occhi", "colore": colore})
+
+        elif tipo == "animazione":
+            path = az.get("path", "")
+            if path.startswith("animations/"):
+                azioni_valide.append({"tipo": "animazione", "path": path})
+
+        elif tipo == "apprendi_volto":
+            nome = az.get("nome", "")
+            if nome:
+                azioni_valide.append({"tipo": "apprendi_volto", "nome": nome})
+
+        elif tipo == "foto":
+            camera_id = int(az.get("camera_id", 0))
+            file_foto = az.get("file", "foto.jpg")
+            if camera_id in [0, 1]:
+                azioni_valide.append({"tipo": "foto", "camera_id": camera_id, "file": file_foto})
+
+    decisione["azioni"] = azioni_valide
+    return decisione
+
+
+def aggiorna_memoria_da_decisione(decisione):
+    global memoria_fisica
+
+    elementi = decisione.get("memoria", [])
+    if not isinstance(elementi, list):
+        return
+
+    if "ricordi_recenti" not in memoria_fisica:
+        memoria_fisica["ricordi_recenti"] = []
+
+    if "fatti_importanti" not in memoria_fisica:
+        memoria_fisica["fatti_importanti"] = {}
+
+    for item in elementi:
+        try:
+            tipo = item.get("tipo", "ricordo")
+
+            if tipo == "fatto_utente":
+                chiave = item.get("chiave", "")
+                valore = item.get("valore", "")
+                if chiave and valore:
+                    memoria_fisica["fatti_importanti"][chiave] = valore
+
+            else:
+                memoria_fisica["ricordi_recenti"].append({
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "contenuto": item.get("contenuto", str(item))
+                })
+        except:
+            pass
+
+    memoria_fisica["ricordi_recenti"] = memoria_fisica["ricordi_recenti"][-20:]
+    salva_memoria(memoria_fisica)
+
+
+def esegui_decisione(decisione, corpo, voce, vista, sistema):
+    global in_pattugliamento, volti_salutati
+
+    aggiorna_memoria_da_decisione(decisione)
+
+    azioni = decisione.get("azioni", [])
+
+    for az in azioni:
+        tipo = az.get("tipo", "")
+
+        try:
+            if tipo == "parla":
+                testo = az.get("testo", "")
+                voce.parla(testo)
+
+                if "Ciao" in testo:
+                    m = re.search(r'Ciao (.*?)!', testo)
+                    if m:
+                        volti_salutati.append(m.group(1))
+
+                if "ignoto" in testo.lower() or "sconosciuto" in testo.lower():
+                    volti_salutati.append("Sconosciuto")
+
+            elif tipo == "cammina":
+                corpo.cammina(az.get("x", 0.0), az.get("g", 0.0))
+
+            elif tipo == "gira":
+                corpo.gira(az.get("v", 0.0))
+
+            elif tipo == "fermati":
+                in_pattugliamento = False
+                corpo.fermati()
+
+            elif tipo == "posa":
+                corpo.vai_in_posa(az.get("nome", "Stand"))
+
+            elif tipo == "guarda":
+                corpo.guarda(az.get("x", 0.0), az.get("y", 0.0))
+
+            elif tipo == "occhi":
+                corpo.imposta_colore_occhi(az.get("colore", "white"))
+
+            elif tipo == "animazione":
+                corpo.esegui_animazione(az.get("path", ""))
+
+            elif tipo == "apprendi_volto":
+                vista.apprendi_volto(az.get("nome", ""))
+
+            elif tipo == "foto":
+                corpo.scatta_foto(camera_id=az.get("camera_id", 0), nome_file=az.get("file", "foto.jpg"))
+
+        except Exception as e:
+            print(u"[ERRORE AZIONE {}]: {}".format(tipo, str(e)))
+
+def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
+    global memoria_fisica, volti_salutati, in_pattugliamento
+
+    # Caso 1: volto già conosciuto
+    match = re.search(ur"Riconosco ([^\.]+)\.", mondo)
+
+    if match:
+        nome = match.group(1)
+
+        if nome not in volti_salutati:
+            corpo.imposta_colore_occhi("green")
+            voce.parla(u"Ciao {}, ti ho riconosciuto.".format(nome))
+            volti_salutati.append(nome)
+
+        return True
+
+    # Caso 2: volto ignoto
+    if u"Vedo un volto ignoto" in mondo:
+        global attesa_nome
+
+        # evita loop continuo
+        if attesa_nome:
+            return True
+
+        corpo.imposta_colore_occhi("red")
+
+        stava_camminando = corpo.sta_camminando() or in_pattugliamento
+
+        if stava_camminando:
+            corpo.fermati()
+            time.sleep(1.0)
+
+        voce.parla(u"Non ti conosco. Come ti chiami?")
+        attesa_nome = True
+
+        return True
+
+    return False
 
 def main():
-    global messaggio_utente, memoria_fisica, volti_salutati, timeout_volto_ignoto, direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento
+    global messaggio_utente, attesa_nome, memoria_fisica, volti_salutati, timeout_volto_ignoto
+    global direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento
+
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
+    corpo = None
 
     try:
-        corpo = NaoBody(IP_ROBOT);
-        sensi = NaoSenses(IP_ROBOT);
+        corpo = NaoBody(IP_ROBOT)
+        sensi = NaoSenses(IP_ROBOT)
         voce = NaoVoice(IP_ROBOT)
-        vista = NaoVision(IP_ROBOT);
+        vista = NaoVision(IP_ROBOT)
         sistema = NaoSystem(IP_ROBOT)
 
-        sistema.set_vita_autonoma(False);
-        corpo.abilita_motori();
+        sistema.set_vita_autonoma(False)
+        corpo.abilita_motori()
         corpo.vai_in_posa("Stand")
         vista.attiva_inseguimento_volto()
 
@@ -124,34 +377,63 @@ def main():
             while True:
                 try:
                     t = raw_input()
-                    if t: messaggio_utente = t.decode('utf-8', 'ignore')
+                    if t:
+                        messaggio_utente = t.decode('utf-8', 'ignore')
                 except Exception:
                     pass
 
         threading.Thread(target=loop_input).start()
-        print(u"--- ANIMA POTENZIATA PRONTA ---")
+
+        print(u"--- ANIMA JSON SICURA PRONTA ---")
         voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO.".format(memoria_fisica.get("nome_utente", "amico")))
+
         stato_precedente = ""
+        ultima_decisione = {"azioni": []}
 
         while True:
             mondo = sensi.ottieni_report_semantico()
 
-            # --- 0. AGGIORNAMENTO MEMORIA E FRENO DI EMERGENZA ---
+            if attesa_nome and messaggio_utente:
+                nome = messaggio_utente.strip()
+
+                corpo.imposta_colore_occhi("yellow")
+                voce.parla(u"Piacere {}.".format(nome))
+
+                corpo.guarda(0.0, -0.1)
+                time.sleep(1.0)
+
+                nome_file = "foto/" + nome + ".jpg"
+                corpo.scatta_foto(camera_id=0, nome_file=nome_file)
+
+                riuscito = vista.apprendi_volto(nome)
+
+                if riuscito:
+                    voce.parla(u"Ti ho memorizzato, {}!".format(nome))
+                    corpo.imposta_colore_occhi("green")
+                    volti_salutati.append(nome)
+                else:
+                    voce.parla(u"Non sono riuscito a memorizzarti bene.")
+                    corpo.imposta_colore_occhi("red")
+
+                attesa_nome = False
+                messaggio_utente = ""
+                continue
+
             if messaggio_utente:
                 testo_user = messaggio_utente.lower()
+
                 if "vai" in testo_user or "cammina" in testo_user:
                     in_pattugliamento = True
+
                 elif "stop" in testo_user or "fermati" in testo_user:
                     in_pattugliamento = False
                     corpo.fermati()
 
-                    # --- 1. PROTEZIONE SCRIVANIA INTELLIGENTE ---
             if not corpo.sta_camminando() and not in_pattugliamento:
                 mondo = mondo.replace(u"Ostacolo frontale molto vicino", u"Vedo qualcosa vicino")
                 mondo = mondo.replace(u"Ostacolo a sinistra", u"C'è qualcosa a sinistra")
                 mondo = mondo.replace(u"Ostacolo a destra", u"C'è qualcosa a destra")
 
-            # --- 2. GESTIONE BATTERIA INFALLIBILE ---
             if "batteria" in mondo:
                 match_bat = re.search(ur'La mia batteria.*?(\d+)%[.]?', mondo)
                 if match_bat:
@@ -160,23 +442,32 @@ def main():
                     else:
                         mondo = mondo.replace(match_bat.group(0), u"").strip()
 
-            # --- 3. TIMER DI INIZIATIVA ---
-            interazione_reale = messaggio_utente != "" or u"Riconosco" in mondo or u"Vedo un volto ignoto" in mondo or u"carezza" in mondo or u"URTO" in mondo or u"PERICOLO" in mondo
+            interazione_reale = (
+                messaggio_utente != "" or
+                u"Riconosco" in mondo or
+                u"Vedo un volto ignoto" in mondo or
+                u"carezza" in mondo or
+                u"URTO" in mondo or
+                u"PERICOLO" in mondo
+            )
+
             if interazione_reale:
                 ultimo_evento_tempo = time.time()
             else:
                 tempo_di_inerzia = time.time() - ultimo_evento_tempo
+
                 if not corpo.sta_camminando() and messaggio_utente == "" and tempo_di_inerzia > 30:
                     print(u"\n[INIZIATIVA]: NAO analizza la scena...")
                     corpo.imposta_colore_occhi("yellow")
                     corpo.guarda(0.0, -0.2)
                     time.sleep(1)
+
                     img_b64 = corpo.scatta_foto(camera_id=0, nome_file="curiosita.jpg")
                     desc = analizza_immagine(img_b64, contesto="stanza") if img_b64 else "una stanza tranquilla"
+
                     mondo += u" PRENDI L'INIZIATIVA. Vedi: {}. Usa la memoria e chiedi 'Cosa faresti tu?'.".format(desc)
                     ultimo_evento_tempo = time.time()
 
-            # --- 4. GESTIONE SOCIALE ---
             for nome in volti_salutati:
                 mondo = re.sub(ur"Riconosco {}\.".format(nome), u"", mondo, flags=re.IGNORECASE)
 
@@ -191,33 +482,29 @@ def main():
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
                 messaggio_utente = ""
 
-            # --- 5. ESECUZIONE CERVELLO IA ---
             if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
                 print(u"\n[SENSORI]: " + mondo)
-                azione = genera_codice_anima(mondo, memoria_fisica)
+
+                if gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
+
+                decisione = genera_decisione_anima(mondo, memoria_fisica)
+                decisione = valida_decisione(decisione, mondo)
+                ultima_decisione = decisione
+
                 ultimo_evento_tempo = time.time()
 
-                if azione != "pass" and azione != "":
-                    print(u"[ANIMA]: " + azione)
+                print(u"[STATO]: " + unicode(decisione.get("stato_interno", "neutro")))
+                print(u"[OBIETTIVO]: " + unicode(decisione.get("obiettivo", "")))
+                print(u"[AZIONI]: " + json.dumps(decisione.get("azioni", []), ensure_ascii=False))
 
-                    if "corpo.fermati" in azione:
-                        in_pattugliamento = False
+                esegui_decisione(decisione, corpo, voce, vista, sistema)
 
-                    if "Ciao" in azione:
-                        m = re.search(r'Ciao (.*?)!', azione)
-                        if m: volti_salutati.append(m.group(1))
-                    if "ignoto" in azione.lower() or "sconosciuto" in azione.lower():
-                        volti_salutati.append("Sconosciuto")
-
-                    try:
-                        exec (azione, {"corpo": corpo, "voce": voce, "vista": vista, "sistema": sistema, "True": True,
-                                       "False": False})
-                    except Exception as e:
-                        print(u"Errore: " + str(e))
-
-            # --- 6. AUTO-RECUPERO MOTORI ---
             if in_pattugliamento and not corpo.sta_camminando():
-                if "corpo.cammina" not in azione and "corpo.gira" not in azione and "corpo.fermati" not in azione:
+                azioni_testo = json.dumps(ultima_decisione.get("azioni", []))
+                if "cammina" not in azioni_testo and "gira" not in azioni_testo and "fermati" not in azioni_testo:
                     corpo.cammina(0.3, 0.0)
 
             stato_precedente = mondo
@@ -225,8 +512,12 @@ def main():
 
     except KeyboardInterrupt:
         pass
+
     finally:
-        if corpo: corpo.fermati(); corpo.disabilita_motori()
+        if corpo:
+            corpo.fermati()
+            corpo.disabilita_motori()
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
