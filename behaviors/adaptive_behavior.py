@@ -6,17 +6,22 @@ Gestione comportamento adattivo:
 - se non lo trova, chiede al LLM;
 - salva il nuovo comportamento generato.
 """
+
 import os
 import time
 import json
 import logging
 import requests
-if not isinstance(testo, unicode):
-    testo = unicode(testo, "utf-8", "ignore")
+
+logger = logging.getLogger(__name__)
 
 GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
-
 SOGLIA_SIMILARITA = 1
+
+
+def _assicura_cartella_generated():
+    if not os.path.exists(GENERATED_DIR):
+        os.makedirs(GENERATED_DIR)
 
 
 def nessuna_condizione_nota(mondo, ultima_decisione):
@@ -35,20 +40,6 @@ def nessuna_condizione_nota(mondo, ultima_decisione):
         return True
 
     return False
-
-
-"""#SOLO PER I TEST
-def nessuna_condizione_nota(mondo, ultima_decisione):
-    if u"C'è qualcosa a sinistra" in mondo:
-        return True
-
-    azioni = ultima_decisione.get("azioni", [])
-    return not azioni
-"""
-
-def _assicura_cartella_generated():
-    if not os.path.exists(GENERATED_DIR):
-        os.makedirs(GENERATED_DIR)
 
 
 def _estrai_json(testo):
@@ -122,7 +113,9 @@ def carica_comportamenti_generati():
 
             try:
                 with open(path_file, "rb") as f:
-                    dati = json.loads(f.read().decode("utf-8"))
+                    contenuto = f.read().decode("utf-8")
+
+                dati = json.loads(contenuto)
 
                 if "mondo" in dati and "decisione" in dati:
                     comportamenti.append(dati)
@@ -141,9 +134,9 @@ def carica_comportamenti_generati():
 
 def _normalizza_unicode(testo):
     try:
-        if not isinstance(testo, unicode):
-            testo = unicode(testo, "utf-8", "ignore")
-    except:
+        if isinstance(testo, str):
+            testo = testo.decode("utf-8", "ignore")
+    except Exception:
         pass
 
     return testo.lower()
@@ -160,27 +153,10 @@ def _tokenizza(testo):
     parole = testo.split()
 
     stopword = set([
-        u"report",
-        u"sono",
-        u"fermo",
-        u"sto",
-        u"camminando",
-        u"la",
-        u"il",
-        u"lo",
-        u"le",
-        u"gli",
-        u"un",
-        u"una",
-        u"di",
-        u"a",
-        u"al",
-        u"in",
-        u"e",
-        u"è",
-        u"c",
-        u"ce",
-        u"qualcosa"
+        u"report", u"sono", u"fermo", u"sto", u"camminando",
+        u"la", u"il", u"lo", u"le", u"gli",
+        u"un", u"una", u"di", u"a", u"al", u"in",
+        u"e", u"è", u"c", u"ce", u"qualcosa"
     ])
 
     parole_utili = []
@@ -226,7 +202,6 @@ def trova_comportamento_simile(mondo):
         logger.info(u"[ADAPTIVE] Riuso comportamento salvato. Similarità: {}".format(
             miglior_punteggio
         ))
-
         return migliore.get("decisione", None)
 
     return None
@@ -235,12 +210,15 @@ def trova_comportamento_simile(mondo):
 def _genera_comportamento_con_llm(mondo, dati_memoria, stato_robot, chiave_privata):
     logger.info(u"[ADAPTIVE] Nessun comportamento simile. Chiedo comportamento JSON al LLM.")
 
+    if not chiave_privata:
+        logger.warning(u"[ADAPTIVE] OPENAI_API_KEY assente. Uso fallback.")
+        return _fallback_base()
+
     prompt = (
         u"Sei un generatore di comportamento adattivo per un robot NAO.\n"
         u"Devi proporre SOLO un comportamento sicuro in JSON valido.\n"
         u"NON generare codice Python.\n"
         u"NON scrivere testo fuori dal JSON.\n\n"
-
         u"FORMATO OBBLIGATORIO:\n"
         u"{\n"
         u'  "stato_interno": "curioso/prudente/sociale/allerta/neutro",\n'
@@ -252,20 +230,17 @@ def _genera_comportamento_con_llm(mondo, dati_memoria, stato_robot, chiave_priva
         u"  ],\n"
         u'  "memoria": []\n'
         u"}\n\n"
-
         u"AZIONI CONSENTITE:\n"
         u'{"tipo":"parla","testo":"..."}\n'
         u'{"tipo":"guarda","x":0.0,"y":-0.2}\n'
         u'{"tipo":"occhi","colore":"white/red/green/blue/yellow/purple/cyan"}\n'
         u'{"tipo":"animazione","path":"animations/Stand/Gestures/Stretch_1"}\n\n'
-
         u"REGOLE DI SICUREZZA:\n"
         u"- Non usare cammina.\n"
         u"- Non usare gira.\n"
         u"- Non usare fermati, salvo pericolo esplicito.\n"
         u"- Massimo 3 azioni.\n"
         u"- Se non sei sicuro, fai parlare il robot e fallo osservare.\n\n"
-
         u"MONDO ATTUALE:\n"
         + mondo +
         u"\n\nMEMORIA:\n"
@@ -297,6 +272,10 @@ def _genera_comportamento_con_llm(mondo, dati_memoria, stato_robot, chiave_priva
             timeout=6
         )
 
+        if res.status_code != 200:
+            logger.warning(u"[ADAPTIVE] Errore HTTP LLM: {}".format(res.text))
+            return _fallback_base()
+
         risposta = res.json()["choices"][0]["message"]["content"].strip()
         decisione = _estrai_json(risposta)
 
@@ -307,7 +286,6 @@ def _genera_comportamento_con_llm(mondo, dati_memoria, stato_robot, chiave_priva
             return _fallback_base()
 
         salva_comportamento_generato(mondo, decisione)
-
         return decisione
 
     except Exception as e:

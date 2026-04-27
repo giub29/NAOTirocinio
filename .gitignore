@@ -2,3 +2,10 @@
 foto/
 *.pyc
 __pycache__/
+# comportamenti generati runtime
+NAOTirocinio/behaviors/generated/*
+NAOTirocinio/behaviors/generated_conditions/*
+
+#solo init
+!NAOTirocinio/behaviors/generated/__init__.py
+!NAOTirocinio/behaviors/generated_conditions/__init__.py
