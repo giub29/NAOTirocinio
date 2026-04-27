@@ -22,7 +22,16 @@ direzione_recente = ""
 tempo_direzione = 0
 ultima_batteria_letta = -1
 in_pattugliamento = False
-
+stato_robot = {
+    "modalita": "idle",
+    "umore": "neutro",
+    "energia": 100,
+    "sta_camminando": False,
+    "persona_attuale": None,
+    "ultimo_evento": "",
+    "livello_allerta": 0
+}
+DEBUG_STATO = False #per eventuali scopi futuri
 
 def carica_memoria():
     try:
@@ -133,6 +142,8 @@ def genera_decisione_anima(contesto, dati_memoria):
 
         u"DATI MEMORIA ATTUALE:\n"
         + json.dumps(dati_memoria, ensure_ascii=False)
+        + u"\n\nSTATO INTERNO ATTUALE DEL ROBOT:\n"
+        + json.dumps(stato_robot, ensure_ascii=False)
     )
 
     payload = {
@@ -398,10 +409,55 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista):
 
     return False
 
+def aggiorna_stato_robot(mondo, corpo):
+    global stato_robot, ultimo_nome_riconosciuto
+
+    stato_robot["sta_camminando"] = corpo.sta_camminando() or in_pattugliamento
+
+    if stato_robot["sta_camminando"]:
+        stato_robot["modalita"] = "esplorazione"
+    else:
+        stato_robot["modalita"] = "osservazione"
+
+    match_bat = re.search(ur'La mia batteria.*?(\d+)%', mondo)
+    if match_bat:
+        stato_robot["energia"] = int(match_bat.group(1))
+
+    if u"PERICOLO CADUTA" in mondo:
+        stato_robot["umore"] = "allerta"
+        stato_robot["livello_allerta"] = 3
+        stato_robot["ultimo_evento"] = "pericolo caduta"
+
+    elif u"URTO" in mondo:
+        stato_robot["umore"] = "allerta"
+        stato_robot["livello_allerta"] = 2
+        stato_robot["ultimo_evento"] = "urto rilevato"
+
+    elif u"Ostacolo" in mondo or u"Vedo qualcosa" in mondo or u"C'è qualcosa" in mondo:
+        stato_robot["umore"] = "prudente"
+        stato_robot["livello_allerta"] = 1
+        stato_robot["ultimo_evento"] = "ostacolo rilevato"
+
+    elif u"Riconosco" in mondo:
+        stato_robot["umore"] = "sociale"
+        stato_robot["livello_allerta"] = 0
+        stato_robot["persona_attuale"] = ultimo_nome_riconosciuto
+        stato_robot["ultimo_evento"] = "persona riconosciuta"
+
+    elif u"Vedo un volto ignoto" in mondo:
+        stato_robot["umore"] = "curioso"
+        stato_robot["livello_allerta"] = 0
+        stato_robot["ultimo_evento"] = "volto ignoto"
+
+    else:
+        stato_robot["umore"] = "neutro"
+        stato_robot["livello_allerta"] = 0
+
 def main():
     global messaggio_utente, attesa_nome, memoria_fisica, volti_salutati, timeout_volto_ignoto
     global direzione_recente, tempo_direzione, ultima_batteria_letta, in_pattugliamento, riprendi_dopo_nome
     global ultimo_volto_noto_tempo, ultimo_nome_riconosciuto, primo_ignoto_tempo
+    global stato_robot
 
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
@@ -438,6 +494,9 @@ def main():
 
         while True:
             mondo = sensi.ottieni_report_semantico()
+            aggiorna_stato_robot(mondo, corpo)
+            if DEBUG_STATO:
+                print(u"[STATO ROBOT]: " + json.dumps(stato_robot, ensure_ascii=False))
 
             # PRIORITÀ ASSOLUTA: sicurezza fisica
             if u"URTO TATTILE" in mondo or u"URTO LATERALE" in mondo:
