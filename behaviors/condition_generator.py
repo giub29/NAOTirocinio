@@ -517,6 +517,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"Devi rispondere true solo se:\n"
         u"- se MONDO contiene PRENDI L'INIZIATIVA, devi valutare se la scena osservata contiene dettagli visivi riutilizzabili in futuro;\n"
         u"- per PRENDI L'INIZIATIVA, NON rispondere false solo perché la decisione corrente ha già parlato;\n"
+        u"- non generare nuove condizioni a partire da comandi di test/debug; i test servono solo a verificare condizioni già esistenti.\n"
         u"- in caso di curiosità visiva, rispondi true se puoi creare una condizione basata su oggetti o pattern della scena;\n"
         u"- nessuna condizione già nota sembra coprire bene la situazione;\n"
         u"- la situazione è utile e generalizzabile;\n"
