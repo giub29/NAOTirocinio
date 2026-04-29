@@ -300,27 +300,87 @@ def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata):
 
     return res.json()["choices"][0]["message"]["content"]
 
-def _mondo_generabile(mondo):
-    eventi_da_non_generare = [
-        u"STO CAMMINANDO",
-        u"Riconosco",
-        u"Vedo un volto ignoto",
-        u"La mia batteria",
-        u"L'utente dice"
-    ]
+def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_robot, chiave_privata):
+    if not chiave_privata:
+        logger.warning(u"[GENERATOR] OPENAI_API_KEY assente. Non posso valutare generazione.")
+        return False
 
-    for evento in eventi_da_non_generare:
-        if evento in mondo:
+    prompt = (
+        u"Sei il supervisore cognitivo di un robot NAO.\n"
+        u"Devi decidere se la situazione osservata merita la creazione di una NUOVA condizione Python autonoma.\n\n"
+
+        u"Rispondi SOLO con JSON valido nel formato:\n"
+        u"{\"genera\": true/false, \"motivo\": \"breve spiegazione\"}\n\n"
+
+        u"Devi rispondere true solo se:\n"
+        u"- nessuna condizione già nota sembra coprire bene la situazione;\n"
+        u"- la situazione è utile e generalizzabile;\n"
+        u"- il comportamento può essere riutilizzato in futuro.\n\n"
+
+        u"Devi rispondere false se:\n"
+        u"- è solo batteria, stato fermo/cammino o informazione banale;\n"
+        u"- riguarda riconoscimento volto già gestito;\n"
+        u"- è un input diretto dell'utente;\n"
+        u"- la decisione corrente è già adeguata.\n\n"
+
+        u"MONDO:\n"
+        + mondo +
+        u"\n\nULTIMA DECISIONE:\n"
+        + json.dumps(ultima_decisione, ensure_ascii=False) +
+        u"\n\nMEMORIA:\n"
+        + json.dumps(dati_memoria, ensure_ascii=False) +
+        u"\n\nSTATO ROBOT:\n"
+        + json.dumps(stato_robot, ensure_ascii=False)
+    )
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": mondo}
+        ],
+        "temperature": 0.0,
+        "max_tokens": 120
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + chiave_privata
+    }
+
+    try:
+        res = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=8
+        )
+
+        if res.status_code != 200:
+            logger.warning(u"[GENERATOR] Errore HTTP valutazione: {}".format(res.text))
             return False
 
-    return True
+        risposta = res.json()["choices"][0]["message"]["content"].strip()
+        risposta = risposta.replace("```json", "").replace("```", "").strip()
+
+        dati = json.loads(risposta)
+
+        genera = dati.get("genera", False)
+        motivo = dati.get("motivo", "")
+
+        logger.info(u"[GENERATOR] Valutazione generazione: {} - {}".format(
+            genera,
+            motivo
+        ))
+
+        return bool(genera)
+
+    except Exception as e:
+        logger.warning(u"[GENERATOR] Errore valutazione generazione: {}".format(e))
+        return False
 
 def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata):
     _assicura_cartelle()
-
-    if not _mondo_generabile(mondo):
-        logger.info(u"[GENERATOR] Mondo non adatto alla generazione autonoma.")
-        return None
 
     if not chiave_privata:
         logger.warning(u"[GENERATOR] OPENAI_API_KEY assente. Non genero condizioni.")

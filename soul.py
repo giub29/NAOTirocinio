@@ -29,11 +29,9 @@ from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_dura
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
 from behaviors.condition_manager import valuta_condizioni_generate
-from behaviors.condition_generator import genera_condizione_autonoma
-
-from behaviors.adaptive_behavior import (
-    nessuna_condizione_nota,
-    gestisci_comportamento_adattivo
+from behaviors.condition_generator import (
+    genera_condizione_autonoma,
+    valuta_se_generare_condizione
 )
 
 logging.basicConfig(
@@ -485,29 +483,14 @@ def main():
                             sistema
                         )
 
-                        if nessuna_condizione_nota(mondo, ultima_decisione):
-                            logger.info(u"[SOUL] Attivo comportamento adattivo")
-
-                            decisione_adattiva = gestisci_comportamento_adattivo(
-                                mondo,
-                                memoria_fisica,
-                                stato_robot,
-                                CHIAVE_PRIVATA
-                            )
-
-                            decisione_adattiva = valida_decisione(decisione_adattiva, mondo)
-
-                            esegui_decisione(
-                                decisione_adattiva,
-                                corpo,
-                                voce,
-                                vista,
-                                sistema,
-                                stato_runtime,
-                                aggiorna_memoria_callback=aggiorna_memoria_da_decisione
-                            )
-
-                            ultima_decisione = decisione_adattiva
+                        if valuta_se_generare_condizione(
+                            mondo,
+                            ultima_decisione,
+                            memoria_fisica,
+                            stato_robot,
+                            CHIAVE_PRIVATA
+                        ):
+                            logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
 
                             nuova_condizione = genera_condizione_autonoma(
                                 mondo,
