@@ -121,7 +121,11 @@ class NaoSenses:
 
         # 4. TESTA E BRACCIA LATERALI
         try:
-            if self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value") > 0:
+            head_front = self.memory.getData("Device/SubDeviceList/Head/Touch/Front/Sensor/Value")
+            head_middle = self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value")
+            head_rear = self.memory.getData("Device/SubDeviceList/Head/Touch/Rear/Sensor/Value")
+
+            if head_front > 0 or head_middle > 0 or head_rear > 0:
                 eventi.append(u"Sento una carezza sulla testa.")
 
             mano_sx = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
@@ -155,7 +159,7 @@ class NaoSenses:
             peso_dx = self.memory.getData("Device/SubDeviceList/RFoot/FSR/TotalWeight/Sensor/Value")
             peso_totale = peso_sx + peso_dx
 
-            if peso_totale < 0.4:
+            if peso_totale < 0.8:
                 if tempo_attuale - self.ultimo_urto > 4:
                     eventi.append(u"PERICOLO CADUTA! Pavimento mancante o sollevamento.")
                     self.ultimo_urto = tempo_attuale

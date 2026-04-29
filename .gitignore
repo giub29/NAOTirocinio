@@ -17,3 +17,12 @@ NAOTirocinio/behaviors/generated_conditions/*
 # comportamenti generati runtime
 behaviors/generated/*
 !behaviors/generated/.gitkeep
+
+# condizioni generate runtime
+NAOTirocinio/behaviors/quarantine_conditions/*
+NAOTirocinio/behaviors/rejected_conditions/*
+NAOTirocinio/behaviors/generated_conditions/*
+
+!NAOTirocinio/behaviors/quarantine_conditions/.gitkeep
+!NAOTirocinio/behaviors/rejected_conditions/.gitkeep
+!NAOTirocinio/behaviors/generated_conditions/.gitkeep

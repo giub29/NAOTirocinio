@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 
 def condizione(mondo, stato_runtime):
+    if u"PRENDI L'INIZIATIVA" in mondo:
+        return False
+
+    if u"Sento una carezza" in mondo:
+        return False
+
+    if u"Riconosco" in mondo or u"Vedo un volto ignoto" in mondo:
+        return False
+
     return u"C'è qualcosa a sinistra" in mondo and u"SONO FERMO" in mondo
 
 

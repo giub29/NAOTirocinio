@@ -29,6 +29,7 @@ from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_dura
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
 from behaviors.condition_manager import valuta_condizioni_generate
+from behaviors.condition_generator import genera_condizione_autonoma
 
 from behaviors.adaptive_behavior import (
     nessuna_condizione_nota,
@@ -61,8 +62,15 @@ def aggiorna_heartbeat():
         if not os.path.exists(HEARTBEAT_DIR):
             os.makedirs(HEARTBEAT_DIR)
 
-        with open(HEARTBEAT_FILE, "w") as f:
+        tmp_file = HEARTBEAT_FILE + ".tmp"
+
+        with open(tmp_file, "w") as f:
             f.write(str(time.time()))
+
+        if os.path.exists(HEARTBEAT_FILE):
+            os.remove(HEARTBEAT_FILE)
+
+        os.rename(tmp_file, HEARTBEAT_FILE)
 
     except Exception:
         pass
@@ -300,6 +308,13 @@ def _riprendi_cammino_automatico(corpo, ultima_decisione):
             corpo.cammina(VELOCITA_CAMMINO, 0.0)
             logger.debug(u"Cammino automatico ripreso")
 
+import signal
+
+def handle_exit(sig, frame):
+    print("Soul arrestato pulitamente")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_exit)
 
 def main():
     global messaggio_utente, input_ricevuto, STOP_PROGRAMMA
@@ -335,7 +350,7 @@ def main():
 
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
-            
+
             mondo = sensi.ottieni_report_semantico()
 
             stato_robot = aggiorna_stato_robot(
@@ -401,6 +416,23 @@ def main():
             mondo = _pulisci_mondo_da_volti_salutati(mondo)
             mondo = re.sub(r"\s+", " ", mondo).strip()
             mondo = _aggiungi_stato_movimento(mondo, corpo)
+
+            if (stato_runtime["in_pattugliamento"] and 
+                (
+                    u"Sento una carezza sulla testa" in mondo or
+                    u"Vedo un volto ignoto" in mondo or
+                    u"Riconosco" in mondo or
+                    u"URTO" in mondo or
+                    u"PERICOLO" in mondo
+                )
+            ):
+                logger.warning(u"[SAFETY] Evento sensibile durante cammino: arresto immediato")
+                stato_runtime["in_pattugliamento"] = False
+                corpo.fermati()
+                voce.parla(u"Mi fermo per sicurezza.")
+                stato_precedente = mondo
+                time.sleep(0.2)
+                continue
 
             if input_ricevuto and messaggio_utente:
                 mondo += u" L'utente dice: '{}'.".format(messaggio_utente)
@@ -476,6 +508,18 @@ def main():
                             )
 
                             ultima_decisione = decisione_adattiva
+
+                            nuova_condizione = genera_condizione_autonoma(
+                                mondo,
+                                memoria_fisica,
+                                stato_robot,
+                                CHIAVE_PRIVATA
+                            )
+
+                            if nuova_condizione:
+                                logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
+                                    nuova_condizione
+                                ))
 
                     ultimo_evento_tempo = time.time()
 
