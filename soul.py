@@ -52,6 +52,20 @@ VELOCITA_CAMMINO = 0.3
 
 ANGOLO_SGUARDO_NEUTRO = (0.0, -0.35)
 ANGOLO_SGUARDO_INIZIATIVA = (0.0, -0.2)
+HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
+HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
+
+
+def aggiorna_heartbeat():
+    try:
+        if not os.path.exists(HEARTBEAT_DIR):
+            os.makedirs(HEARTBEAT_DIR)
+
+        with open(HEARTBEAT_FILE, "w") as f:
+            f.write(str(time.time()))
+
+    except Exception:
+        pass
 
 messaggio_utente = ""
 input_ricevuto = False
@@ -320,6 +334,8 @@ def main():
         ultima_decisione = {"azioni": []}
 
         while not STOP_PROGRAMMA:
+            aggiorna_heartbeat()
+            
             mondo = sensi.ottieni_report_semantico()
 
             stato_robot = aggiorna_stato_robot(
