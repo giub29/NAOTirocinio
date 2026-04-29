@@ -18,6 +18,8 @@ if sys.version_info[0] < 3:
 import codecs
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
 
+from utils.text_utils import normalizza_testo_ascii, testo_per_log
+
 from modules.vision_perception import NaoVision
 from modules.voice_interaction import NaoVoice
 from modules.system_manager import NaoSystem
@@ -216,7 +218,7 @@ def _processa_input_utente(mondo, corpo, voce):
             corpo.guarda(*ANGOLO_SGUARDO_NEUTRO)
             logger.debug(u"Comando vai/cammina ricevuto")
 
-        elif "stop" in testo_user or "fermati" in testo_user:
+        elif "stop" in testo_user or "fermati" in testo_user or "ferma" in testo_user:
             stato_runtime["in_pattugliamento"] = False
             corpo.fermati()
             logger.debug(u"Comando stop/fermati ricevuto")
@@ -240,10 +242,10 @@ def _processa_input_utente(mondo, corpo, voce):
                     stato_runtime
                 )
 
-                messaggio_utente = ""
-                input_ricevuto = False
-    return mondo
+        messaggio_utente = ""
+        input_ricevuto = False
 
+    return mondo
 
 def _normalizza_mondo_fermo(mondo, corpo):
     if not corpo.sta_camminando() and not stato_runtime["in_pattugliamento"]:
@@ -322,10 +324,10 @@ def _elabora_decisione(mondo, corpo, voce, vista, sistema):
 
     decisione = valida_decisione(decisione, mondo)
 
-    logger.info(u"Stato: {}".format(decisione.get("stato_interno", "neutro")))
-    logger.info(u"Obiettivo: {}".format(decisione.get("obiettivo", "")))
+    logger.info(u"Stato: {}".format(testo_per_log(decisione.get("stato_interno", "neutro"))))
+    logger.info(u"Obiettivo: {}".format(testo_per_log(decisione.get("obiettivo", ""))))
     logger.info(u"Azioni: {}".format(
-        json.dumps(decisione.get("azioni", []), ensure_ascii=False)
+        testo_per_log(json.dumps(decisione.get("azioni", []), ensure_ascii=False))
     ))
 
     esegui_decisione(
@@ -409,6 +411,7 @@ def main():
                 continue
 
             mondo = sensi.ottieni_report_semantico()
+            mondo = normalizza_testo_ascii(mondo)
 
             if (
                 not corpo.sta_camminando() and
@@ -529,7 +532,7 @@ def main():
 
             if not stato_runtime["attesa_nome"]:
                 if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
-                    logger.info(u"SENSORI: {}".format(mondo))
+                    logger.info(u"SENSORI: {}".format(testo_per_log(mondo)))
 
                     if gestisci_volto_durante_cammino(
                         mondo,
