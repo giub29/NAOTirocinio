@@ -414,6 +414,7 @@ def main():
                 u"URTO" not in mondo and
                 (
                     u"Sento una carezza" in mondo or
+                    u"Sento un tocco sulla mano" in mondo or
                     u"Vedo qualcosa vicino" in mondo or
                     u"C'è qualcosa a sinistra" in mondo or
                     u"C'è qualcosa a destra" in mondo or
@@ -500,16 +501,15 @@ def main():
 
             evento_fisico_sensibile = (
                 u"Sento una carezza sulla testa" in mondo or
+                u"Sento un tocco sulla mano" in mondo or
                 u"URTO" in mondo or
                 u"PERICOLO" in mondo or
-                u"Vedo qualcosa vicino" in mondo or
-                u"Ostacolo" in mondo or
                 u"rischio di cadere" in mondo.lower() or
                 u"cadere" in mondo.lower()
             )
 
             if stato_runtime["in_pattugliamento"] and evento_fisico_sensibile:
-                logger.warning(u"[SAFETY] Evento sensibile durante cammino: arresto immediato")
+                logger.warning(u"[SAFETY] Evento fisico sensibile durante cammino: arresto immediato")
                 stato_runtime["in_pattugliamento"] = False
                 corpo.fermati()
                 voce.parla(u"Mi fermo per sicurezza.")

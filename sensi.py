@@ -119,7 +119,7 @@ class NaoSenses:
         except:
             pass
 
-        # 4. TESTA E BRACCIA LATERALI
+                # 4. TESTA E MANI
         try:
             head_front = self.memory.getData("Device/SubDeviceList/Head/Touch/Front/Sensor/Value")
             head_middle = self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value")
@@ -128,14 +128,24 @@ class NaoSenses:
             if head_front > 0 or head_middle > 0 or head_rear > 0:
                 eventi.append(u"Sento una carezza sulla testa.")
 
-            mano_sx = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
-            mano_dx = self.memory.getData("Device/SubDeviceList/RHand/Touch/Back/Sensor/Value")
+            mano_sx_back = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
+            mano_sx_left = self.memory.getData("Device/SubDeviceList/LHand/Touch/Left/Sensor/Value")
+            mano_sx_right = self.memory.getData("Device/SubDeviceList/LHand/Touch/Right/Sensor/Value")
 
-            if mano_sx > 0 or mano_dx > 0:
-                if tempo_attuale - self.ultimo_urto > 5:
-                    lato = "sinistra" if mano_sx > 0 else "destra"
-                    eventi.append(u"URTO LATERALE a {}! Braccio bloccato.".format(lato))
-                    self.ultimo_urto = tempo_attuale
+            mano_dx_back = self.memory.getData("Device/SubDeviceList/RHand/Touch/Back/Sensor/Value")
+            mano_dx_left = self.memory.getData("Device/SubDeviceList/RHand/Touch/Left/Sensor/Value")
+            mano_dx_right = self.memory.getData("Device/SubDeviceList/RHand/Touch/Right/Sensor/Value")
+
+            mano_sx_toccata = mano_sx_back > 0 or mano_sx_left > 0 or mano_sx_right > 0
+            mano_dx_toccata = mano_dx_back > 0 or mano_dx_left > 0 or mano_dx_right > 0
+
+            if mano_sx_toccata and mano_dx_toccata:
+                eventi.append(u"Sento un tocco su entrambe le mani.")
+            elif mano_sx_toccata:
+                eventi.append(u"Sento un tocco sulla mano sinistra.")
+            elif mano_dx_toccata:
+                eventi.append(u"Sento un tocco sulla mano destra.")
+
         except:
             pass
 
