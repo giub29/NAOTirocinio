@@ -11,6 +11,9 @@ import re
 import logging
 import sys
 
+utente_sta_scrivendo = False
+ultimo_input_tempo = 0
+
 if sys.version_info[0] < 3:
     reload(sys)
     sys.setdefaultencoding('utf-8')
@@ -174,23 +177,28 @@ def aggiorna_memoria_da_decisione(decisione):
 
 def _thread_input_utente():
     global messaggio_utente, input_ricevuto
+    global utente_sta_scrivendo, ultimo_input_tempo
 
     while True:
         try:
+            utente_sta_scrivendo = True
+
             t = raw_input()
+
+            utente_sta_scrivendo = False
+            ultimo_input_tempo = time.time()
+
             testo = t.decode("utf-8", "ignore").lower().strip()
 
             if "stop" in testo or "fermati" in testo or "ferma" in testo:
                 stato_runtime["comando_stop_immediato"] = True
-                messaggio_utente = testo
-                input_ricevuto = True
-            else:
-                messaggio_utente = testo
-                input_ricevuto = True
+
+            messaggio_utente = testo
+            input_ricevuto = True
 
         except Exception as e:
+            utente_sta_scrivendo = False
             logger.debug(u"Errore nella lettura input: {}".format(e))
-
 
 def _inizializza_robot(corpo, voce, vista, sistema):
     sistema.set_vita_autonoma(False)
@@ -200,7 +208,7 @@ def _inizializza_robot(corpo, voce, vista, sistema):
     logger.info(u"Robot inizializzato")
 
 
-def _processa_input_utente(mondo, corpo, voce):
+def _processa_input_utente(mondo, corpo, voce, vista, sistema):
     global input_ricevuto, messaggio_utente, STOP_PROGRAMMA
 
     if input_ricevuto and messaggio_utente:
@@ -223,8 +231,8 @@ def _processa_input_utente(mondo, corpo, voce):
             corpo.fermati()
             logger.debug(u"Comando stop/fermati ricevuto")
 
-        elif testo_user.startswith("test condizione"):
-            nome = testo_user.replace("test condizione", "").strip()
+        elif testo_user.startswith("test condizione") or testo_user.startswith("test"):
+            nome = testo_user.replace("test condizione", "").replace("test", "").strip()
 
             decisione = esegui_condizione_per_nome(
                 nome,
@@ -241,6 +249,10 @@ def _processa_input_utente(mondo, corpo, voce):
                     sistema,
                     stato_runtime
                 )
+
+            messaggio_utente = ""
+            input_ricevuto = False
+            return mondo
 
         messaggio_utente = ""
         input_ricevuto = False
@@ -398,6 +410,10 @@ def main():
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
 
+            if time.time() - ultimo_input_tempo < 2.0 and not input_ricevuto:
+                time.sleep(0.1)
+                continue
+
             if stato_runtime.get("comando_stop_immediato", False):
                 logger.warning(u"[SAFETY] Stop immediato richiesto dall'utente")
                 stato_runtime["comando_stop_immediato"] = False
@@ -476,7 +492,7 @@ def main():
                 input_ricevuto = False
                 continue
 
-            _processa_input_utente(mondo, corpo, voce)
+            mondo = _processa_input_utente(mondo, corpo, voce, vista, sistema)
 
             if STOP_PROGRAMMA:
                 break

@@ -16,9 +16,13 @@ class NaoVoice:
 
     def parla(self, messaggio):
         from utils.text_utils import testo_per_voce
+        from soul import utente_sta_scrivendo
+
+        if utente_sta_scrivendo:
+            return  
+
         testo = testo_per_voce(messaggio)
 
-        # Python 2 compatibilità
         if isinstance(testo, unicode):
             testo = testo.encode('utf-8')
 

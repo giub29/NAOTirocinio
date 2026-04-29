@@ -97,7 +97,8 @@ def esegui_condizione_per_nome(nome, mondo, stato_runtime):
 
         if nome in nome_condizione:
             try:
-                if item["modulo"].condizione(mondo, stato_runtime):
+                mondo_test = mondo + u" Sento una carezza sulla testa. Vedo qualcosa vicino. Ostacolo a sinistra."
+                if item["modulo"].condizione(mondo_test, stato_runtime):
                     print("[TEST] Attivata:", item["nome"])
                     return item["modulo"].comportamento()
                 else:
