@@ -15,6 +15,9 @@ if sys.version_info[0] < 3:
     reload(sys)
     sys.setdefaultencoding('utf-8')
 
+import codecs
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
+
 from modules.vision_perception import NaoVision
 from modules.voice_interaction import NaoVoice
 from modules.system_manager import NaoSystem

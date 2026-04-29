@@ -89,13 +89,18 @@ def valuta_condizioni_generate(mondo, stato_runtime):
 def esegui_condizione_per_nome(nome, mondo, stato_runtime):
     condizioni = carica_condizioni_generate()
 
+    nome = nome.lower().strip()
+
     for item in condizioni:
-        if item["nome"] == nome:
+        nome_condizione = item["nome"].lower()
+
+        if nome in nome_condizione:
             try:
                 if item["modulo"].condizione(mondo, stato_runtime):
+                    print("[TEST] Attivata:", item["nome"])
                     return item["modulo"].comportamento()
                 else:
-                    print("[TEST] Condizione NON attivata")
+                    print("[TEST] Condizione trovata ma NON attiva")
                     return None
 
             except Exception as e:

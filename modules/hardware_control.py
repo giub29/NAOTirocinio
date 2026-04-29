@@ -65,6 +65,11 @@ class NaoBody:
     def guarda(self, x, y):
         try:
             self.motion.setStiffnesses("Head", 1.0)
+            if y > -0.15:
+                y = -0.15
+            if y < -0.55:
+                y = -0.55
+
             self.motion.angleInterpolationWithSpeed("HeadYaw", float(x), 0.2)
             self.motion.angleInterpolationWithSpeed("HeadPitch", float(y), 0.2)
         except Exception as e:
