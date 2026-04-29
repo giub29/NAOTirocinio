@@ -37,10 +37,24 @@ from behaviors.condition_generator import (
     valuta_se_generare_condizione
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+import colorlog
+
+handler = colorlog.StreamHandler()
+
+handler.setFormatter(colorlog.ColoredFormatter(
+    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    log_colors={
+        'DEBUG':    'cyan',
+        'INFO':     'green',
+        'WARNING':  'yellow',
+        'ERROR':    'red',
+        'CRITICAL': 'red,bg_white',
+    }
+))
+
+logger = colorlog.getLogger()
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
