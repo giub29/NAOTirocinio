@@ -13,6 +13,7 @@ import sys
 
 utente_sta_scrivendo = False
 ultimo_input_tempo = 0
+MODALITA_TEST = True
 
 if sys.version_info[0] < 3:
     reload(sys)
@@ -409,6 +410,7 @@ def main():
 
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
+            
 
             if time.time() - ultimo_input_tempo < 2.0 and not input_ricevuto:
                 time.sleep(0.1)
