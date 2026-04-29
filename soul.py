@@ -108,7 +108,8 @@ stato_runtime = {
     "ultimo_volto_noto_tempo": 0,
     "ultimo_nome_riconosciuto": "",
     "volti_salutati": [],
-    "in_pattugliamento": False
+    "in_pattugliamento": False,
+    "comando_stop_immediato": False
 }
 
 
@@ -175,8 +176,15 @@ def _thread_input_utente():
     while True:
         try:
             t = raw_input()
-            messaggio_utente = t.decode("utf-8", "ignore")
-            input_ricevuto = True
+            testo = t.decode("utf-8", "ignore").lower().strip()
+
+            if "stop" in testo or "fermati" in testo or "ferma" in testo:
+                stato_runtime["comando_stop_immediato"] = True
+                messaggio_utente = testo
+                input_ricevuto = True
+            else:
+                messaggio_utente = testo
+                input_ricevuto = True
 
         except Exception as e:
             logger.debug(u"Errore nella lettura input: {}".format(e))
@@ -386,6 +394,18 @@ def main():
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
 
+            if stato_runtime.get("comando_stop_immediato", False):
+                logger.warning(u"[SAFETY] Stop immediato richiesto dall'utente")
+                stato_runtime["comando_stop_immediato"] = False
+                stato_runtime["in_pattugliamento"] = False
+                input_ricevuto = False
+                messaggio_utente = ""
+                corpo.fermati()
+                voce.parla(u"Mi fermo.")
+                stato_precedente = ""
+                time.sleep(0.1)
+                continue
+
             mondo = sensi.ottieni_report_semantico()
 
             if (
@@ -478,15 +498,17 @@ def main():
             mondo = re.sub(r"\s+", " ", mondo).strip()
             mondo = _aggiungi_stato_movimento(mondo, corpo)
 
-            if (stato_runtime["in_pattugliamento"] and 
-                (
-                    u"Sento una carezza sulla testa" in mondo or
-                    u"Vedo un volto ignoto" in mondo or
-                    u"Riconosco" in mondo or
-                    u"URTO" in mondo or
-                    u"PERICOLO" in mondo
-                )
-            ):
+            evento_fisico_sensibile = (
+                u"Sento una carezza sulla testa" in mondo or
+                u"URTO" in mondo or
+                u"PERICOLO" in mondo or
+                u"Vedo qualcosa vicino" in mondo or
+                u"Ostacolo" in mondo or
+                u"rischio di cadere" in mondo.lower() or
+                u"cadere" in mondo.lower()
+            )
+
+            if stato_runtime["in_pattugliamento"] and evento_fisico_sensibile:
                 logger.warning(u"[SAFETY] Evento sensibile durante cammino: arresto immediato")
                 stato_runtime["in_pattugliamento"] = False
                 corpo.fermati()

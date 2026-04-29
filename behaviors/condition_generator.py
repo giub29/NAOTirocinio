@@ -19,6 +19,7 @@ import logging
 import requests
 import json
 import imp
+import ast
 
 from behaviors.condition_manager import reset_cache_condizioni
 
@@ -121,19 +122,94 @@ def _codice_contiene_token_vietati(codice):
 
 
 def _valida_struttura_codice(codice):
-    if "def condizione(" not in codice:
-        return False, "Manca def condizione(mondo, stato_runtime)"
-
-    if "def comportamento(" not in codice:
-        return False, "Manca def comportamento()"
-
-    if "return" not in codice:
-        return False, "Manca return"
-
     token_vietato = _codice_contiene_token_vietati(codice)
 
     if token_vietato:
         return False, "Token vietato trovato: {}".format(token_vietato)
+
+    try:
+        if isinstance(codice, unicode):
+            codice_ast = codice.encode("utf-8")
+        else:
+            codice_ast = codice
+
+        albero = ast.parse(codice_ast)
+    except Exception as e:
+        return False, "Errore sintassi Python: {}".format(e)
+
+    funzioni_trovate = []
+
+    for nodo in albero.body:
+        if isinstance(nodo, ast.FunctionDef):
+            funzioni_trovate.append(nodo.name)
+        elif isinstance(nodo, ast.Expr) and isinstance(nodo.value, ast.Str):
+            continue
+        else:
+            return False, "Il file deve contenere solo funzioni, nessun codice eseguito fuori funzione"
+
+    if "condizione" not in funzioni_trovate:
+        return False, "Manca funzione condizione(mondo, stato_runtime)"
+
+    if "comportamento" not in funzioni_trovate:
+        return False, "Manca funzione comportamento()"
+
+    if len(funzioni_trovate) != 2:
+        return False, "Sono consentite solo due funzioni: condizione e comportamento"
+
+    for nodo in ast.walk(albero):
+        if isinstance(nodo, ast.Subscript):
+            return False, "Accesso diretto con parentesi quadre vietato: usare .get()"
+        
+        if isinstance(nodo, (ast.Import, ast.ImportFrom)):
+            return False, "Import vietato"
+
+        if isinstance(nodo, ast.Global):
+            return False, "Uso di global vietato"
+
+        if isinstance(nodo, ast.Lambda):
+            return False, "Lambda vietata"
+
+        if isinstance(nodo, ast.ClassDef):
+            return False, "Classi vietate"
+
+        if isinstance(nodo, ast.While):
+            return False, "While vietato"
+
+        if isinstance(nodo, ast.For):
+            return False, "For vietato"
+
+        if isinstance(nodo, ast.Try):
+            return False, "Try/except vietato"
+
+        if isinstance(nodo, ast.With):
+            return False, "With vietato"
+
+        if isinstance(nodo, ast.Call):
+            nome_chiamata = ""
+
+            if isinstance(nodo.func, ast.Name):
+                nome_chiamata = nodo.func.id
+
+            elif isinstance(nodo.func, ast.Attribute):
+                nome_chiamata = nodo.func.attr
+
+            chiamate_permesse = [
+                "lower",
+                "upper",
+                "strip",
+                "get"
+            ]
+
+            if nome_chiamata not in chiamate_permesse:
+                return False, "Chiamata funzione non consentita: {}".format(nome_chiamata)
+
+        if isinstance(nodo, ast.Attribute):
+            if nodo.attr.startswith("__"):
+                return False, "Accesso ad attributo speciale vietato"
+
+        if isinstance(nodo, ast.Name):
+            if nodo.id.startswith("__"):
+                return False, "Nome speciale vietato"
 
     return True, "ok"
 
@@ -151,7 +227,11 @@ def _valida_modulo_python(path_file):
             return False, "Funzione comportamento assente"
 
         test_mondo = u"REPORT: situazione di test. SONO FERMO."
-        test_runtime = {}
+        test_runtime = {
+            "batteria": 80,
+            "sta_camminando": False,
+            "utente_presente": True
+        }
 
         risultato_condizione = modulo.condizione(test_mondo, test_runtime)
 
@@ -163,22 +243,107 @@ def _valida_modulo_python(path_file):
         if not isinstance(comportamento, dict):
             return False, "comportamento() deve restituire un dizionario"
 
-        if "azioni" not in comportamento:
-            return False, "comportamento() non contiene azioni"
-
         azioni = comportamento.get("azioni", [])
 
         if not isinstance(azioni, list):
             return False, "azioni deve essere una lista"
 
+        if len(azioni) == 0:
+            return False, "Il comportamento deve contenere almeno una azione"
+
+        if len(azioni) > 4:
+            return False, "Massimo 4 azioni consentite"
+
+        ha_reazione_fisica = False
+
         for azione in azioni:
             if not isinstance(azione, dict):
-                return False, "azione non valida"
+                return False, "Ogni azione deve essere un dizionario"
 
             tipo = azione.get("tipo", "")
 
             if tipo not in AZIONI_CONSENTITE:
                 return False, "Azione non consentita: {}".format(tipo)
+
+            if tipo in ["occhi", "guarda", "posa", "fermati", "animazione"]:
+                ha_reazione_fisica = True
+
+            if tipo == "parla":
+                testo = azione.get("testo", "")
+
+                if not isinstance(testo, basestring):
+                    return False, "parla.testo deve essere una stringa"
+
+                if len(testo) > 120:
+                    return False, "Testo parlato troppo lungo"
+
+            elif tipo == "occhi":
+                colore = azione.get("colore", "")
+
+                if colore not in ["white", "red", "green", "blue", "yellow", "purple", "cyan"]:
+                    return False, "Colore occhi non consentito: {}".format(colore)
+
+            elif tipo == "guarda":
+                x = azione.get("x", 0.0)
+                y = azione.get("y", -0.25)
+
+                if not isinstance(x, (int, float)):
+                    return False, "guarda.x deve essere numerico"
+
+                if not isinstance(y, (int, float)):
+                    return False, "guarda.y deve essere numerico"
+
+                if x < -1.0 or x > 1.0:
+                    return False, "guarda.x fuori range"
+
+                if y < -0.5 or y > -0.1:
+                    return False, "guarda.y fuori range"
+
+            elif tipo == "cammina":
+                x = azione.get("x", 0.0)
+                g = azione.get("g", 0.0)
+
+                if not isinstance(x, (int, float)):
+                    return False, "cammina.x deve essere numerico"
+
+                if not isinstance(g, (int, float)):
+                    return False, "cammina.g deve essere numerico"
+
+                if x < -0.2 or x > 0.2:
+                    return False, "cammina.x fuori range"
+
+                if g < -0.2 or g > 0.2:
+                    return False, "cammina.g fuori range"
+
+            elif tipo == "gira":
+                v = azione.get("v", 0.0)
+
+                if not isinstance(v, (int, float)):
+                    return False, "gira.v deve essere numerico"
+
+                if v < -0.3 or v > 0.3:
+                    return False, "gira.v fuori range"
+
+            elif tipo == "posa":
+                nome_posa = azione.get("nome", "")
+
+                if nome_posa not in ["Stand", "Crouch", "Sit", "SitRelax"]:
+                    return False, "Posa non consentita: {}".format(nome_posa)
+
+            elif tipo == "animazione":
+                path = azione.get("path", "")
+
+                if not isinstance(path, basestring):
+                    return False, "animazione.path deve essere una stringa"
+
+                if not path.startswith("animations/Stand/"):
+                    return False, "Path animazione non sicuro"
+
+        if not ha_reazione_fisica:
+            return False, "Il comportamento deve avere almeno una reazione fisica"
+
+        if len(azioni) == 1 and azioni[0].get("tipo") == "parla":
+            return False, "Vietato comportamento solo verbale"
 
         return True, "ok"
 

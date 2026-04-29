@@ -8,6 +8,7 @@ import logging
 import imp 
 import time
 
+
 logger = logging.getLogger(__name__)
 
 CONDIZIONI_DIR = os.path.join(os.path.dirname(__file__), "generated_conditions")
