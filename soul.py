@@ -52,9 +52,10 @@ handler.setFormatter(colorlog.ColoredFormatter(
     }
 ))
 
-logger = colorlog.getLogger()
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+root_logger = logging.getLogger()
+root_logger.handlers = []
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +387,32 @@ def main():
             aggiorna_heartbeat()
 
             mondo = sensi.ottieni_report_semantico()
+
+            if (
+                not corpo.sta_camminando() and
+                not stato_runtime["in_pattugliamento"] and
+                u"URTO" not in mondo and
+                (
+                    u"Sento una carezza" in mondo or
+                    u"Vedo qualcosa vicino" in mondo or
+                    u"C'è qualcosa a sinistra" in mondo or
+                    u"C'è qualcosa a destra" in mondo or
+                    u"Ostacolo a sinistra" in mondo or
+                    u"Ostacolo a destra" in mondo
+                )
+            ):
+                mondo = mondo.replace(u"Vedo qualcosa vicino.", u"")
+                mondo = mondo.replace(u"Vedo qualcosa vicino", u"")
+                mondo = mondo.replace(u"C'è qualcosa a sinistra.", u"")
+                mondo = mondo.replace(u"C'è qualcosa a sinistra", u"")
+                mondo = mondo.replace(u"C'è qualcosa a destra.", u"")
+                mondo = mondo.replace(u"C'è qualcosa a destra", u"")
+                mondo = mondo.replace(u"Ostacolo a sinistra.", u"")
+                mondo = mondo.replace(u"Ostacolo a sinistra", u"")
+                mondo = mondo.replace(u"Ostacolo a destra.", u"")
+                mondo = mondo.replace(u"Ostacolo a destra", u"")
+
+                mondo += u" INTERAZIONE_UTENTE."
 
             stato_robot = aggiorna_stato_robot(
                 stato_robot,
