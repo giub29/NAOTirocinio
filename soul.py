@@ -28,7 +28,7 @@ from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
-from behaviors.condition_manager import valuta_condizioni_generate
+from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
 from behaviors.condition_generator import (
     genera_condizione_autonoma,
     valuta_se_generare_condizione
@@ -194,6 +194,25 @@ def _processa_input_utente(mondo, corpo, voce):
             stato_runtime["in_pattugliamento"] = False
             corpo.fermati()
             logger.debug(u"Comando stop/fermati ricevuto")
+
+        elif testo_user.startswith("test condizione"):
+            nome = testo_user.replace("test condizione", "").strip()
+
+            decisione = esegui_condizione_per_nome(
+                nome,
+                mondo,
+                stato_runtime
+            )
+
+            if decisione:
+                esegui_decisione(
+                    decisione,
+                    corpo,
+                    voce,
+                    vista,
+                    sistema,
+                    stato_runtime
+                )
 
     return mondo
 

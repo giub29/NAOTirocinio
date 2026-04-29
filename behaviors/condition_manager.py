@@ -6,13 +6,15 @@ Caricatore di condizioni Python generate.
 import os
 import logging
 import imp 
+import time
 
 logger = logging.getLogger(__name__)
 
 CONDIZIONI_DIR = os.path.join(os.path.dirname(__file__), "generated_conditions")
 
 _condizioni_cache = None
-
+_ultima_attivazione_condizione = {}
+COOLDOWN_CONDIZIONE = 30
 
 def reset_cache_condizioni():
     global _condizioni_cache
@@ -62,17 +64,43 @@ def carica_condizioni_generate():
 
 def valuta_condizioni_generate(mondo, stato_runtime):
     condizioni = carica_condizioni_generate()
+    adesso = time.time()
 
     for item in condizioni:
         nome = item["nome"]
         modulo = item["modulo"]
 
         try:
+            ultimo_tempo = _ultima_attivazione_condizione.get(nome, 0)
+
+            if adesso - ultimo_tempo < COOLDOWN_CONDIZIONE:
+                continue
+
             if modulo.condizione(mondo, stato_runtime):
                 logger.info(u"[CONDIZIONI] Attivata condizione generata: {}".format(nome))
+                _ultima_attivazione_condizione[nome] = adesso
                 return modulo.comportamento()
 
         except Exception as e:
             logger.warning(u"[CONDIZIONI] Errore valutazione {}: {}".format(nome, e))
 
+    return None
+
+def esegui_condizione_per_nome(nome, mondo, stato_runtime):
+    condizioni = carica_condizioni_generate()
+
+    for item in condizioni:
+        if item["nome"] == nome:
+            try:
+                if item["modulo"].condizione(mondo, stato_runtime):
+                    return item["modulo"].comportamento()
+                else:
+                    print("[TEST] Condizione NON attivata")
+                    return None
+
+            except Exception as e:
+                print("[TEST ERROR]:", e)
+                return None
+
+    print("[TEST] Condizione non trovata:", nome)
     return None

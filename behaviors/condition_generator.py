@@ -36,7 +36,9 @@ AZIONI_CONSENTITE = [
     "occhi",
     "animazione",
     "posa",
-    "fermati"
+    "fermati",
+    "cammina",
+    "gira"
 ]
 
 TOKEN_VIETATI = [
@@ -254,12 +256,23 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"    }\n\n"
 
         u"AZIONI CONSENTITE:\n"
-        u"- parla\n"
-        u"- guarda\n"
-        u"- occhi\n"
-        u"- animazione\n"
-        u"- posa\n"
-        u"- fermati\n\n"
+        u"- parla: risposta vocale breve\n"
+        u"- guarda: orienta la testa, usa x tra -1.0 e 1.0, y tra -0.7 e 0.7\n"
+        u"- occhi: cambia colore occhi tra white/red/green/blue/yellow/purple/cyan\n"
+        u"- animazione: usa path sicuri come animations/Stand/Gestures/Hey_1\n"
+        u"- posa: usa Stand, Crouch, Sit, SitRelax\n"
+        u"- fermati: arresta il movimento\n"
+        u"- cammina: solo per micro-movimenti prudenti, x tra -0.2 e 0.2, g tra -0.2 e 0.2\n"
+        u"- gira: rotazione prudente, v tra -0.3 e 0.3\n\n"
+
+        u"REGOLE PER COMPORTAMENTO AUTONOMO:\n"
+        u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
+        u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"
+        u"- Per interazioni sociali positive, usa occhi verdi/cyan, guarda verso la persona e rispondi con tono amichevole.\n"
+        u"- Per ostacoli o pericolo, usa fermati, occhi gialli/rossi, guarda verso il lato del problema e parla.\n"
+        u"- Non usare cammina se il robot è fermo e non c'è una richiesta esplicita o una situazione di evitamento.\n"
+        u"- Non usare gira/cammina per eventi sociali come carezza o volto.\n"
+        u"- Massimo 4 azioni.\n\n"
 
         u"MONDO ATTUALE:\n"
         + mondo +
