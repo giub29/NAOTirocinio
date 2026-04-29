@@ -178,8 +178,14 @@ def _valida_struttura_codice(codice):
         if isinstance(nodo, ast.For):
             return False, "For vietato"
 
-        if isinstance(nodo, ast.Try):
+        if hasattr(ast, "Try") and isinstance(nodo, ast.Try):
             return False, "Try/except vietato"
+
+        if hasattr(ast, "TryExcept") and isinstance(nodo, ast.TryExcept):
+            return False, "Try/except vietato"
+
+        if hasattr(ast, "TryFinally") and isinstance(nodo, ast.TryFinally):
+            return False, "Try/finally vietato"
 
         if isinstance(nodo, ast.With):
             return False, "With vietato"
@@ -444,6 +450,19 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"- Vietato generare un comportamento con una sola azione di tipo parla.\n"
         u"- Ogni comportamento deve contenere almeno una reazione fisica: occhi, guarda, posa, fermati o animazione.\n\n"
 
+        u"\nGESTIONE CURIOSITÀ:\n"
+        u"- Se MONDO contiene 'PRENDI L'INIZIATIVA', stai osservando una scena reale tramite immagine.\n"
+        u"- In questo caso puoi creare una nuova condizione di curiosità riutilizzabile.\n"
+        u"- La condizione NON deve dipendere da 'PRENDI L'INIZIATIVA'.\n"
+        u"- Deve invece attivarsi su dettagli visivi concreti (oggetti, ambienti, persone).\n"
+        u"- Usa mondo.lower() e cerca parole chiave.\n"
+        u"- Esempio corretto:\n"
+        u"  testo = mondo.lower()\n"
+        u"  return u\"armadio\" in testo or u\"foto\" in testo\n"
+        u"- Esempio sbagliato:\n"
+        u"  return u\"PRENDI L'INIZIATIVA\" in mondo\n"
+        u"- Il comportamento deve essere curioso ma semplice, non complesso.\n\n"
+
         u"MONDO ATTUALE:\n"
         + mondo +
         u"\n\nMEMORIA:\n"
@@ -496,6 +515,9 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"{\"genera\": true/false, \"motivo\": \"breve spiegazione\"}\n\n"
 
         u"Devi rispondere true solo se:\n"
+        u"- se MONDO contiene PRENDI L'INIZIATIVA, devi valutare se la scena osservata contiene dettagli visivi riutilizzabili in futuro;\n"
+        u"- per PRENDI L'INIZIATIVA, NON rispondere false solo perché la decisione corrente ha già parlato;\n"
+        u"- in caso di curiosità visiva, rispondi true se puoi creare una condizione basata su oggetti o pattern della scena;\n"
         u"- nessuna condizione già nota sembra coprire bene la situazione;\n"
         u"- la situazione è utile e generalizzabile;\n"
         u"- il comportamento può essere riutilizzato in futuro.\n\n"
@@ -504,8 +526,9 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"- è solo batteria, stato fermo/cammino o informazione banale;\n"
         u"- riguarda riconoscimento volto già gestito;\n"
         u"- è un input diretto dell'utente;\n"
-        u"- la decisione corrente è già adeguata.\n\n"
-
+        u"- la decisione corrente è già adeguata, TRANNE nei casi PRENDI L'INIZIATIVA con dettagli visivi riutilizzabili.\n\n"
+        u"IMPORTANTE: PRENDI L'INIZIATIVA è un caso speciale di apprendimento autonomo. Se la scena contiene oggetti, persone parziali, arredi o dettagli ambientali, preferisci genera=true.\n\n"
+        
         u"MONDO:\n"
         + mondo +
         u"\n\nULTIMA DECISIONE:\n"

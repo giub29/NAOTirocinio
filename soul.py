@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 IP_ROBOT = "172.16.165.86"
 CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY")
 
-TEMPO_INERZIA_INIZIATIVA = 30
+TEMPO_INERZIA_INIZIATIVA = 20
 LUNGHEZZA_MAX_RICORDI = 20
 VELOCITA_CAMMINO = 0.3
 
@@ -240,6 +240,8 @@ def _processa_input_utente(mondo, corpo, voce):
                     stato_runtime
                 )
 
+                messaggio_utente = ""
+                input_ricevuto = False
     return mondo
 
 
