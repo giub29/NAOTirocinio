@@ -15,10 +15,19 @@ class NaoVoice:
             self.tts.setLanguage("English")
 
     def parla(self, messaggio):
-        if isinstance(messaggio, unicode):
-            messaggio = messaggio.encode('utf-8')
-        print("NAO dice: " + messaggio)
-        self.tts.say(messaggio)
+        from utils.text_utils import testo_per_voce
+        testo = testo_per_voce(messaggio)
+
+        # Python 2 compatibilità
+        if isinstance(testo, unicode):
+            testo = testo.encode('utf-8')
+
+        print("NAO dice: " + testo)
+
+        try:
+            self.tts.say(testo)
+        except Exception as e:
+            print("[ERRORE VOCE]: {}".format(e))
 
     def imposta_volume(self, livello):
         """Livello da 0 a 100"""
