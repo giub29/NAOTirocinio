@@ -75,18 +75,21 @@ class NaoSenses:
         # 1. RICONOSCIMENTO VOLTI CON MEMORIA TEMPORANEA
         volto_corrente = self._leggi_volto()
 
-        if volto_corrente:
+        # Se riconosco un nome vero, aggiorno la memoria.
+        # Se vedo solo "Sconosciuto", non cancello subito l'ultimo volto noto.
+        if volto_corrente and volto_corrente != "Sconosciuto":
             self.ultimo_volto_nome = volto_corrente
             self.ultimo_volto_tempo = tempo_attuale
 
-        if (
+        volto_noto_recente = (
             self.ultimo_volto_nome and
             tempo_attuale - self.ultimo_volto_tempo <= self.durata_memoria_volto
-        ):
-            if self.ultimo_volto_nome != "Sconosciuto":
-                eventi.append(u"Riconosco {}.".format(self.ultimo_volto_nome))
-            else:
-                eventi.append(u"Vedo un volto ignoto.")
+        )
+
+        if volto_noto_recente:
+            eventi.append(u"Riconosco {}.".format(self.ultimo_volto_nome))
+        elif volto_corrente == "Sconosciuto":
+            eventi.append(u"Vedo un volto ignoto.")
 
         # 2. GESTIONE BATTITI
         try:
@@ -155,13 +158,6 @@ class NaoSenses:
             lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
             rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
             rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
-
-            print("[DEBUG BUMPER] LFoot Left={}, LFoot Right={}, RFoot Left={}, RFoot Right={}".format(
-                lb_left,
-                lb_right,
-                rb_left,
-                rb_right
-            ))
 
             piede_sx_toccato = lb_left > 0 or lb_right > 0
             piede_dx_toccato = rb_left > 0 or rb_right > 0
