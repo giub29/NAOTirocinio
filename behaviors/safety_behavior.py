@@ -62,10 +62,12 @@ def gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
         return True
 
     if u"Ostacolo a sinistra" in mondo:
+        corpo.imposta_colore_occhi("red")
         corpo.cammina(0.25, -0.12)
         return True
 
     if u"Ostacolo a destra" in mondo:
+        corpo.imposta_colore_occhi("red")
         corpo.cammina(0.25, 0.12)
         return True
 

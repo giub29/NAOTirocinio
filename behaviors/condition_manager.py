@@ -97,49 +97,48 @@ def _registra_errore(nome_modulo, errore):
     if numero_errori >= MAX_ERRORI_CONDIZIONE:
         _sposta_in_rejected(nome_modulo, errore)
 
+def _priorita_condizione(nome):
+    nome = nome.lower()
+    punteggio = 0
+
+    if "durante_cammino" in nome:
+        punteggio += 100
+
+    if "_e_" in nome:
+        punteggio += 80
+
+    if "entrambe" in nome:
+        punteggio += 70
+
+    if "ostacolo" in nome:
+        punteggio += 40
+
+    return punteggio
 
 def carica_condizioni_generate():
-    global _condizioni_cache
-
-    if _condizioni_cache is not None:
-        return _condizioni_cache
-
-    _assicura_cartelle()
     condizioni = []
 
     for nome_file in os.listdir(CONDIZIONI_DIR):
         if not nome_file.endswith(".py"):
             continue
 
-        if nome_file == "__init__.py":
-            continue
+        # importa il file
+        # verifica che abbia condizione() e comportamento()
+        # aggiunge alla lista:
+        condizioni.append({
+            "nome": nome_file,
+            "modulo": modulo,
+            "condizione": modulo.condizione,
+            "comportamento": modulo.comportamento
+        })
 
-        path_file = os.path.join(CONDIZIONI_DIR, nome_file)
-        nome_modulo = nome_file.replace(".py", "")
+    # QUI va messo l'ordinamento
+    condizioni.sort(
+        key=lambda item: _priorita_condizione(item["nome"]),
+        reverse=True
+    )
 
-        try:
-            modulo = imp.load_source(nome_modulo, path_file)
-
-            if hasattr(modulo, "condizione") and hasattr(modulo, "comportamento"):
-                condizioni.append({
-                    "nome": nome_modulo,
-                    "modulo": modulo
-                })
-
-                logger.info(u"[CONDIZIONI] Caricata condizione: {}".format(nome_modulo))
-
-            else:
-                logger.warning(u"[CONDIZIONI] File ignorato, mancano condizione() o comportamento(): {}".format(
-                    nome_file
-                ))
-
-        except Exception as e:
-            logger.warning(u"[CONDIZIONI] Errore caricamento {}: {}".format(nome_file, e))
-            _registra_errore(nome_modulo, e)
-
-    _condizioni_cache = condizioni
     return condizioni
-
 
 def valuta_condizioni_generate(mondo, stato_runtime):
     """

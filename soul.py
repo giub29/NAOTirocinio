@@ -40,7 +40,8 @@ from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_inp
 from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
 from behaviors.condition_generator import (
     genera_condizione_autonoma,
-    valuta_se_generare_condizione
+    valuta_se_generare_condizione,
+    estrai_eventi
 )
 
 import colorlog
@@ -575,16 +576,6 @@ def main():
                     u"Ostacolo a destra" in mondo
                 )
             ):
-                mondo = mondo.replace(u"Vedo qualcosa vicino.", u"")
-                mondo = mondo.replace(u"Vedo qualcosa vicino", u"")
-                mondo = mondo.replace(u"C'è qualcosa a sinistra.", u"")
-                mondo = mondo.replace(u"C'è qualcosa a sinistra", u"")
-                mondo = mondo.replace(u"C'è qualcosa a destra.", u"")
-                mondo = mondo.replace(u"C'è qualcosa a destra", u"")
-                mondo = mondo.replace(u"Ostacolo a sinistra.", u"")
-                mondo = mondo.replace(u"Ostacolo a sinistra", u"")
-                mondo = mondo.replace(u"Ostacolo a destra.", u"")
-                mondo = mondo.replace(u"Ostacolo a destra", u"")
 
                 mondo += u" INTERAZIONE_UTENTE."
 
@@ -762,7 +753,7 @@ def main():
                         continue
 
                 decisione_condizione = None
-
+                stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
                 # Se il mondo era composto, NON faccio partire subito una condizione semplice
                 # nello stesso ciclo. Questo evita che carezza_testa/tocco_mano rubino
                 # l'evento alla nuova condizione composta.

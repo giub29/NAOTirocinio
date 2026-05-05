@@ -68,6 +68,20 @@ TOKEN_VIETATI = [
     "multiprocessing"
 ]
 
+def estrai_eventi(mondo, stato_runtime):
+    testo = mondo.lower()
+
+    return {
+        "carezza_testa": "testa" in testo and ("tocc" in testo or "carezza" in testo),
+        "mano_sinistra": "mano sinistra" in testo,
+        "mano_destra": "mano destra" in testo,
+        "ostacolo_sinistra": ("ostacolo" in testo or "qualcosa" in testo) and "sinistra" in testo,
+        "ostacolo_destra": ("ostacolo" in testo or "qualcosa" in testo) and "destra" in testo,
+        "fermo": "sono fermo" in testo,
+        "camminando": "sto camminando" in testo,
+        "volto_riconosciuto": "riconosco" in testo,
+        "volto_ignoto": "volto ignoto" in testo or "non riconosco" in testo,
+    }
 
 def _assicura_cartelle():
     for cartella in [QUARANTINE_DIR, GENERATED_DIR, REJECTED_DIR]:
@@ -76,6 +90,7 @@ def _assicura_cartelle():
 
 
 def _slug_testo(testo):
+    testo_originale = testo
     testo = testo.lower()
 
     testo = testo.replace("report:", " ")
