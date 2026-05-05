@@ -549,7 +549,10 @@ def main():
                 input_ricevuto = False
 
             if not stato_runtime["attesa_nome"]:
-                if mondo != stato_precedente and mondo.strip() != "REPORT: SONO FERMO.":
+                mondo_valido = mondo.strip() != "REPORT: SONO FERMO."
+                mondo_cambiato = mondo != stato_precedente
+
+                if mondo_cambiato and mondo_valido:
                     logger.info(u"SENSORI: {}".format(testo_per_log(mondo)))
 
                     if gestisci_volto_durante_cammino(
@@ -563,54 +566,59 @@ def main():
                         time.sleep(0.1)
                         continue
 
-                    decisione_condizione = valuta_condizioni_generate(mondo, stato_runtime)
+                # AUTONOMIA RUNTIME:
+                # Le condizioni Python generate vengono valutate a ogni ciclo,
+                # non solo quando il testo del mondo cambia.
+                # Il cooldown e la quarantena degli errori sono gestiti in condition_manager.py.
+                decisione_condizione = valuta_condizioni_generate(mondo, stato_runtime)
 
-                    if decisione_condizione:
-                        logger.info(u"[SOUL] Uso condizione Python generata/caricata")
+                if decisione_condizione:
+                    logger.info(u"[SOUL] Uso condizione Python generata/caricata")
 
-                        decisione_condizione = valida_decisione(decisione_condizione, mondo)
+                    decisione_condizione = valida_decisione(decisione_condizione, mondo)
 
-                        esegui_decisione(
-                            decisione_condizione,
-                            corpo,
-                            voce,
-                            vista,
-                            sistema,
-                            stato_runtime,
-                            aggiorna_memoria_callback=aggiorna_memoria_da_decisione
-                        )
+                    esegui_decisione(
+                        decisione_condizione,
+                        corpo,
+                        voce,
+                        vista,
+                        sistema,
+                        stato_runtime,
+                        aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                    )
 
-                        ultima_decisione = decisione_condizione
+                    ultima_decisione = decisione_condizione
+                    ultimo_evento_tempo = time.time()
 
-                    else:
-                        ultima_decisione = _elabora_decisione(
+                elif mondo_cambiato and mondo_valido:
+                    ultima_decisione = _elabora_decisione(
+                        mondo,
+                        corpo,
+                        voce,
+                        vista,
+                        sistema
+                    )
+
+                    if valuta_se_generare_condizione(
+                        mondo,
+                        ultima_decisione,
+                        memoria_fisica,
+                        stato_robot,
+                        CHIAVE_PRIVATA
+                    ):
+                        logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
+
+                        nuova_condizione = genera_condizione_autonoma(
                             mondo,
-                            corpo,
-                            voce,
-                            vista,
-                            sistema
-                        )
-
-                        if valuta_se_generare_condizione(
-                            mondo,
-                            ultima_decisione,
                             memoria_fisica,
                             stato_robot,
                             CHIAVE_PRIVATA
-                        ):
-                            logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
+                        )
 
-                            nuova_condizione = genera_condizione_autonoma(
-                                mondo,
-                                memoria_fisica,
-                                stato_robot,
-                                CHIAVE_PRIVATA
-                            )
-
-                            if nuova_condizione:
-                                logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
-                                    nuova_condizione
-                                ))
+                        if nuova_condizione:
+                            logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
+                                nuova_condizione
+                            ))
 
                     ultimo_evento_tempo = time.time()
 

@@ -100,6 +100,130 @@ def _estrai_codice_python(testo):
 
     return testo.strip()
 
+def _normalizza_testo_trigger(testo):
+    testo = testo.lower()
+    testo = testo.replace("report:", " ")
+    testo = testo.replace("interazione_utente", " ")
+    testo = testo.replace("sono fermo", " ")
+    testo = testo.replace("sto camminando", " ")
+    testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
+    testo = re.sub(r"\s+", " ", testo)
+    return testo.strip()
+
+
+def _estrai_trigger_da_mondo(mondo):
+    """
+    Estrae parole semplici dal mondo corrente per costruire automaticamente
+    una condizione quando l'LLM genera solo comportamento().
+    """
+    testo = _normalizza_testo_trigger(mondo)
+
+    parole_vietate = [
+        "report",
+        "sono",
+        "fermo",
+        "sto",
+        "camminando",
+        "interazione",
+        "utente",
+        "mia",
+        "mio",
+        "la",
+        "il",
+        "lo",
+        "gli",
+        "le",
+        "un",
+        "una",
+        "di",
+        "a",
+        "da",
+        "in",
+        "con",
+        "per",
+        "che",
+        "sulla",
+        "sullo",
+        "sul",
+        "del",
+        "della",
+        "dei",
+        "degli",
+        "delle"
+    ]
+
+    parole = []
+
+    for parola in testo.split(" "):
+        parola = parola.strip()
+
+        if len(parola) < 4:
+            continue
+
+        if parola in parole_vietate:
+            continue
+
+        if parola not in parole:
+            parole.append(parola)
+
+    # Limitiamo i trigger per evitare condizioni troppo larghe o troppo lunghe.
+    return parole[:5]
+
+
+def _costruisci_condizione_automatica(mondo):
+    """
+    Crea automaticamente la funzione condizione(mondo, stato_runtime)
+    quando l'LLM si dimentica di generarla.
+    """
+    trigger = _estrai_trigger_da_mondo(mondo)
+
+    if not trigger:
+        trigger = ["interazione"]
+
+    righe = []
+    righe.append("def condizione(mondo, stato_runtime):")
+    righe.append("    testo = mondo.lower()")
+
+    controlli = []
+
+    for parola in trigger:
+        parola = parola.replace('"', "").replace("'", "")
+        controlli.append('u"{}" in testo'.format(parola))
+
+    righe.append("    return " + " or ".join(controlli))
+    righe.append("")
+
+    return "\n".join(righe)
+
+
+def _contiene_funzione(codice, nome_funzione):
+    pattern = r"def\s+" + re.escape(nome_funzione) + r"\s*\("
+    return re.search(pattern, codice) is not None
+
+
+def _aggiungi_condizione_automatica_se_manca(codice, mondo):
+    """
+    Se il codice generato contiene comportamento() ma non condizione(),
+    aggiunge automaticamente una condizione basata sul mondo corrente.
+    """
+    ha_condizione = _contiene_funzione(codice, "condizione")
+    ha_comportamento = _contiene_funzione(codice, "comportamento")
+
+    if ha_condizione:
+        return codice
+
+    if not ha_comportamento:
+        return codice
+
+    logger.warning(u"[GENERATOR] LLM ha generato comportamento() senza condizione(). Creo condizione automatica.")
+
+    intestazione = "# -*- coding: utf-8 -*-\n\n"
+
+    codice_senza_encoding = codice.replace("# -*- coding: utf-8 -*-", "").strip()
+
+    condizione_auto = _costruisci_condizione_automatica(mondo)
+
+    return intestazione + condizione_auto + "\n" + codice_senza_encoding + "\n"
 
 def _scrivi_file(path_file, contenuto):
     with open(path_file, "wb") as f:
@@ -604,6 +728,11 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         )
 
         codice = _estrai_codice_python(risposta)
+
+        # AUTORIPARAZIONE:
+        # Se l'LLM genera solo comportamento(), il sistema aggiunge da solo
+        # la funzione condizione(mondo, stato_runtime).
+        codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         nome_base = _slug_testo(mondo)

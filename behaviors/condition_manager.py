@@ -1,25 +1,101 @@
 # -*- coding: utf-8 -*-
 """
 Caricatore di condizioni Python generate.
+
+Questo modulo permette a NAO di:
+1. caricare automaticamente i file Python generati dall'LLM;
+2. valutare le condizioni a runtime senza input manuale da tastiera;
+3. eseguire il comportamento associato se la condizione risulta vera;
+4. isolare in rejected_conditions le condizioni che generano troppi errori.
 """
 
 import os
 import logging
-import imp 
+import imp
 import time
+import shutil
 
 
 logger = logging.getLogger(__name__)
 
-CONDIZIONI_DIR = os.path.join(os.path.dirname(__file__), "generated_conditions")
+BASE_DIR = os.path.dirname(__file__)
+CONDIZIONI_DIR = os.path.join(BASE_DIR, "generated_conditions")
+REJECTED_DIR = os.path.join(BASE_DIR, "rejected_conditions")
 
 _condizioni_cache = None
 _ultima_attivazione_condizione = {}
+_errori_condizione = {}
+
+# Una condizione vera non viene rieseguita continuamente.
 COOLDOWN_CONDIZIONE = 30
+
+# Dopo questo numero di errori runtime, la condizione viene disattivata.
+MAX_ERRORI_CONDIZIONE = 3
+
 
 def reset_cache_condizioni():
     global _condizioni_cache
     _condizioni_cache = None
+
+
+def _assicura_cartelle():
+    if not os.path.exists(CONDIZIONI_DIR):
+        os.makedirs(CONDIZIONI_DIR)
+
+    if not os.path.exists(REJECTED_DIR):
+        os.makedirs(REJECTED_DIR)
+
+
+def _path_condizione(nome_modulo):
+    return os.path.join(CONDIZIONI_DIR, nome_modulo + ".py")
+
+
+def _sposta_in_rejected(nome_modulo, motivo):
+    """
+    Sposta una condizione difettosa fuori da generated_conditions.
+    In questo modo NAO non continuerà a ricaricarla nei cicli successivi.
+    """
+    _assicura_cartelle()
+
+    origine = _path_condizione(nome_modulo)
+
+    if not os.path.exists(origine):
+        return
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    destinazione = os.path.join(
+        REJECTED_DIR,
+        nome_modulo + "_rejected_" + timestamp + ".py"
+    )
+
+    try:
+        shutil.move(origine, destinazione)
+        logger.warning(u"[CONDIZIONI] Condizione spostata in rejected_conditions: {} | motivo: {}".format(
+            nome_modulo,
+            motivo
+        ))
+    except Exception as e:
+        logger.error(u"[CONDIZIONI] Impossibile spostare {} in rejected_conditions: {}".format(
+            nome_modulo,
+            e
+        ))
+
+    reset_cache_condizioni()
+
+
+def _registra_errore(nome_modulo, errore):
+    numero_errori = _errori_condizione.get(nome_modulo, 0) + 1
+    _errori_condizione[nome_modulo] = numero_errori
+
+    logger.warning(u"[CONDIZIONI] Errore runtime in {} ({}/{}): {}".format(
+        nome_modulo,
+        numero_errori,
+        MAX_ERRORI_CONDIZIONE,
+        errore
+    ))
+
+    if numero_errori >= MAX_ERRORI_CONDIZIONE:
+        _sposta_in_rejected(nome_modulo, errore)
 
 
 def carica_condizioni_generate():
@@ -28,12 +104,8 @@ def carica_condizioni_generate():
     if _condizioni_cache is not None:
         return _condizioni_cache
 
+    _assicura_cartelle()
     condizioni = []
-
-    if not os.path.exists(CONDIZIONI_DIR):
-        os.makedirs(CONDIZIONI_DIR)
-        _condizioni_cache = condizioni
-        return condizioni
 
     for nome_file in os.listdir(CONDIZIONI_DIR):
         if not nome_file.endswith(".py"):
@@ -56,14 +128,27 @@ def carica_condizioni_generate():
 
                 logger.info(u"[CONDIZIONI] Caricata condizione: {}".format(nome_modulo))
 
+            else:
+                logger.warning(u"[CONDIZIONI] File ignorato, mancano condizione() o comportamento(): {}".format(
+                    nome_file
+                ))
+
         except Exception as e:
             logger.warning(u"[CONDIZIONI] Errore caricamento {}: {}".format(nome_file, e))
+            _registra_errore(nome_modulo, e)
 
     _condizioni_cache = condizioni
     return condizioni
 
 
 def valuta_condizioni_generate(mondo, stato_runtime):
+    """
+    Valuta tutte le condizioni generate.
+
+    Ritorna una decisione se una condizione è vera, altrimenti None.
+    Questa funzione è pensata per essere chiamata automaticamente dal ciclo
+    principale di soul.py, senza input manuale dell'utente.
+    """
     condizioni = carica_condizioni_generate()
     adesso = time.time()
 
@@ -77,17 +162,29 @@ def valuta_condizioni_generate(mondo, stato_runtime):
             if adesso - ultimo_tempo < COOLDOWN_CONDIZIONE:
                 continue
 
-            if modulo.condizione(mondo, stato_runtime):
+            condizione_vera = modulo.condizione(mondo, stato_runtime)
+
+            if condizione_vera:
                 logger.info(u"[CONDIZIONI] Attivata condizione generata: {}".format(nome))
                 _ultima_attivazione_condizione[nome] = adesso
-                return modulo.comportamento()
+
+                try:
+                    return modulo.comportamento()
+                except Exception as e:
+                    _registra_errore(nome, e)
+                    return None
 
         except Exception as e:
-            logger.warning(u"[CONDIZIONI] Errore valutazione {}: {}".format(nome, e))
+            _registra_errore(nome, e)
 
     return None
 
+
 def esegui_condizione_per_nome(nome, mondo, stato_runtime):
+    """
+    Funzione solo di debug manuale.
+    L'autonomia vera usa valuta_condizioni_generate() dentro soul.py.
+    """
     condizioni = carica_condizioni_generate()
 
     nome = nome.lower().strip()
@@ -107,6 +204,7 @@ def esegui_condizione_per_nome(nome, mondo, stato_runtime):
 
             except Exception as e:
                 print("[TEST ERROR]:", e)
+                _registra_errore(item["nome"], e)
                 return None
 
     print("[TEST] Condizione non trovata:", nome)
