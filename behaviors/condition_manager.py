@@ -116,28 +116,56 @@ def _priorita_condizione(nome):
     return punteggio
 
 def carica_condizioni_generate():
+    global _condizioni_cache
+
+    _assicura_cartelle()
+
+    if _condizioni_cache is not None:
+        return _condizioni_cache
+
     condizioni = []
 
     for nome_file in os.listdir(CONDIZIONI_DIR):
         if not nome_file.endswith(".py"):
             continue
 
-        # importa il file
-        # verifica che abbia condizione() e comportamento()
-        # aggiunge alla lista:
-        condizioni.append({
-            "nome": nome_file,
-            "modulo": modulo,
-            "condizione": modulo.condizione,
-            "comportamento": modulo.comportamento
-        })
+        if nome_file.startswith("__"):
+            continue
 
-    # QUI va messo l'ordinamento
+        nome_modulo = nome_file.replace(".py", "")
+        path_file = os.path.join(CONDIZIONI_DIR, nome_file)
+
+        try:
+            modulo = imp.load_source(nome_modulo, path_file)
+
+            if not hasattr(modulo, "condizione"):
+                _sposta_in_rejected(nome_modulo, "manca funzione condizione")
+                continue
+
+            if not hasattr(modulo, "comportamento"):
+                _sposta_in_rejected(nome_modulo, "manca funzione comportamento")
+                continue
+
+            condizioni.append({
+                "nome": nome_file,
+                "modulo": modulo,
+                "condizione": modulo.condizione,
+                "comportamento": modulo.comportamento
+            })
+
+        except Exception as e:
+            logger.warning(u"[CONDIZIONI] Errore caricamento {}: {}".format(
+                nome_file,
+                e
+            ))
+            _sposta_in_rejected(nome_modulo, str(e))
+
     condizioni.sort(
         key=lambda item: _priorita_condizione(item["nome"]),
         reverse=True
     )
 
+    _condizioni_cache = condizioni
     return condizioni
 
 def valuta_condizioni_generate(mondo, stato_runtime):

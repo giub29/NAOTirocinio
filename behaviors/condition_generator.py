@@ -71,16 +71,54 @@ TOKEN_VIETATI = [
 def estrai_eventi(mondo, stato_runtime):
     testo = mondo.lower()
 
+    piede_sinistro = "piede sinistro" in testo
+    piede_destro = "piede destro" in testo
+
     return {
         "carezza_testa": "testa" in testo and ("tocc" in testo or "carezza" in testo),
+
         "mano_sinistra": "mano sinistra" in testo,
         "mano_destra": "mano destra" in testo,
+        "entrambe_mani": "entrambe le mani" in testo,
+
+        "piede_sinistro": piede_sinistro,
+        "piede_destro": piede_destro,
+        "entrambi_piedi": (
+            "ostacolo frontale ai piedi" in testo or
+            "entrambi i piedi" in testo or
+            "due piedi" in testo or
+            (piede_sinistro and piede_destro)
+        ),
+
+        "urto": "urto" in testo,
+        "urto_piedi": (
+            "urto tattile" in testo and (
+                "piede" in testo or
+                "piedi" in testo
+            )
+        ),
+
         "ostacolo_sinistra": ("ostacolo" in testo or "qualcosa" in testo) and "sinistra" in testo,
         "ostacolo_destra": ("ostacolo" in testo or "qualcosa" in testo) and "destra" in testo,
+        "ostacolo_frontale": (
+            "ostacolo frontale" in testo or
+            "vedo qualcosa vicino" in testo or
+            "qualcosa vicino" in testo
+        ),
+
         "fermo": "sono fermo" in testo,
         "camminando": "sto camminando" in testo,
+
         "volto_riconosciuto": "riconosco" in testo,
         "volto_ignoto": "volto ignoto" in testo or "non riconosco" in testo,
+
+        "pericolo": (
+            "pericolo" in testo or
+            "caduta" in testo or
+            "cadere" in testo or
+            "sollevamento" in testo or
+            "pavimento mancante" in testo
+        ),
     }
 
 def _assicura_cartelle():
@@ -111,6 +149,11 @@ def _slug_testo(testo):
     ha_ostacolo_dx = "ostacolo" in testo and "destra" in testo
     ha_urto_piede_sx = "piede sinistro" in testo
     ha_urto_piede_dx = "piede destro" in testo
+    ha_urto_piedi = (
+        "ostacolo frontale ai piedi" in testo or
+        "urto tattile" in testo and "pied" in testo or
+        (ha_urto_piede_sx and ha_urto_piede_dx)
+    )
 
     # COMBINAZIONI CON CAMMINO
     if camminando and ha_carezza:
@@ -139,6 +182,9 @@ def _slug_testo(testo):
 
     if camminando and ha_urto_piede_dx:
         return "piede_destro_durante_cammino"
+    
+    if camminando and ha_urto_piedi:
+        return "urto_piedi_durante_cammino"
 
     # COMBINAZIONI SOCIALI / TATTILI
     if ha_carezza and ha_mano_sx:
@@ -196,6 +242,9 @@ def _slug_testo(testo):
     if ha_ostacolo_dx:
         return "ostacolo_destra"
 
+    if ha_urto_piedi:
+        return "urto_piedi"
+    
     if ha_urto_piede_sx:
         return "piede_sinistro"
 
@@ -980,38 +1029,48 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
         righe.append('    return (u"ostacolo frontale" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
 
     elif nome_base == "urto_piedi_durante_cammino":
-        righe.append('    return u"urto" in testo and u"pied" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return (eventi.get("urto_piedi", False) or eventi.get("entrambi_piedi", False)) and eventi.get("camminando", False)')
 
     elif nome_base == "pericolo_caduta_durante_cammino":
         righe.append('    return (u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo) and u"sto camminando" in testo')
 
     # COMBINAZIONI SOCIALI / MULTI-EVENTO
-    elif nome_base == "volto_riconosciuto_carezza_testa":
-        righe.append('    return u"riconosco" in testo and u"carezza" in testo and u"testa" in testo')
+    elif nome_base == "carezza_e_mano_sinistra":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False) and eventi.get("mano_sinistra", False)')
 
-    elif nome_base == "volto_riconosciuto_mano_sinistra":
-        righe.append('    return u"riconosco" in testo and u"mano sinistra" in testo')
+    elif nome_base == "carezza_e_mano_destra":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False) and eventi.get("mano_destra", False)')
 
-    elif nome_base == "volto_riconosciuto_mano_destra":
-        righe.append('    return u"riconosco" in testo and u"mano destra" in testo')
+    elif nome_base == "carezza_e_volto_riconosciuto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False) and eventi.get("volto_riconosciuto", False)')
 
-    elif nome_base == "volto_ignoto_carezza_testa":
-        righe.append('    return u"volto ignoto" in testo and u"carezza" in testo and u"testa" in testo')
+    elif nome_base == "carezza_e_volto_ignoto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False) and eventi.get("volto_ignoto", False)')
 
-    elif nome_base == "volto_ignoto_mano_sinistra":
-        righe.append('    return u"volto ignoto" in testo and u"mano sinistra" in testo')
+    elif nome_base == "mano_sinistra_e_volto_riconosciuto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_sinistra", False) and eventi.get("volto_riconosciuto", False)')
 
-    elif nome_base == "volto_ignoto_mano_destra":
-        righe.append('    return u"volto ignoto" in testo and u"mano destra" in testo')
+    elif nome_base == "mano_destra_e_volto_riconosciuto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_destra", False) and eventi.get("volto_riconosciuto", False)')
 
-    elif nome_base == "oggetto_vicino_carezza_testa":
-        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"carezza" in testo and u"testa" in testo')
+    elif nome_base == "mano_sinistra_e_volto_ignoto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_sinistra", False) and eventi.get("volto_ignoto", False)')
 
-    elif nome_base == "oggetto_vicino_mano_sinistra":
-        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"mano sinistra" in testo')
+    elif nome_base == "mano_destra_e_volto_ignoto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_destra", False) and eventi.get("volto_ignoto", False)')
 
-    elif nome_base == "oggetto_vicino_mano_destra":
-        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"mano destra" in testo')
+    elif nome_base == "tocco_entrambe_mani":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("entrambe_mani", False) or (eventi.get("mano_sinistra", False) and eventi.get("mano_destra", False))')
 
     # EVENTI SINGOLI
     elif nome_base == "carezza_testa":
@@ -1022,9 +1081,6 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
 
     elif nome_base == "tocco_mano_destra":
         righe.append('    return u"mano destra" in testo')
-
-    elif nome_base == "tocco_entrambe_mani":
-        righe.append('    return u"entrambe le mani" in testo')
 
     elif nome_base == "oggetto_vicino":
         righe.append('    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo')
@@ -1039,7 +1095,8 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
         righe.append('    return u"ostacolo frontale" in testo or u"qualcosa davanti" in testo')
 
     elif nome_base == "urto_piedi":
-        righe.append('    return u"urto" in testo and u"pied" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("urto_piedi", False) or eventi.get("entrambi_piedi", False)')
 
     elif nome_base == "piede_sinistro":
         righe.append('    return u"piede sinistro" in testo')

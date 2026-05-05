@@ -331,6 +331,9 @@ def _mondo_ha_eventi_multipli(mondo):
 
     if u"ostacolo" in testo:
         segnali += 1
+    
+    if u"ostacolo frontale ai piedi" in testo:
+        segnali += 2
 
     if u"urto tattile" in testo or u"piede sinistro" in testo or u"piede destro" in testo:
         segnali += 1

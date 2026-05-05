@@ -371,6 +371,9 @@ class NaoSenses:
             while evento_pulito.lower().startswith("evento recente:"):
                 evento_pulito = evento_pulito.split(":", 1)[1].strip()
 
+            if "interazione_utente" in evento_pulito.lower():
+                continue
+
             # Non ha senso memorizzare/interpolare marker generici
             if evento_pulito in [u"INTERAZIONE_UTENTE", u"INTERAZIONE_UTENTE."]:
                 continue
