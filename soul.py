@@ -355,6 +355,65 @@ def _elabora_decisione(mondo, corpo, voce, vista, sistema):
 
     return decisione
 
+def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
+    """
+    Permette di generare condizioni anche quando un evento fisico viene
+    intercettato dalla safety prima del normale flusso decisionale.
+
+    Serve per casi come:
+    - carezza durante cammino;
+    - urto ai piedi;
+    - pericolo caduta;
+    - ostacolo durante movimento.
+
+    La safety resta prioritaria, ma l'evento non viene perso.
+    """
+
+    try:
+        if not CHIAVE_PRIVATA:
+            logger.warning(u"[SOUL] Non posso generare condizione da safety: OPENAI_API_KEY assente")
+            return
+
+        decisione_safety = {
+            "stato_interno": "sicurezza",
+            "obiettivo": motivo,
+            "azioni": [
+                {
+                    "tipo": "fermati"
+                },
+                {
+                    "tipo": "parla",
+                    "testo": "Mi fermo per sicurezza."
+                }
+            ],
+            "memoria": []
+        }
+
+        if valuta_se_generare_condizione(
+            mondo,
+            decisione_safety,
+            memoria_fisica,
+            stato_robot,
+            CHIAVE_PRIVATA
+        ):
+            logger.info(u"[SOUL] Genero condizione autonoma da evento safety: {}".format(
+                testo_per_log(motivo)
+            ))
+
+            nuova_condizione = genera_condizione_autonoma(
+                mondo,
+                memoria_fisica,
+                stato_robot,
+                CHIAVE_PRIVATA
+            )
+
+            if nuova_condizione:
+                logger.info(u"[SOUL] Nuova condizione autonoma creata da safety: {}".format(
+                    nuova_condizione
+                ))
+
+    except Exception as e:
+        logger.warning(u"[SOUL] Errore generazione condizione da evento safety: {}".format(e))
 
 def _riprendi_cammino_automatico(corpo, ultima_decisione):
     if stato_runtime["in_pattugliamento"] and not corpo.sta_camminando():
@@ -478,6 +537,11 @@ def main():
                 continue
 
             if gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
+                mondo_evento = mondo + u" STO CAMMINANDO."
+                _tenta_generare_condizione_da_evento_safety(
+                    mondo_evento,
+                    u"ostacolo o urto durante il cammino"
+                )
                 continue
 
             if stato_runtime["attesa_nome"] and input_ricevuto:
@@ -533,10 +597,22 @@ def main():
 
             if stato_runtime["in_pattugliamento"] and evento_fisico_sensibile:
                 logger.warning(u"[SAFETY] Evento fisico sensibile durante cammino: arresto immediato")
+
+                mondo_evento = mondo
+
+                if u"STO CAMMINANDO" not in mondo_evento:
+                    mondo_evento += u" STO CAMMINANDO."
+
                 stato_runtime["in_pattugliamento"] = False
                 corpo.fermati()
                 voce.parla(u"Mi fermo per sicurezza.")
-                stato_precedente = mondo
+
+                _tenta_generare_condizione_da_evento_safety(
+                    mondo_evento,
+                    u"evento fisico sensibile durante il cammino"
+                )
+
+                stato_precedente = mondo_evento
                 time.sleep(0.2)
                 continue
 

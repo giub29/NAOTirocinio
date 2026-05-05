@@ -92,6 +92,40 @@ def _slug_testo(testo):
     testo = testo.replace("sono fermo", " ")
     testo = testo.replace("sto camminando", " ")
 
+        # COMBINAZIONI IMPORTANTI
+    camminando = "sto camminando" in testo
+    fermo = "sono fermo" in testo
+
+    if camminando and "carezza" in testo and "testa" in testo:
+        return "carezza_durante_cammino"
+
+    if camminando and "riconosco" in testo:
+        return "volto_riconosciuto_durante_cammino"
+
+    if camminando and "volto ignoto" in testo:
+        return "volto_ignoto_durante_cammino"
+
+    if camminando and "vedo qualcosa vicino" in testo:
+        return "oggetto_vicino_durante_cammino"
+
+    if camminando and "ostacolo" in testo and "sinistra" in testo:
+        return "ostacolo_sinistra_durante_cammino"
+
+    if camminando and "ostacolo" in testo and "destra" in testo:
+        return "ostacolo_destra_durante_cammino"
+
+    if camminando and ("ostacolo frontale" in testo or "qualcosa davanti" in testo):
+        return "ostacolo_frontale_durante_cammino"
+
+    if camminando and "urto" in testo and "pied" in testo:
+        return "urto_piedi_durante_cammino"
+
+    if fermo and "carezza" in testo and "testa" in testo:
+        return "carezza_testa"
+
+    if fermo and "vedo qualcosa vicino" in testo:
+        return "oggetto_vicino"
+
     # Casi specifici più importanti
     if "ostacolo" in testo and "sinistra" in testo:
         return "ostacolo_sinistra"
@@ -123,6 +157,15 @@ def _slug_testo(testo):
     if "volto ignoto" in testo:
         return "volto_ignoto"
 
+    if "urto" in testo and "pied" in testo:
+        return "urto_piedi"
+
+    if "piede sinistro" in testo:
+        return "piede_sinistro"
+
+    if "piede destro" in testo:
+        return "piede_destro"
+    
     if "pericolo caduta" in testo or "sollevamento" in testo or "pavimento mancante" in testo:
         return "pericolo_caduta"
 
@@ -130,7 +173,7 @@ def _slug_testo(testo):
         return "battito_mani"
 
     if "prendi l'iniziativa" in testo or "prendi l iniziativa" in testo:
-        return "curiosita_visiva"
+        return "curiosita_dinamica"
 
     # Fallback: crea un nome breve dalle parole più significative
     testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
@@ -753,7 +796,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         testo_mondo = ""
 
     # Eventi fisici/sensoriali che vogliamo rendere apprendibili.
-    eventi_fisici_generabili = [
+        eventi_fisici_generabili = [
         "sento una carezza sulla testa",
         "sento un tocco sulla mano sinistra",
         "sento un tocco sulla mano destra",
@@ -762,10 +805,20 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         "ostacolo a sinistra",
         "ostacolo a destra",
         "ostacolo frontale",
+        "urto tattile",
+        "ostacolo ai piedi",
+        "piede sinistro premuto",
+        "piede destro premuto",
+        "riconosco",
+        "volto ignoto",
         "pericolo caduta",
         "pavimento mancante",
         "sollevamento"
     ]
+
+    if "prendi l'iniziativa" in testo_mondo or "prendi l iniziativa" in testo_mondo:
+            logger.info(u"[GENERATOR] Curiosita visiva dinamica: non genero condizione statica.")
+            return False
 
     for evento in eventi_fisici_generabili:
         if evento in testo_mondo:
@@ -789,6 +842,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
 
             logger.info(u"[GENERATOR] Evento fisico utile rilevato, genero condizione: {}".format(evento))
             return True
+        
 
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
@@ -883,6 +937,31 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     righe.append("def condizione(mondo, stato_runtime):")
     righe.append("    testo = mondo.lower()")
 
+    if nome_base == "carezza_durante_cammino":
+        righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "volto_riconosciuto_durante_cammino":
+        righe.append('    return u"riconosco" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "volto_ignoto_durante_cammino":
+        righe.append('    return u"volto ignoto" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "oggetto_vicino_durante_cammino":
+        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"sto camminando" in testo')
+
+    elif nome_base == "ostacolo_sinistra_durante_cammino":
+        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "ostacolo_destra_durante_cammino":
+        righe.append('    return u"ostacolo" in testo and u"destra" in testo and u"sto camminando" in testo')
+
+
+    elif nome_base == "ostacolo_frontale_durante_cammino":
+        righe.append('    return (u"ostacolo frontale" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
+
+    elif nome_base == "urto_piedi_durante_cammino":
+        righe.append('    return u"urto" in testo and u"pied" in testo and u"sto camminando" in testo')
+    
     if nome_base == "carezza_testa":
         righe.append('    return u"carezza" in testo and u"testa" in testo')
 
@@ -906,6 +985,15 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
 
     elif nome_base == "ostacolo_frontale":
         righe.append('    return u"ostacolo frontale" in testo or u"qualcosa davanti" in testo')
+
+    elif nome_base == "urto_piedi":
+        righe.append('    return u"urto" in testo and u"pied" in testo')
+
+    elif nome_base == "piede_sinistro":
+        righe.append('    return u"piede sinistro" in testo')
+
+    elif nome_base == "piede_destro":
+        righe.append('    return u"piede destro" in testo')
 
     elif nome_base == "pericolo_caduta":
         righe.append('    return u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo')
