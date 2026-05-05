@@ -26,3 +26,7 @@ NAOTirocinio/behaviors/generated_conditions/*
 !NAOTirocinio/behaviors/quarantine_conditions/.gitkeep
 !NAOTirocinio/behaviors/rejected_conditions/.gitkeep
 !NAOTirocinio/behaviors/generated_conditions/.gitkeep
+
+NAOTirocinio/behaviors/rejected_conditions/
+NAOTirocinio/behaviors/quarantine_conditions/
+NAOTirocinio/behaviors/backup_conditions_demo/

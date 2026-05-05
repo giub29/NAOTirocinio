@@ -76,15 +76,119 @@ def _assicura_cartelle():
 
 
 def _slug_testo(testo):
+    """
+    Crea nomi brevi e leggibili per le condizioni generate.
+    Esempi:
+    - "Ostacolo a sinistra" -> ostacolo_sinistra
+    - "Sento una carezza sulla testa" -> carezza_testa
+    - "Vedo qualcosa vicino" -> oggetto_vicino
+    """
+
     testo = testo.lower()
-    testo = re.sub(r"[^a-z0-9_]+", "_", testo)
-    testo = re.sub(r"_+", "_", testo)
-    testo = testo.strip("_")
 
-    if not testo:
-        testo = "condizione_generata"
+    # Pulizia base
+    testo = testo.replace("report:", " ")
+    testo = testo.replace("interazione_utente", " ")
+    testo = testo.replace("sono fermo", " ")
+    testo = testo.replace("sto camminando", " ")
 
-    return testo[:50]
+    # Casi specifici più importanti
+    if "ostacolo" in testo and "sinistra" in testo:
+        return "ostacolo_sinistra"
+
+    if "ostacolo" in testo and "destra" in testo:
+        return "ostacolo_destra"
+
+    if "ostacolo frontale" in testo or "qualcosa davanti" in testo:
+        return "ostacolo_frontale"
+
+    if "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo:
+        return "oggetto_vicino"
+
+    if "carezza" in testo and "testa" in testo:
+        return "carezza_testa"
+
+    if "mano sinistra" in testo:
+        return "tocco_mano_sinistra"
+
+    if "mano destra" in testo:
+        return "tocco_mano_destra"
+
+    if "entrambe le mani" in testo:
+        return "tocco_entrambe_mani"
+
+    if "riconosco" in testo:
+        return "volto_riconosciuto"
+
+    if "volto ignoto" in testo:
+        return "volto_ignoto"
+
+    if "pericolo caduta" in testo or "sollevamento" in testo or "pavimento mancante" in testo:
+        return "pericolo_caduta"
+
+    if "battiti di mani" in testo or "battito" in testo:
+        return "battito_mani"
+
+    if "prendi l'iniziativa" in testo or "prendi l iniziativa" in testo:
+        return "curiosita_visiva"
+
+    # Fallback: crea un nome breve dalle parole più significative
+    testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
+    testo = re.sub(r"\s+", " ", testo).strip()
+
+    parole_vietate = [
+        "report",
+        "sono",
+        "fermo",
+        "sto",
+        "camminando",
+        "interazione",
+        "utente",
+        "mia",
+        "mio",
+        "la",
+        "il",
+        "lo",
+        "gli",
+        "le",
+        "un",
+        "una",
+        "di",
+        "a",
+        "da",
+        "in",
+        "con",
+        "per",
+        "che",
+        "sulla",
+        "sullo",
+        "sul",
+        "del",
+        "della",
+        "dei",
+        "degli",
+        "delle",
+        "qualcosa"
+    ]
+
+    parole_utili = []
+
+    for parola in testo.split(" "):
+        parola = parola.strip("_ ").lower()
+
+        if len(parola) < 4:
+            continue
+
+        if parola in parole_vietate:
+            continue
+
+        if parola not in parole_utili:
+            parole_utili.append(parola)
+
+    if not parole_utili:
+        return "generica"
+
+    return "_".join(parole_utili[:3])
 
 
 def _estrai_codice_python(testo):
@@ -627,9 +731,64 @@ def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata):
     return res.json()["choices"][0]["message"]["content"]
 
 def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_robot, chiave_privata):
+    """
+    Decide se creare una nuova condizione Python autonoma.
+
+    Prima regola:
+    - per eventi fisici/sensoriali utili, genera direttamente una condizione,
+      senza chiedere al supervisore LLM.
+    - se la condizione esiste gia', non genera duplicati.
+
+    Seconda regola:
+    - per casi piu' complessi, usa il supervisore LLM come prima.
+    """
+
     if not chiave_privata:
         logger.warning(u"[GENERATOR] OPENAI_API_KEY assente. Non posso valutare generazione.")
         return False
+
+    try:
+        testo_mondo = mondo.lower()
+    except:
+        testo_mondo = ""
+
+    # Eventi fisici/sensoriali che vogliamo rendere apprendibili.
+    eventi_fisici_generabili = [
+        "sento una carezza sulla testa",
+        "sento un tocco sulla mano sinistra",
+        "sento un tocco sulla mano destra",
+        "sento un tocco su entrambe le mani",
+        "vedo qualcosa vicino",
+        "ostacolo a sinistra",
+        "ostacolo a destra",
+        "ostacolo frontale",
+        "pericolo caduta",
+        "pavimento mancante",
+        "sollevamento"
+    ]
+
+    for evento in eventi_fisici_generabili:
+        if evento in testo_mondo:
+            nome_base = _slug_testo(mondo)
+            nome_file = "condizione_{}.py".format(nome_base)
+            path_generato = os.path.join(GENERATED_DIR, nome_file)
+            path_quarantena = os.path.join(QUARANTINE_DIR, nome_file)
+            path_rifiutato = os.path.join(REJECTED_DIR, nome_file.replace(".py", "_rejected.py"))
+
+            if os.path.exists(path_generato):
+                logger.info(u"[GENERATOR] Condizione gia' esistente, non genero duplicato: {}".format(nome_file))
+                return False
+
+            if os.path.exists(path_quarantena):
+                logger.info(u"[GENERATOR] Condizione gia' in quarantena, non genero duplicato: {}".format(nome_file))
+                return False
+
+            if os.path.exists(path_rifiutato):
+                logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
+                return False
+
+            logger.info(u"[GENERATOR] Evento fisico utile rilevato, genero condizione: {}".format(evento))
+            return True
 
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
@@ -650,10 +809,13 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"Devi rispondere false se:\n"
         u"- è solo batteria, stato fermo/cammino o informazione banale;\n"
         u"- riguarda riconoscimento volto già gestito;\n"
-        u"- è un input diretto dell'utente;\n"
+        u"- è un input diretto dell'utente non riutilizzabile;\n"
         u"- la decisione corrente è già adeguata, TRANNE nei casi PRENDI L'INIZIATIVA con dettagli visivi riutilizzabili.\n\n"
-        u"IMPORTANTE: PRENDI L'INIZIATIVA è un caso speciale di apprendimento autonomo. Se la scena contiene oggetti, persone parziali, arredi o dettagli ambientali, preferisci genera=true.\n\n"
-        
+
+        u"IMPORTANTE:\n"
+        u"- PRENDI L'INIZIATIVA è un caso speciale di apprendimento autonomo.\n"
+        u"- Se la scena contiene oggetti, persone parziali, arredi o dettagli ambientali, preferisci genera=true.\n\n"
+
         u"MONDO:\n"
         + mondo +
         u"\n\nULTIMA DECISIONE:\n"
@@ -709,6 +871,93 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     except Exception as e:
         logger.warning(u"[GENERATOR] Errore valutazione generazione: {}".format(e))
         return False
+    
+def _costruisci_condizione_specifica_da_slug(nome_base):
+    """
+    Costruisce automaticamente una condizione precisa in base al tipo di evento.
+    Serve per evitare che l'LLM usi trigger troppo generici come:
+    interazione, interazione_utente, sono fermo, report.
+    """
+
+    righe = []
+    righe.append("def condizione(mondo, stato_runtime):")
+    righe.append("    testo = mondo.lower()")
+
+    if nome_base == "carezza_testa":
+        righe.append('    return u"carezza" in testo and u"testa" in testo')
+
+    elif nome_base == "tocco_mano_sinistra":
+        righe.append('    return u"mano sinistra" in testo')
+
+    elif nome_base == "tocco_mano_destra":
+        righe.append('    return u"mano destra" in testo')
+
+    elif nome_base == "tocco_entrambe_mani":
+        righe.append('    return u"entrambe le mani" in testo')
+
+    elif nome_base == "oggetto_vicino":
+        righe.append('    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo')
+
+    elif nome_base == "ostacolo_sinistra":
+        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo')
+
+    elif nome_base == "ostacolo_destra":
+        righe.append('    return u"ostacolo" in testo and u"destra" in testo')
+
+    elif nome_base == "ostacolo_frontale":
+        righe.append('    return u"ostacolo frontale" in testo or u"qualcosa davanti" in testo')
+
+    elif nome_base == "pericolo_caduta":
+        righe.append('    return u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo')
+
+    elif nome_base == "battito_mani":
+        righe.append('    return u"battiti di mani" in testo or u"battito" in testo')
+
+    elif nome_base == "volto_riconosciuto":
+        righe.append('    return u"riconosco" in testo')
+
+    elif nome_base == "volto_ignoto":
+        righe.append('    return u"volto ignoto" in testo')
+
+    elif nome_base == "curiosita_visiva":
+        righe.append('    return u"computer" in testo or u"sedia" in testo or u"ufficio" in testo or u"persona seduta" in testo')
+
+    else:
+        return None
+
+    righe.append("")
+    return "\n".join(righe)
+
+
+def _forza_condizione_specifica(codice, mondo):
+    """
+    Sostituisce automaticamente la funzione condizione() generata dall'LLM
+    con una versione più precisa, quando l'evento è riconoscibile.
+
+    Il comportamento resta generato dall'LLM.
+    Il trigger invece viene reso sicuro e specifico dal sistema.
+    """
+
+    nome_base = _slug_testo(mondo)
+    condizione_specifica = _costruisci_condizione_specifica_da_slug(nome_base)
+
+    if not condizione_specifica:
+        return codice
+
+    pattern = r"def\s+condizione\s*\(\s*mondo\s*,\s*stato_runtime\s*\)\s*:.*?(?=\ndef\s+comportamento\s*\()"
+
+    nuovo_codice, numero_sostituzioni = re.subn(
+        pattern,
+        condizione_specifica + "\n",
+        codice,
+        flags=re.DOTALL
+    )
+
+    if numero_sostituzioni > 0:
+        logger.info(u"[GENERATOR] Trigger reso specifico automaticamente: {}".format(nome_base))
+        return nuovo_codice
+
+    return codice
 
 def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata):
     _assicura_cartelle()
@@ -734,9 +983,13 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         # la funzione condizione(mondo, stato_runtime).
         codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
 
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        # SICUREZZA SEMANTICA:
+        # Il comportamento resta generato dall'LLM,
+        # ma il trigger viene reso specifico automaticamente.
+        codice = _forza_condizione_specifica(codice, mondo)
+
         nome_base = _slug_testo(mondo)
-        nome_file = "condizione_{}_{}.py".format(nome_base, timestamp)
+        nome_file = "condizione_{}.py".format(nome_base)
 
         path_quarantine = os.path.join(QUARANTINE_DIR, nome_file)
 

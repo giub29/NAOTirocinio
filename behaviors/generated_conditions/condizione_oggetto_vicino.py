@@ -2,7 +2,8 @@
 
 def condizione(mondo, stato_runtime):
     testo = mondo.lower()
-    return u"qualcosa vicino" in testo or u"ostacolo" in testo
+    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo
+
 
 def comportamento():
     return {
@@ -10,8 +11,8 @@ def comportamento():
         "obiettivo": "evitare ostacolo",
         "azioni": [
             {"tipo": "occhi", "colore": "yellow"},
-            {"tipo": "guarda", "x": 0.0, "y": -0.2},
-            {"tipo": "parla", "testo": "Attenzione, c'è qualcosa davanti a me."},
+            {"tipo": "guarda", "x": 0.5, "y": -0.2},
+            {"tipo": "parla", "testo": "Attenzione, c'è qualcosa qui."},
             {"tipo": "fermati"}
         ],
         "memoria": []

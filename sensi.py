@@ -9,7 +9,7 @@ class NaoSenses:
 
         self.ultimo_volto_nome = None
         self.ultimo_volto_tempo = 0
-        self.durata_memoria_volto = 4.0
+        self.durata_memoria_volto = 8.0
 
         try:
             self.face_detection = ALProxy("ALFaceDetection", ip, port)
