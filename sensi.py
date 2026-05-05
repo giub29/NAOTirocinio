@@ -7,6 +7,10 @@ class NaoSenses:
     def __init__(self, ip, port=9559):
         self.memory = ALProxy("ALMemory", ip, port)
 
+        # Memoria breve eventi: serve per avere piu' eventi nello stesso REPORT
+        self.eventi_recenti = {}
+        self.durata_eventi_recenti = 6.0
+
         self.ultimo_volto_nome = None
         self.ultimo_volto_tempo = 0
         self.durata_memoria_volto = 8.0
@@ -29,6 +33,39 @@ class NaoSenses:
             self.sonar.subscribe("SensiAnima")
         except:
             pass
+
+    def _ricorda_evento(self, chiave, testo):
+        """
+        Salva un evento per pochi secondi.
+        Questo permette di combinare eventi vicini nel tempo:
+        volto + carezza, volto + mano, cammino + carezza, ecc.
+        """
+        self.eventi_recenti[chiave] = {
+            "testo": testo,
+            "tempo": time.time()
+        }
+
+    def _eventi_recenti_validi(self):
+        tempo_attuale = time.time()
+        eventi = []
+        chiavi_da_eliminare = []
+
+        for chiave, dati in self.eventi_recenti.items():
+            try:
+                if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
+                    eventi.append(dati["testo"])
+                else:
+                    chiavi_da_eliminare.append(chiave)
+            except:
+                chiavi_da_eliminare.append(chiave)
+
+        for chiave in chiavi_da_eliminare:
+            try:
+                del self.eventi_recenti[chiave]
+            except:
+                pass
+
+        return eventi
 
     def _leggi_volto(self):
         try:
@@ -59,7 +96,6 @@ class NaoSenses:
                 if len(info_extra) > 2 and info_extra[2]:
                     nome_riconosciuto = info_extra[2]
                     break
-
             except:
                 pass
 
@@ -87,9 +123,14 @@ class NaoSenses:
         )
 
         if volto_noto_recente:
-            eventi.append(u"Riconosco {}.".format(self.ultimo_volto_nome))
+            evento = u"Riconosco {}.".format(self.ultimo_volto_nome)
+            eventi.append(evento)
+            self._ricorda_evento("volto_riconosciuto", evento)
+
         elif volto_corrente == "Sconosciuto":
-            eventi.append(u"Vedo un volto ignoto.")
+            evento = u"Vedo un volto ignoto."
+            eventi.append(evento)
+            self._ricorda_evento("volto_ignoto", evento)
 
         # 2. GESTIONE BATTITI
         try:
@@ -99,13 +140,16 @@ class NaoSenses:
 
         if dati_audio and len(dati_audio) > 0:
             timestamp_audio = dati_audio[0][0] + dati_audio[0][1] * 1e-6
+
             if timestamp_audio > self.ultimo_timestamp_audio:
                 self.ultimo_timestamp_audio = timestamp_audio
                 self.contatore_battiti += 1
                 self.ultimo_battito_rilevato = tempo_attuale
 
         if self.contatore_battiti > 0 and (tempo_attuale - self.ultimo_battito_rilevato > self.finestra_ascolto):
-            eventi.append(u"Sento {} battiti di mani.".format(self.contatore_battiti))
+            evento = u"Sento {} battiti di mani.".format(self.contatore_battiti)
+            eventi.append(evento)
+            self._ricorda_evento("battiti_mani", evento)
             self.contatore_battiti = 0
 
         # 3. SONAR
@@ -114,11 +158,20 @@ class NaoSenses:
             dist_r = self.memory.getData("Device/SubDeviceList/US/Right/Sensor/Value")
 
             if dist_l < 0.65 and dist_r < 0.65:
-                eventi.append(u"Ostacolo frontale molto vicino.")
+                evento = u"Ostacolo frontale molto vicino."
+                eventi.append(evento)
+                self._ricorda_evento("ostacolo_frontale", evento)
+
             elif dist_l < 0.70:
-                eventi.append(u"Ostacolo a sinistra.")
+                evento = u"Ostacolo a sinistra."
+                eventi.append(evento)
+                self._ricorda_evento("ostacolo_sinistra", evento)
+
             elif dist_r < 0.70:
-                eventi.append(u"Ostacolo a destra.")
+                evento = u"Ostacolo a destra."
+                eventi.append(evento)
+                self._ricorda_evento("ostacolo_destra", evento)
+
         except:
             pass
 
@@ -129,7 +182,9 @@ class NaoSenses:
             head_rear = self.memory.getData("Device/SubDeviceList/Head/Touch/Rear/Sensor/Value")
 
             if head_front > 0 or head_middle > 0 or head_rear > 0:
-                eventi.append(u"Sento una carezza sulla testa.")
+                evento = u"Sento una carezza sulla testa."
+                eventi.append(evento)
+                self._ricorda_evento("carezza_testa", evento)
 
             mano_sx_back = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
             mano_sx_left = self.memory.getData("Device/SubDeviceList/LHand/Touch/Left/Sensor/Value")
@@ -143,11 +198,19 @@ class NaoSenses:
             mano_dx_toccata = mano_dx_back > 0 or mano_dx_left > 0 or mano_dx_right > 0
 
             if mano_sx_toccata and mano_dx_toccata:
-                eventi.append(u"Sento un tocco su entrambe le mani.")
+                evento = u"Sento un tocco su entrambe le mani."
+                eventi.append(evento)
+                self._ricorda_evento("entrambe_mani", evento)
+
             elif mano_sx_toccata:
-                eventi.append(u"Sento un tocco sulla mano sinistra.")
+                evento = u"Sento un tocco sulla mano sinistra."
+                eventi.append(evento)
+                self._ricorda_evento("mano_sinistra", evento)
+
             elif mano_dx_toccata:
-                eventi.append(u"Sento un tocco sulla mano destra.")
+                evento = u"Sento un tocco sulla mano destra."
+                eventi.append(evento)
+                self._ricorda_evento("mano_destra", evento)
 
         except:
             pass
@@ -165,11 +228,19 @@ class NaoSenses:
             if piede_sx_toccato or piede_dx_toccato:
                 if tempo_attuale - self.ultimo_urto > 2:
                     if piede_sx_toccato and piede_dx_toccato:
-                        eventi.append(u"URTO TATTILE! Ostacolo frontale ai piedi.")
+                        evento = u"URTO TATTILE! Ostacolo frontale ai piedi."
+                        eventi.append(evento)
+                        self._ricorda_evento("urto_piedi", evento)
+
                     elif piede_sx_toccato:
-                        eventi.append(u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto.")
+                        evento = u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto."
+                        eventi.append(evento)
+                        self._ricorda_evento("piede_sinistro", evento)
+
                     elif piede_dx_toccato:
-                        eventi.append(u"URTO TATTILE! Ostacolo a destra. Piede destro premuto.")
+                        evento = u"URTO TATTILE! Ostacolo a destra. Piede destro premuto."
+                        eventi.append(evento)
+                        self._ricorda_evento("piede_destro", evento)
 
                     self.ultimo_urto = tempo_attuale
 
@@ -184,8 +255,11 @@ class NaoSenses:
 
             if peso_totale < 0.8:
                 if tempo_attuale - self.ultimo_urto > 4:
-                    eventi.append(u"PERICOLO CADUTA! Pavimento mancante o sollevamento.")
+                    evento = u"PERICOLO CADUTA! Pavimento mancante o sollevamento."
+                    eventi.append(evento)
+                    self._ricorda_evento("pericolo_caduta", evento)
                     self.ultimo_urto = tempo_attuale
+
         except:
             pass
 
@@ -195,5 +269,13 @@ class NaoSenses:
             eventi.append(u"La mia batteria è al {}%.".format(int(carica)))
         except:
             pass
+
+        # 8. FUSIONE EVENTI RECENTI
+        # Qui uniamo gli eventi rilevati ora con quelli degli ultimi secondi.
+        eventi_memoria = self._eventi_recenti_validi()
+
+        for evento in eventi_memoria:
+            if evento not in eventi:
+                eventi.append(evento)
 
         return u"REPORT: " + u" ".join(eventi)

@@ -294,6 +294,49 @@ def _valuta_interazione_reale(mondo):
         u"PERICOLO" in mondo
     )
 
+def _mondo_ha_eventi_multipli(mondo):
+    try:
+        testo = mondo.lower()
+    except:
+        return False
+
+    segnali = 0
+
+    if "riconosco" in testo:
+        segnali += 1
+
+    if "volto ignoto" in testo:
+        segnali += 1
+
+    if "carezza" in testo and "testa" in testo:
+        segnali += 1
+
+    if "mano sinistra" in testo:
+        segnali += 1
+
+    if "mano destra" in testo:
+        segnali += 1
+
+    if "entrambe le mani" in testo:
+        segnali += 1
+
+    if "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo:
+        segnali += 1
+
+    if "ostacolo" in testo:
+        segnali += 1
+
+    if "urto" in testo:
+        segnali += 1
+
+    if "pericolo caduta" in testo or "sollevamento" in testo or "pavimento mancante" in testo:
+        segnali += 1
+
+    # Il movimento non basta da solo, ma rende più specifica una combinazione.
+    if "sto camminando" in testo and segnali >= 1:
+        segnali += 1
+
+    return segnali >= 2
 
 def _gestisci_iniziativa_robot(corpo):
     logger.info(u"Robot prende l'iniziativa")
@@ -642,6 +685,89 @@ def main():
                         time.sleep(0.1)
                         continue
 
+                # APPRENDIMENTO DI EVENTI COMPOSTI:
+                # Prima di usare una condizione gia' generata, controlliamo se il mondo
+                # contiene piu' segnali utili insieme. In quel caso il robot puo'
+                # imparare una condizione piu' specifica, senza bisogno di input manuale.
+                concetti_evento = 0
+
+                testo_mondo_composto = mondo.lower()
+
+                if u"sento una carezza sulla testa" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"sento un tocco sulla mano" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"riconosco" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"volto ignoto" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"vedo qualcosa vicino" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"ostacolo" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"urto" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"pericolo" in testo_mondo_composto or u"caduta" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if u"sto camminando" in testo_mondo_composto:
+                    concetti_evento += 1
+
+                if concetti_evento >= 2:
+                    if valuta_se_generare_condizione(
+                        mondo,
+                        ultima_decisione,
+                        memoria_fisica,
+                        stato_robot,
+                        CHIAVE_PRIVATA
+                    ):
+                        logger.info(u"[SOUL] Genero condizione autonoma composta prima delle condizioni gia' note")
+
+                        nuova_condizione = genera_condizione_autonoma(
+                            mondo,
+                            memoria_fisica,
+                            stato_robot,
+                            CHIAVE_PRIVATA
+                        )
+
+                        if nuova_condizione:
+                            logger.info(u"[SOUL] Nuova condizione composta creata: {}".format(
+                                nuova_condizione
+                            ))
+                            
+                                # APPRENDIMENTO COMPOSTO:
+                # Se il mondo contiene più eventi insieme, provo a generare
+                # una condizione composta PRIMA che una condizione singola
+                # già esistente la intercetti.
+                if mondo_cambiato and mondo_valido and _mondo_ha_eventi_multipli(mondo):
+                    if valuta_se_generare_condizione(
+                        mondo,
+                        ultima_decisione,
+                        memoria_fisica,
+                        stato_robot,
+                        CHIAVE_PRIVATA
+                    ):
+                        logger.info(u"[SOUL] Creo condizione autonoma composta da più eventi")
+
+                        nuova_condizione = genera_condizione_autonoma(
+                            mondo,
+                            memoria_fisica,
+                            stato_robot,
+                            CHIAVE_PRIVATA
+                        )
+
+                        if nuova_condizione:
+                            logger.info(u"[SOUL] Nuova condizione composta creata: {}".format(
+                                nuova_condizione
+                            ))
+                            
                 # AUTONOMIA RUNTIME:
                 # Le condizioni Python generate vengono valutate a ogni ciclo,
                 # non solo quando il testo del mondo cambia.

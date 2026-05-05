@@ -75,183 +75,164 @@ def _assicura_cartelle():
             os.makedirs(cartella)
 
 
-def _normalizza_testo_trigger(testo):
-    try:
-        testo = testo.lower()
-    except:
-        testo = ""
-
-    testo = testo.replace("report:", " ")
-    testo = testo.replace("interazione_utente", " ")
-    testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
-    testo = re.sub(r"\s+", " ", testo)
-    return testo.strip()
-
-
 def _slug_testo(testo):
     """
     Crea nomi brevi e leggibili per le condizioni generate.
-
-    Esempi:
-    - Sento una carezza sulla testa. SONO FERMO.
-      -> carezza_testa
-
-    - Sento una carezza sulla testa. STO CAMMINANDO.
-      -> carezza_testa_camminando
-
-    - Ostacolo a destra. STO CAMMINANDO.
-      -> ostacolo_destra_camminando
+    Prima riconosce combinazioni di eventi, poi eventi singoli.
     """
 
     testo_originale = testo.lower()
 
+    # Stato del robot: va letto PRIMA di pulire il testo.
     camminando = "sto camminando" in testo_originale
     fermo = "sono fermo" in testo_originale
 
+    # Eventi base
+    ha_carezza_testa = "carezza" in testo_originale and "testa" in testo_originale
+    ha_mano_sinistra = "mano sinistra" in testo_originale
+    ha_mano_destra = "mano destra" in testo_originale
+    ha_entrambe_mani = "entrambe le mani" in testo_originale
+    ha_volto_noto = "riconosco" in testo_originale
+    ha_volto_ignoto = "volto ignoto" in testo_originale
+    ha_oggetto_vicino = "vedo qualcosa vicino" in testo_originale or "qualcosa vicino" in testo_originale
+    ha_ostacolo_sinistra = "ostacolo" in testo_originale and "sinistra" in testo_originale
+    ha_ostacolo_destra = "ostacolo" in testo_originale and "destra" in testo_originale
+    ha_ostacolo_frontale = "ostacolo frontale" in testo_originale or "qualcosa davanti" in testo_originale
+    ha_urto_piedi = "urto" in testo_originale and "pied" in testo_originale
+    ha_pericolo_caduta = (
+        "pericolo caduta" in testo_originale or
+        "sollevamento" in testo_originale or
+        "pavimento mancante" in testo_originale
+    )
+
+    # 1) COMBINAZIONI DURANTE CAMMINO
+    if camminando and ha_carezza_testa:
+        return "carezza_durante_cammino"
+
+    if camminando and ha_mano_sinistra:
+        return "mano_sinistra_durante_cammino"
+
+    if camminando and ha_mano_destra:
+        return "mano_destra_durante_cammino"
+
+    if camminando and ha_volto_noto:
+        return "volto_riconosciuto_durante_cammino"
+
+    if camminando and ha_volto_ignoto:
+        return "volto_ignoto_durante_cammino"
+
+    if camminando and ha_oggetto_vicino:
+        return "oggetto_vicino_durante_cammino"
+
+    if camminando and ha_ostacolo_sinistra:
+        return "ostacolo_sinistra_durante_cammino"
+
+    if camminando and ha_ostacolo_destra:
+        return "ostacolo_destra_durante_cammino"
+
+    if camminando and ha_ostacolo_frontale:
+        return "ostacolo_frontale_durante_cammino"
+
+    if camminando and ha_urto_piedi:
+        return "urto_piedi_durante_cammino"
+
+    if camminando and ha_pericolo_caduta:
+        return "pericolo_caduta_durante_cammino"
+
+    # 2) COMBINAZIONI SOCIALI / MULTI-EVENTO DA FERMO
+    if ha_volto_noto and ha_carezza_testa:
+        return "volto_riconosciuto_carezza_testa"
+
+    if ha_volto_noto and ha_mano_sinistra:
+        return "volto_riconosciuto_mano_sinistra"
+
+    if ha_volto_noto and ha_mano_destra:
+        return "volto_riconosciuto_mano_destra"
+
+    if ha_volto_ignoto and ha_carezza_testa:
+        return "volto_ignoto_carezza_testa"
+
+    if ha_volto_ignoto and ha_mano_sinistra:
+        return "volto_ignoto_mano_sinistra"
+
+    if ha_volto_ignoto and ha_mano_destra:
+        return "volto_ignoto_mano_destra"
+
+    if ha_oggetto_vicino and ha_carezza_testa:
+        return "oggetto_vicino_carezza_testa"
+
+    if ha_oggetto_vicino and ha_mano_sinistra:
+        return "oggetto_vicino_mano_sinistra"
+
+    if ha_oggetto_vicino and ha_mano_destra:
+        return "oggetto_vicino_mano_destra"
+
+    # 3) EVENTI SINGOLI
+    if ha_ostacolo_sinistra:
+        return "ostacolo_sinistra"
+
+    if ha_ostacolo_destra:
+        return "ostacolo_destra"
+
+    if ha_ostacolo_frontale:
+        return "ostacolo_frontale"
+
+    if ha_oggetto_vicino:
+        return "oggetto_vicino"
+
+    if ha_carezza_testa:
+        return "carezza_testa"
+
+    if ha_entrambe_mani:
+        return "tocco_entrambe_mani"
+
+    if ha_mano_sinistra:
+        return "tocco_mano_sinistra"
+
+    if ha_mano_destra:
+        return "tocco_mano_destra"
+
+    if ha_volto_noto:
+        return "volto_riconosciuto"
+
+    if ha_volto_ignoto:
+        return "volto_ignoto"
+
+    if ha_urto_piedi:
+        return "urto_piedi"
+
+    if "piede sinistro" in testo_originale:
+        return "piede_sinistro"
+
+    if "piede destro" in testo_originale:
+        return "piede_destro"
+
+    if ha_pericolo_caduta:
+        return "pericolo_caduta"
+
+    if "battiti di mani" in testo_originale or "battito" in testo_originale:
+        return "battito_mani"
+
+    if "prendi l'iniziativa" in testo_originale or "prendi l iniziativa" in testo_originale:
+        return "curiosita_dinamica"
+
+    # 4) FALLBACK
     testo = testo_originale
     testo = testo.replace("report:", " ")
     testo = testo.replace("interazione_utente", " ")
-
-    # COMBINAZIONI DURANTE CAMMINO
-    if camminando and "carezza" in testo and "testa" in testo:
-        return "carezza_testa_camminando"
-
-    if camminando and "riconosco" in testo:
-        return "volto_riconosciuto_camminando"
-
-    if camminando and "volto ignoto" in testo:
-        return "volto_ignoto_camminando"
-
-    if camminando and ("vedo qualcosa vicino" in testo or "qualcosa vicino" in testo):
-        return "oggetto_vicino_camminando"
-
-    if camminando and "ostacolo" in testo and "sinistra" in testo:
-        return "ostacolo_sinistra_camminando"
-
-    if camminando and "ostacolo" in testo and "destra" in testo:
-        return "ostacolo_destra_camminando"
-
-    if camminando and ("ostacolo frontale" in testo or "qualcosa davanti" in testo):
-        return "ostacolo_frontale_camminando"
-
-    if camminando and "urto" in testo and "pied" in testo:
-        return "urto_piedi_camminando"
-
-    if camminando and "piede sinistro" in testo:
-        return "piede_sinistro_camminando"
-
-    if camminando and "piede destro" in testo:
-        return "piede_destro_camminando"
-
-    if camminando and "mano sinistra" in testo:
-        return "tocco_mano_sinistra_camminando"
-
-    if camminando and "mano destra" in testo:
-        return "tocco_mano_destra_camminando"
-
-    if camminando and "entrambe le mani" in testo:
-        return "tocco_entrambe_mani_camminando"
-
-    if camminando and (
-        "pericolo caduta" in testo or
-        "sollevamento" in testo or
-        "pavimento mancante" in testo
-    ):
-        return "pericolo_caduta_camminando"
-
-    # CASI DA FERMO / GENERALI
-    if fermo and "carezza" in testo and "testa" in testo:
-        return "carezza_testa"
-
-    if fermo and ("vedo qualcosa vicino" in testo or "qualcosa vicino" in testo):
-        return "oggetto_vicino"
-
-    if "ostacolo" in testo and "sinistra" in testo:
-        return "ostacolo_sinistra"
-
-    if "ostacolo" in testo and "destra" in testo:
-        return "ostacolo_destra"
-
-    if "ostacolo frontale" in testo or "qualcosa davanti" in testo:
-        return "ostacolo_frontale"
-
-    if "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo:
-        return "oggetto_vicino"
-
-    if "carezza" in testo and "testa" in testo:
-        return "carezza_testa"
-
-    if "mano sinistra" in testo:
-        return "tocco_mano_sinistra"
-
-    if "mano destra" in testo:
-        return "tocco_mano_destra"
-
-    if "entrambe le mani" in testo:
-        return "tocco_entrambe_mani"
-
-    if "riconosco" in testo:
-        return "volto_riconosciuto"
-
-    if "volto ignoto" in testo:
-        return "volto_ignoto"
-
-    if "urto" in testo and "pied" in testo:
-        return "urto_piedi"
-
-    if "piede sinistro" in testo:
-        return "piede_sinistro"
-
-    if "piede destro" in testo:
-        return "piede_destro"
-
-    if "pericolo caduta" in testo or "sollevamento" in testo or "pavimento mancante" in testo:
-        return "pericolo_caduta"
-
-    if "battiti di mani" in testo or "battito" in testo:
-        return "battito_mani"
-
-    if "prendi l'iniziativa" in testo or "prendi l iniziativa" in testo:
-        return "curiosita_dinamica"
-
-    # FALLBACK
     testo = testo.replace("sono fermo", " ")
     testo = testo.replace("sto camminando", " ")
+
     testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
     testo = re.sub(r"\s+", " ", testo).strip()
 
     parole_vietate = [
-        "report",
-        "sono",
-        "fermo",
-        "sto",
-        "camminando",
-        "interazione",
-        "utente",
-        "mia",
-        "mio",
-        "la",
-        "il",
-        "lo",
-        "gli",
-        "le",
-        "un",
-        "una",
-        "di",
-        "a",
-        "da",
-        "in",
-        "con",
-        "per",
-        "che",
-        "sulla",
-        "sullo",
-        "sul",
-        "del",
-        "della",
-        "dei",
-        "degli",
-        "delle",
+        "report", "sono", "fermo", "sto", "camminando",
+        "interazione", "utente", "mia", "mio",
+        "la", "il", "lo", "gli", "le",
+        "un", "una", "di", "a", "da", "in", "con", "per",
+        "che", "sulla", "sullo", "sul",
+        "del", "della", "dei", "degli", "delle",
         "qualcosa"
     ]
 
@@ -288,8 +269,22 @@ def _estrai_codice_python(testo):
 
     return testo.strip()
 
+def _normalizza_testo_trigger(testo):
+    testo = testo.lower()
+    testo = testo.replace("report:", " ")
+    testo = testo.replace("interazione_utente", " ")
+    testo = testo.replace("sono fermo", " ")
+    testo = testo.replace("sto camminando", " ")
+    testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
+    testo = re.sub(r"\s+", " ", testo)
+    return testo.strip()
+
 
 def _estrai_trigger_da_mondo(mondo):
+    """
+    Estrae parole semplici dal mondo corrente per costruire automaticamente
+    una condizione quando l'LLM genera solo comportamento().
+    """
     testo = _normalizza_testo_trigger(mondo)
 
     parole_vietate = [
@@ -340,10 +335,15 @@ def _estrai_trigger_da_mondo(mondo):
         if parola not in parole:
             parole.append(parola)
 
+    # Limitiamo i trigger per evitare condizioni troppo larghe o troppo lunghe.
     return parole[:5]
 
 
 def _costruisci_condizione_automatica(mondo):
+    """
+    Crea automaticamente la funzione condizione(mondo, stato_runtime)
+    quando l'LLM si dimentica di generarla.
+    """
     trigger = _estrai_trigger_da_mondo(mondo)
 
     if not trigger:
@@ -359,7 +359,7 @@ def _costruisci_condizione_automatica(mondo):
         parola = parola.replace('"', "").replace("'", "")
         controlli.append('u"{}" in testo'.format(parola))
 
-    righe.append("    return " + " and ".join(controlli))
+    righe.append("    return " + " or ".join(controlli))
     righe.append("")
 
     return "\n".join(righe)
@@ -371,6 +371,10 @@ def _contiene_funzione(codice, nome_funzione):
 
 
 def _aggiungi_condizione_automatica_se_manca(codice, mondo):
+    """
+    Se il codice generato contiene comportamento() ma non condizione(),
+    aggiunge automaticamente una condizione basata sul mondo corrente.
+    """
     ha_condizione = _contiene_funzione(codice, "condizione")
     ha_comportamento = _contiene_funzione(codice, "comportamento")
 
@@ -383,11 +387,12 @@ def _aggiungi_condizione_automatica_se_manca(codice, mondo):
     logger.warning(u"[GENERATOR] LLM ha generato comportamento() senza condizione(). Creo condizione automatica.")
 
     intestazione = "# -*- coding: utf-8 -*-\n\n"
+
     codice_senza_encoding = codice.replace("# -*- coding: utf-8 -*-", "").strip()
+
     condizione_auto = _costruisci_condizione_automatica(mondo)
 
     return intestazione + condizione_auto + "\n" + codice_senza_encoding + "\n"
-
 
 def _scrivi_file(path_file, contenuto):
     with open(path_file, "wb") as f:
@@ -422,7 +427,6 @@ def _valida_struttura_codice(codice):
             codice_ast = codice
 
         albero = ast.parse(codice_ast)
-
     except Exception as e:
         return False, "Errore sintassi Python: {}".format(e)
 
@@ -431,10 +435,8 @@ def _valida_struttura_codice(codice):
     for nodo in albero.body:
         if isinstance(nodo, ast.FunctionDef):
             funzioni_trovate.append(nodo.name)
-
         elif isinstance(nodo, ast.Expr) and isinstance(nodo.value, ast.Str):
             continue
-
         else:
             return False, "Il file deve contenere solo funzioni, nessun codice eseguito fuori funzione"
 
@@ -450,7 +452,7 @@ def _valida_struttura_codice(codice):
     for nodo in ast.walk(albero):
         if isinstance(nodo, ast.Subscript):
             return False, "Accesso diretto con parentesi quadre vietato: usare .get()"
-
+        
         if isinstance(nodo, (ast.Import, ast.ImportFrom)):
             return False, "Import vietato"
 
@@ -706,8 +708,7 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"FORMATO OBBLIGATORIO:\n"
         u"# -*- coding: utf-8 -*-\n\n"
         u"def condizione(mondo, stato_runtime):\n"
-        u"    testo = mondo.lower()\n"
-        u"    return u\"testo trigger\" in testo\n\n"
+        u"    return u\"testo trigger\" in mondo\n\n"
         u"def comportamento():\n"
         u"    return {\n"
         u"        \"stato_interno\": \"prudente/sociale/curioso/allerta/neutro\",\n"
@@ -722,28 +723,38 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
 
         u"AZIONI CONSENTITE:\n"
         u"- parla: risposta vocale breve\n"
-        u"- guarda: orienta la testa, usa x tra -1.0 e 1.0, y tra -0.5 e -0.1\n"
+        u"- guarda: orienta la testa, usa x tra -1.0 e 1.0, y tra -0.5 e -0.1 (NON usare 0.0)\n"
         u"- occhi: cambia colore occhi tra white/red/green/blue/yellow/purple/cyan\n"
         u"- animazione: usa path sicuri come animations/Stand/Gestures/Hey_1\n"
         u"- posa: usa Stand, Crouch, Sit, SitRelax\n"
         u"- fermati: arresta il movimento\n"
+        u"- Evita y = 0.0 perché fa perdere il tracking del volto.\n"
         u"- cammina: solo per micro-movimenti prudenti, x tra -0.2 e 0.2, g tra -0.2 e 0.2\n"
         u"- gira: rotazione prudente, v tra -0.3 e 0.3\n\n"
 
         u"REGOLE PER COMPORTAMENTO AUTONOMO:\n"
-        u"- Il comportamento NON deve essere solo verbale.\n"
+        u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
         u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"
         u"- Per interazioni sociali positive, usa occhi verdi/cyan, guarda verso la persona e rispondi con tono amichevole.\n"
         u"- Per ostacoli o pericolo, usa fermati, occhi gialli/rossi, guarda verso il lato del problema e parla.\n"
+        u"- Non usare cammina se il robot è fermo e non c'è una richiesta esplicita o una situazione di evitamento.\n"
         u"- Non usare gira/cammina per eventi sociali come carezza o volto.\n"
         u"- Massimo 4 azioni.\n"
         u"- Vietato generare un comportamento con una sola azione di tipo parla.\n"
         u"- Ogni comportamento deve contenere almeno una reazione fisica: occhi, guarda, posa, fermati o animazione.\n\n"
 
-        u"IMPORTANTE SUI TRIGGER:\n"
-        u"- Non usare trigger generici come interazione_utente, sono fermo, sto camminando, report.\n"
-        u"- Usa parole sensoriali concrete come carezza, testa, ostacolo, destra, sinistra, volto ignoto, riconosco.\n"
-        u"- Se il robot sta camminando, il sistema rendera' automaticamente la condizione specifica sul cammino.\n\n"
+        u"\nGESTIONE CURIOSITÀ:\n"
+        u"- Se MONDO contiene 'PRENDI L'INIZIATIVA', stai osservando una scena reale tramite immagine.\n"
+        u"- In questo caso puoi creare una nuova condizione di curiosità riutilizzabile.\n"
+        u"- La condizione NON deve dipendere da 'PRENDI L'INIZIATIVA'.\n"
+        u"- Deve invece attivarsi su dettagli visivi concreti (oggetti, ambienti, persone).\n"
+        u"- Usa mondo.lower() e cerca parole chiave.\n"
+        u"- Esempio corretto:\n"
+        u"  testo = mondo.lower()\n"
+        u"  return u\"armadio\" in testo or u\"foto\" in testo\n"
+        u"- Esempio sbagliato:\n"
+        u"  return u\"PRENDI L'INIZIATIVA\" in mondo\n"
+        u"- Il comportamento deve essere curioso ma semplice, non complesso.\n\n"
 
         u"MONDO ATTUALE:\n"
         + mondo +
@@ -784,10 +795,12 @@ def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata):
 
     return res.json()["choices"][0]["message"]["content"]
 
-
 def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_robot, chiave_privata):
     """
     Decide se creare una nuova condizione Python autonoma.
+
+    Prima controlla eventi e combinazioni utili in modo deterministico.
+    Poi, solo se serve, chiede al supervisore LLM.
     """
 
     if not chiave_privata:
@@ -799,14 +812,13 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     except:
         testo_mondo = ""
 
-    # La curiosita' visiva resta dinamica.
-    # Non la trasformiamo in condizione statica per evitare che vecchie scene
-    # blocchino il comportamento futuro.
+    # Non generiamo condizioni statiche dalla curiosità dinamica.
     if "prendi l'iniziativa" in testo_mondo or "prendi l iniziativa" in testo_mondo:
         logger.info(u"[GENERATOR] Curiosita visiva dinamica: non genero condizione statica.")
         return False
 
-    eventi_fisici_generabili = [
+    # Eventi utili. Bastano a far partire la generazione.
+    eventi_generabili = [
         "sento una carezza sulla testa",
         "sento un tocco sulla mano sinistra",
         "sento un tocco sulla mano destra",
@@ -826,29 +838,38 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         "sollevamento"
     ]
 
-    for evento in eventi_fisici_generabili:
+    evento_rilevato = None
+
+    for evento in eventi_generabili:
         if evento in testo_mondo:
-            nome_base = _slug_testo(mondo)
-            nome_file = "condizione_{}.py".format(nome_base)
+            evento_rilevato = evento
+            break
 
-            path_generato = os.path.join(GENERATED_DIR, nome_file)
-            path_quarantena = os.path.join(QUARANTINE_DIR, nome_file)
-            path_rifiutato = os.path.join(REJECTED_DIR, nome_file.replace(".py", "_rejected.py"))
+    if evento_rilevato:
+        nome_base = _slug_testo(mondo)
+        nome_file = "condizione_{}.py".format(nome_base)
 
-            if os.path.exists(path_generato):
-                logger.info(u"[GENERATOR] Condizione gia' esistente, non genero duplicato: {}".format(nome_file))
-                return False
+        path_generato = os.path.join(GENERATED_DIR, nome_file)
+        path_quarantena = os.path.join(QUARANTINE_DIR, nome_file)
+        path_rifiutato = os.path.join(REJECTED_DIR, nome_file.replace(".py", "_rejected.py"))
 
-            if os.path.exists(path_quarantena):
-                logger.info(u"[GENERATOR] Condizione gia' in quarantena, non genero duplicato: {}".format(nome_file))
-                return False
+        if os.path.exists(path_generato):
+            logger.info(u"[GENERATOR] Condizione gia' esistente, non genero duplicato: {}".format(nome_file))
+            return False
 
-            if os.path.exists(path_rifiutato):
-                logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
-                return False
+        if os.path.exists(path_quarantena):
+            logger.info(u"[GENERATOR] Condizione gia' in quarantena, non genero duplicato: {}".format(nome_file))
+            return False
 
-            logger.info(u"[GENERATOR] Evento fisico utile rilevato, genero condizione: {}".format(evento))
-            return True
+        if os.path.exists(path_rifiutato):
+            logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
+            return False
+
+        logger.info(u"[GENERATOR] Evento utile rilevato, genero condizione: {} -> {}".format(
+            evento_rilevato,
+            nome_file
+        ))
+        return True
 
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
@@ -858,16 +879,15 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"{\"genera\": true/false, \"motivo\": \"breve spiegazione\"}\n\n"
 
         u"Devi rispondere true solo se:\n"
-        u"- nessuna condizione gia' nota sembra coprire bene la situazione;\n"
-        u"- la situazione e' utile, concreta e generalizzabile;\n"
-        u"- il comportamento puo' essere riutilizzato in futuro.\n\n"
+        u"- nessuna condizione già nota sembra coprire bene la situazione;\n"
+        u"- la situazione è utile e generalizzabile;\n"
+        u"- il comportamento può essere riutilizzato in futuro;\n"
+        u"- la situazione combina più eventi sensoriali utili, per esempio volto + tocco, volto + carezza, cammino + ostacolo.\n\n"
 
         u"Devi rispondere false se:\n"
-        u"- e' solo batteria, stato fermo/cammino o informazione banale;\n"
-        u"- riguarda riconoscimento volto gia' gestito;\n"
-        u"- e' un input diretto dell'utente non riutilizzabile;\n"
-        u"- e' PRENDI L'INIZIATIVA, perche' la curiosita' resta dinamica;\n"
-        u"- la decisione corrente e' gia' adeguata.\n\n"
+        u"- è solo batteria, stato fermo/cammino o informazione banale;\n"
+        u"- riguarda un input diretto dell'utente non riutilizzabile;\n"
+        u"- la decisione corrente è già adeguata e non c'è nulla di nuovo da apprendere.\n\n"
 
         u"MONDO:\n"
         + mondo +
@@ -924,59 +944,81 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     except Exception as e:
         logger.warning(u"[GENERATOR] Errore valutazione generazione: {}".format(e))
         return False
-
-
+    
 def _costruisci_condizione_specifica_da_slug(nome_base):
     """
-    Costruisce automaticamente una condizione precisa in base al nome breve.
+    Costruisce automaticamente una condizione precisa in base al tipo di evento.
+    Serve per evitare trigger troppo generici come:
+    interazione, interazione_utente, sono fermo, report.
     """
 
     righe = []
     righe.append("def condizione(mondo, stato_runtime):")
     righe.append("    testo = mondo.lower()")
 
-    if nome_base == "carezza_testa_camminando":
+    # COMBINAZIONI DURANTE CAMMINO
+    if nome_base == "carezza_durante_cammino":
         righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
 
-    elif nome_base == "volto_riconosciuto_camminando":
-        righe.append('    return u"riconosco" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "volto_ignoto_camminando":
-        righe.append('    return u"volto ignoto" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "oggetto_vicino_camminando":
-        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"sto camminando" in testo')
-
-    elif nome_base == "ostacolo_sinistra_camminando":
-        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "ostacolo_destra_camminando":
-        righe.append('    return u"ostacolo" in testo and u"destra" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "ostacolo_frontale_camminando":
-        righe.append('    return (u"ostacolo frontale" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
-
-    elif nome_base == "urto_piedi_camminando":
-        righe.append('    return u"urto" in testo and u"pied" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "piede_sinistro_camminando":
-        righe.append('    return u"piede sinistro" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "piede_destro_camminando":
-        righe.append('    return u"piede destro" in testo and u"sto camminando" in testo')
-
-    elif nome_base == "tocco_mano_sinistra_camminando":
+    elif nome_base == "mano_sinistra_durante_cammino":
         righe.append('    return u"mano sinistra" in testo and u"sto camminando" in testo')
 
-    elif nome_base == "tocco_mano_destra_camminando":
+    elif nome_base == "mano_destra_durante_cammino":
         righe.append('    return u"mano destra" in testo and u"sto camminando" in testo')
 
-    elif nome_base == "tocco_entrambe_mani_camminando":
-        righe.append('    return u"entrambe le mani" in testo and u"sto camminando" in testo')
+    elif nome_base == "volto_riconosciuto_durante_cammino":
+        righe.append('    return u"riconosco" in testo and u"sto camminando" in testo')
 
-    elif nome_base == "pericolo_caduta_camminando":
+    elif nome_base == "volto_ignoto_durante_cammino":
+        righe.append('    return u"volto ignoto" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "oggetto_vicino_durante_cammino":
+        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"sto camminando" in testo')
+
+    elif nome_base == "ostacolo_sinistra_durante_cammino":
+        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "ostacolo_destra_durante_cammino":
+        righe.append('    return u"ostacolo" in testo and u"destra" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "ostacolo_frontale_durante_cammino":
+        righe.append('    return (u"ostacolo frontale" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
+
+    elif nome_base == "urto_piedi_durante_cammino":
+        righe.append('    return u"urto" in testo and u"pied" in testo and u"sto camminando" in testo')
+
+    elif nome_base == "pericolo_caduta_durante_cammino":
         righe.append('    return (u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo) and u"sto camminando" in testo')
 
+    # COMBINAZIONI SOCIALI / MULTI-EVENTO
+    elif nome_base == "volto_riconosciuto_carezza_testa":
+        righe.append('    return u"riconosco" in testo and u"carezza" in testo and u"testa" in testo')
+
+    elif nome_base == "volto_riconosciuto_mano_sinistra":
+        righe.append('    return u"riconosco" in testo and u"mano sinistra" in testo')
+
+    elif nome_base == "volto_riconosciuto_mano_destra":
+        righe.append('    return u"riconosco" in testo and u"mano destra" in testo')
+
+    elif nome_base == "volto_ignoto_carezza_testa":
+        righe.append('    return u"volto ignoto" in testo and u"carezza" in testo and u"testa" in testo')
+
+    elif nome_base == "volto_ignoto_mano_sinistra":
+        righe.append('    return u"volto ignoto" in testo and u"mano sinistra" in testo')
+
+    elif nome_base == "volto_ignoto_mano_destra":
+        righe.append('    return u"volto ignoto" in testo and u"mano destra" in testo')
+
+    elif nome_base == "oggetto_vicino_carezza_testa":
+        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"carezza" in testo and u"testa" in testo')
+
+    elif nome_base == "oggetto_vicino_mano_sinistra":
+        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"mano sinistra" in testo')
+
+    elif nome_base == "oggetto_vicino_mano_destra":
+        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"mano destra" in testo')
+
+    # EVENTI SINGOLI
     elif nome_base == "carezza_testa":
         righe.append('    return u"carezza" in testo and u"testa" in testo')
 
@@ -1031,11 +1073,13 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     righe.append("")
     return "\n".join(righe)
 
-
 def _forza_condizione_specifica(codice, mondo):
     """
     Sostituisce automaticamente la funzione condizione() generata dall'LLM
     con una versione più precisa, quando l'evento è riconoscibile.
+
+    Il comportamento resta generato dall'LLM.
+    Il trigger invece viene reso sicuro e specifico dal sistema.
     """
 
     nome_base = _slug_testo(mondo)
@@ -1059,7 +1103,6 @@ def _forza_condizione_specifica(codice, mondo):
 
     return codice
 
-
 def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata):
     _assicura_cartelle()
 
@@ -1079,7 +1122,14 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
 
         codice = _estrai_codice_python(risposta)
 
+        # AUTORIPARAZIONE:
+        # Se l'LLM genera solo comportamento(), il sistema aggiunge da solo
+        # la funzione condizione(mondo, stato_runtime).
         codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
+
+        # SICUREZZA SEMANTICA:
+        # Il comportamento resta generato dall'LLM,
+        # ma il trigger viene reso specifico automaticamente.
         codice = _forza_condizione_specifica(codice, mondo)
 
         nome_base = _slug_testo(mondo)
