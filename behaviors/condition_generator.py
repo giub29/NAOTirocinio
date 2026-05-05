@@ -76,43 +76,35 @@ def _assicura_cartelle():
 
 
 def _slug_testo(testo):
-    """
-    Crea nomi brevi e leggibili per le condizioni generate.
-    Prima riconosce combinazioni di eventi, poi eventi singoli.
-    """
+    testo = testo.lower()
 
-    testo_originale = testo.lower()
+    testo = testo.replace("report:", " ")
+    testo = testo.replace("evento recente:", " ")
+    testo = testo.replace("interazione_utente", " ")
 
-    # Stato del robot: va letto PRIMA di pulire il testo.
-    camminando = "sto camminando" in testo_originale
-    fermo = "sono fermo" in testo_originale
+    camminando = "sto camminando" in testo
+    fermo = "sono fermo" in testo
 
-    # Eventi base
-    ha_carezza_testa = "carezza" in testo_originale and "testa" in testo_originale
-    ha_mano_sinistra = "mano sinistra" in testo_originale
-    ha_mano_destra = "mano destra" in testo_originale
-    ha_entrambe_mani = "entrambe le mani" in testo_originale
-    ha_volto_noto = "riconosco" in testo_originale
-    ha_volto_ignoto = "volto ignoto" in testo_originale
-    ha_oggetto_vicino = "vedo qualcosa vicino" in testo_originale or "qualcosa vicino" in testo_originale
-    ha_ostacolo_sinistra = "ostacolo" in testo_originale and "sinistra" in testo_originale
-    ha_ostacolo_destra = "ostacolo" in testo_originale and "destra" in testo_originale
-    ha_ostacolo_frontale = "ostacolo frontale" in testo_originale or "qualcosa davanti" in testo_originale
-    ha_urto_piedi = "urto" in testo_originale and "pied" in testo_originale
-    ha_pericolo_caduta = (
-        "pericolo caduta" in testo_originale or
-        "sollevamento" in testo_originale or
-        "pavimento mancante" in testo_originale
-    )
+    ha_carezza = "carezza" in testo and "testa" in testo
+    ha_mano_sx = "mano sinistra" in testo
+    ha_mano_dx = "mano destra" in testo
+    ha_entrambe_mani = "entrambe le mani" in testo
+    ha_volto_noto = "riconosco" in testo
+    ha_volto_ignoto = "volto ignoto" in testo
+    ha_oggetto_vicino = "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo
+    ha_ostacolo_sx = "ostacolo" in testo and "sinistra" in testo
+    ha_ostacolo_dx = "ostacolo" in testo and "destra" in testo
+    ha_urto_piede_sx = "piede sinistro" in testo
+    ha_urto_piede_dx = "piede destro" in testo
 
-    # 1) COMBINAZIONI DURANTE CAMMINO
-    if camminando and ha_carezza_testa:
+    # COMBINAZIONI CON CAMMINO
+    if camminando and ha_carezza:
         return "carezza_durante_cammino"
 
-    if camminando and ha_mano_sinistra:
+    if camminando and ha_mano_sx:
         return "mano_sinistra_durante_cammino"
 
-    if camminando and ha_mano_destra:
+    if camminando and ha_mano_dx:
         return "mano_destra_durante_cammino"
 
     if camminando and ha_volto_noto:
@@ -121,76 +113,58 @@ def _slug_testo(testo):
     if camminando and ha_volto_ignoto:
         return "volto_ignoto_durante_cammino"
 
-    if camminando and ha_oggetto_vicino:
-        return "oggetto_vicino_durante_cammino"
-
-    if camminando and ha_ostacolo_sinistra:
+    if camminando and ha_ostacolo_sx:
         return "ostacolo_sinistra_durante_cammino"
 
-    if camminando and ha_ostacolo_destra:
+    if camminando and ha_ostacolo_dx:
         return "ostacolo_destra_durante_cammino"
 
-    if camminando and ha_ostacolo_frontale:
-        return "ostacolo_frontale_durante_cammino"
+    if camminando and ha_urto_piede_sx:
+        return "piede_sinistro_durante_cammino"
 
-    if camminando and ha_urto_piedi:
-        return "urto_piedi_durante_cammino"
+    if camminando and ha_urto_piede_dx:
+        return "piede_destro_durante_cammino"
 
-    if camminando and ha_pericolo_caduta:
-        return "pericolo_caduta_durante_cammino"
+    # COMBINAZIONI SOCIALI / TATTILI
+    if ha_carezza and ha_mano_sx:
+        return "carezza_e_mano_sinistra"
 
-    # 2) COMBINAZIONI SOCIALI / MULTI-EVENTO DA FERMO
-    if ha_volto_noto and ha_carezza_testa:
-        return "volto_riconosciuto_carezza_testa"
+    if ha_carezza and ha_mano_dx:
+        return "carezza_e_mano_destra"
 
-    if ha_volto_noto and ha_mano_sinistra:
-        return "volto_riconosciuto_mano_sinistra"
+    if ha_carezza and ha_volto_noto:
+        return "carezza_e_volto_riconosciuto"
 
-    if ha_volto_noto and ha_mano_destra:
-        return "volto_riconosciuto_mano_destra"
+    if ha_carezza and ha_volto_ignoto:
+        return "carezza_e_volto_ignoto"
 
-    if ha_volto_ignoto and ha_carezza_testa:
-        return "volto_ignoto_carezza_testa"
+    if ha_mano_sx and ha_volto_noto:
+        return "mano_sinistra_e_volto_riconosciuto"
 
-    if ha_volto_ignoto and ha_mano_sinistra:
-        return "volto_ignoto_mano_sinistra"
+    if ha_mano_dx and ha_volto_noto:
+        return "mano_destra_e_volto_riconosciuto"
 
-    if ha_volto_ignoto and ha_mano_destra:
-        return "volto_ignoto_mano_destra"
+    if ha_mano_sx and ha_volto_ignoto:
+        return "mano_sinistra_e_volto_ignoto"
 
-    if ha_oggetto_vicino and ha_carezza_testa:
-        return "oggetto_vicino_carezza_testa"
+    if ha_mano_dx and ha_volto_ignoto:
+        return "mano_destra_e_volto_ignoto"
 
-    if ha_oggetto_vicino and ha_mano_sinistra:
-        return "oggetto_vicino_mano_sinistra"
+    if ha_mano_sx and ha_mano_dx:
+        return "tocco_entrambe_mani"
 
-    if ha_oggetto_vicino and ha_mano_destra:
-        return "oggetto_vicino_mano_destra"
-
-    # 3) EVENTI SINGOLI
-    if ha_ostacolo_sinistra:
-        return "ostacolo_sinistra"
-
-    if ha_ostacolo_destra:
-        return "ostacolo_destra"
-
-    if ha_ostacolo_frontale:
-        return "ostacolo_frontale"
-
-    if ha_oggetto_vicino:
-        return "oggetto_vicino"
-
-    if ha_carezza_testa:
+    # CASI SINGOLI
+    if ha_carezza:
         return "carezza_testa"
+
+    if ha_mano_sx:
+        return "tocco_mano_sinistra"
+
+    if ha_mano_dx:
+        return "tocco_mano_destra"
 
     if ha_entrambe_mani:
         return "tocco_entrambe_mani"
-
-    if ha_mano_sinistra:
-        return "tocco_mano_sinistra"
-
-    if ha_mano_destra:
-        return "tocco_mano_destra"
 
     if ha_volto_noto:
         return "volto_riconosciuto"
@@ -198,22 +172,28 @@ def _slug_testo(testo):
     if ha_volto_ignoto:
         return "volto_ignoto"
 
-    if ha_urto_piedi:
-        return "urto_piedi"
+    if ha_oggetto_vicino:
+        return "oggetto_vicino"
 
-    if "piede sinistro" in testo_originale:
+    if ha_ostacolo_sx:
+        return "ostacolo_sinistra"
+
+    if ha_ostacolo_dx:
+        return "ostacolo_destra"
+
+    if ha_urto_piede_sx:
         return "piede_sinistro"
 
-    if "piede destro" in testo_originale:
+    if ha_urto_piede_dx:
         return "piede_destro"
 
-    if ha_pericolo_caduta:
+    if "pericolo caduta" in testo or "sollevamento" in testo or "pavimento mancante" in testo:
         return "pericolo_caduta"
 
-    if "battiti di mani" in testo_originale or "battito" in testo_originale:
+    if "battiti di mani" in testo or "battito" in testo:
         return "battito_mani"
 
-    if "prendi l'iniziativa" in testo_originale or "prendi l iniziativa" in testo_originale:
+    if "prendi l'iniziativa" in testo or "prendi l iniziativa" in testo:
         return "curiosita_dinamica"
 
     # 4) FALLBACK

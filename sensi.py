@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
 from naoqi import ALProxy
 import time
+import threading
 
 
 class NaoSenses:
     def __init__(self, ip, port=9559):
         self.memory = ALProxy("ALMemory", ip, port)
 
+        # Metti True solo per debug. Se lasci True stampa molto.
+        self.debug_sensori = False
+
         # Memoria breve eventi: serve per avere piu' eventi nello stesso REPORT
         self.eventi_recenti = {}
-        self.durata_eventi_recenti = 6.0
+        self.lock_eventi = threading.RLock()
+        self.durata_eventi_recenti = 10.0
 
         self.ultimo_volto_nome = None
         self.ultimo_volto_tempo = 0
-        self.durata_memoria_volto = 8.0
+        self.durata_memoria_volto = 4.0
 
         try:
             self.face_detection = ALProxy("ALFaceDetection", ip, port)
@@ -34,38 +39,193 @@ class NaoSenses:
         except:
             pass
 
+        # Thread continuo per non perdere tocchi brevi mentre NAO parla o chiama LLM
+        self._stop_monitor_tocco = False
+        self.thread_tocco = threading.Thread(target=self._monitor_tocchi)
+        self.thread_tocco.daemon = True
+        self.thread_tocco.start()
+
+    def _safe_print(self, testo):
+        try:
+            if isinstance(testo, unicode):
+                print(testo.encode("utf-8"))
+            else:
+                print(testo)
+        except:
+            pass
+
     def _ricorda_evento(self, chiave, testo):
         """
-        Salva un evento per pochi secondi.
-        Questo permette di combinare eventi vicini nel tempo:
-        volto + carezza, volto + mano, cammino + carezza, ecc.
+        Salva un evento reale per pochi secondi.
+        Non salva mai eventi gia' marcati come recenti.
         """
+        if not testo:
+            return
+
+        testo = testo.strip()
+
+        # Evita duplicazioni tipo "Evento recente: Evento recente:"
+        while testo.lower().startswith("evento recente:"):
+            testo = testo.split(":", 1)[1].strip()
+
+        # Non memorizzare marker generici
+        if testo == u"INTERAZIONE_UTENTE." or testo == u"INTERAZIONE_UTENTE":
+            return
+
         self.eventi_recenti[chiave] = {
             "testo": testo,
             "tempo": time.time()
         }
-
+        
     def _eventi_recenti_validi(self):
         tempo_attuale = time.time()
         eventi = []
         chiavi_da_eliminare = []
 
-        for chiave, dati in self.eventi_recenti.items():
-            try:
-                if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
-                    eventi.append(dati["testo"])
-                else:
-                    chiavi_da_eliminare.append(chiave)
-            except:
-                chiavi_da_eliminare.append(chiave)
+        try:
+            with self.lock_eventi:
+                for chiave, dati in self.eventi_recenti.items():
+                    try:
+                        if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
+                            eventi.append(dati["testo"])
+                        else:
+                            chiavi_da_eliminare.append(chiave)
+                    except:
+                        chiavi_da_eliminare.append(chiave)
 
-        for chiave in chiavi_da_eliminare:
-            try:
-                del self.eventi_recenti[chiave]
-            except:
-                pass
+                for chiave in chiavi_da_eliminare:
+                    try:
+                        del self.eventi_recenti[chiave]
+                    except:
+                        pass
+        except:
+            pass
 
         return eventi
+
+    def _monitor_tocchi(self):
+        """
+        Legge testa, mani e piedi in modo continuo.
+        Serve per non perdere tocchi brevi mentre il ciclo principale e' bloccato
+        da voce.parla(), LLM o altre operazioni lente.
+        """
+        ultimo_evento = {}
+        cooldown = 1.0
+
+        while not self._stop_monitor_tocco:
+            tempo_attuale = time.time()
+
+            # TESTA
+            try:
+                head_front = self.memory.getData("Device/SubDeviceList/Head/Touch/Front/Sensor/Value")
+                head_middle = self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value")
+                head_rear = self.memory.getData("Device/SubDeviceList/Head/Touch/Rear/Sensor/Value")
+
+                if self.debug_sensori:
+                    print("[DEBUG TESTA] front={} middle={} rear={}".format(
+                        head_front, head_middle, head_rear
+                    ))
+
+                testa_toccata = head_front > 0.2 or head_middle > 0.2 or head_rear > 0.2
+
+                if testa_toccata:
+                    if tempo_attuale - ultimo_evento.get("carezza_testa", 0) > cooldown:
+                        evento = u"Sento una carezza sulla testa."
+                        self._ricorda_evento("carezza_testa", evento)
+                        ultimo_evento["carezza_testa"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+            except Exception as e:
+                if self.debug_sensori:
+                    print("[DEBUG MONITOR TESTA ERROR] {}".format(e))
+
+            # MANI
+            try:
+                mano_sx_back = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
+                mano_sx_left = self.memory.getData("Device/SubDeviceList/LHand/Touch/Left/Sensor/Value")
+                mano_sx_right = self.memory.getData("Device/SubDeviceList/LHand/Touch/Right/Sensor/Value")
+
+                mano_dx_back = self.memory.getData("Device/SubDeviceList/RHand/Touch/Back/Sensor/Value")
+                mano_dx_left = self.memory.getData("Device/SubDeviceList/RHand/Touch/Left/Sensor/Value")
+                mano_dx_right = self.memory.getData("Device/SubDeviceList/RHand/Touch/Right/Sensor/Value")
+
+                if self.debug_sensori:
+                    print("[DEBUG MANO SX] back={} left={} right={}".format(
+                        mano_sx_back, mano_sx_left, mano_sx_right
+                    ))
+                    print("[DEBUG MANO DX] back={} left={} right={}".format(
+                        mano_dx_back, mano_dx_left, mano_dx_right
+                    ))
+
+                mano_sx_toccata = mano_sx_back > 0.2 or mano_sx_left > 0.2 or mano_sx_right > 0.2
+                mano_dx_toccata = mano_dx_back > 0.2 or mano_dx_left > 0.2 or mano_dx_right > 0.2
+
+                if mano_sx_toccata and mano_dx_toccata:
+                    if tempo_attuale - ultimo_evento.get("entrambe_mani", 0) > cooldown:
+                        evento = u"Sento un tocco su entrambe le mani."
+                        self._ricorda_evento("entrambe_mani", evento)
+                        ultimo_evento["entrambe_mani"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+                elif mano_sx_toccata:
+                    if tempo_attuale - ultimo_evento.get("mano_sinistra", 0) > cooldown:
+                        evento = u"Sento un tocco sulla mano sinistra."
+                        self._ricorda_evento("mano_sinistra", evento)
+                        ultimo_evento["mano_sinistra"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+                elif mano_dx_toccata:
+                    if tempo_attuale - ultimo_evento.get("mano_destra", 0) > cooldown:
+                        evento = u"Sento un tocco sulla mano destra."
+                        self._ricorda_evento("mano_destra", evento)
+                        ultimo_evento["mano_destra"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+            except Exception as e:
+                if self.debug_sensori:
+                    print("[DEBUG MONITOR MANI ERROR] {}".format(e))
+
+            # PIEDI / BUMPER
+            try:
+                lb_left = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value")
+                lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
+                rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
+                rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
+
+                if self.debug_sensori:
+                    print("[DEBUG PIEDI] lb_left={} lb_right={} rb_left={} rb_right={}".format(
+                        lb_left, lb_right, rb_left, rb_right
+                    ))
+
+                piede_sx_toccato = lb_left > 0.2 or lb_right > 0.2
+                piede_dx_toccato = rb_left > 0.2 or rb_right > 0.2
+
+                if piede_sx_toccato and piede_dx_toccato:
+                    if tempo_attuale - ultimo_evento.get("urto_piedi", 0) > cooldown:
+                        evento = u"URTO TATTILE! Ostacolo frontale ai piedi."
+                        self._ricorda_evento("urto_piedi", evento)
+                        ultimo_evento["urto_piedi"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+                elif piede_sx_toccato:
+                    if tempo_attuale - ultimo_evento.get("piede_sinistro", 0) > cooldown:
+                        evento = u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto."
+                        self._ricorda_evento("piede_sinistro", evento)
+                        ultimo_evento["piede_sinistro"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+                elif piede_dx_toccato:
+                    if tempo_attuale - ultimo_evento.get("piede_destro", 0) > cooldown:
+                        evento = u"URTO TATTILE! Ostacolo a destra. Piede destro premuto."
+                        self._ricorda_evento("piede_destro", evento)
+                        ultimo_evento["piede_destro"] = tempo_attuale
+                        self._safe_print(u"[TOCCO] " + evento)
+
+            except Exception as e:
+                if self.debug_sensori:
+                    print("[DEBUG MONITOR PIEDI ERROR] {}".format(e))
+
+            time.sleep(0.05)
 
     def _leggi_volto(self):
         try:
@@ -111,8 +271,6 @@ class NaoSenses:
         # 1. RICONOSCIMENTO VOLTI CON MEMORIA TEMPORANEA
         volto_corrente = self._leggi_volto()
 
-        # Se riconosco un nome vero, aggiorno la memoria.
-        # Se vedo solo "Sconosciuto", non cancello subito l'ultimo volto noto.
         if volto_corrente and volto_corrente != "Sconosciuto":
             self.ultimo_volto_nome = volto_corrente
             self.ultimo_volto_tempo = tempo_attuale
@@ -175,79 +333,7 @@ class NaoSenses:
         except:
             pass
 
-        # 4. TESTA E MANI
-        try:
-            head_front = self.memory.getData("Device/SubDeviceList/Head/Touch/Front/Sensor/Value")
-            head_middle = self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value")
-            head_rear = self.memory.getData("Device/SubDeviceList/Head/Touch/Rear/Sensor/Value")
-
-            if head_front > 0 or head_middle > 0 or head_rear > 0:
-                evento = u"Sento una carezza sulla testa."
-                eventi.append(evento)
-                self._ricorda_evento("carezza_testa", evento)
-
-            mano_sx_back = self.memory.getData("Device/SubDeviceList/LHand/Touch/Back/Sensor/Value")
-            mano_sx_left = self.memory.getData("Device/SubDeviceList/LHand/Touch/Left/Sensor/Value")
-            mano_sx_right = self.memory.getData("Device/SubDeviceList/LHand/Touch/Right/Sensor/Value")
-
-            mano_dx_back = self.memory.getData("Device/SubDeviceList/RHand/Touch/Back/Sensor/Value")
-            mano_dx_left = self.memory.getData("Device/SubDeviceList/RHand/Touch/Left/Sensor/Value")
-            mano_dx_right = self.memory.getData("Device/SubDeviceList/RHand/Touch/Right/Sensor/Value")
-
-            mano_sx_toccata = mano_sx_back > 0 or mano_sx_left > 0 or mano_sx_right > 0
-            mano_dx_toccata = mano_dx_back > 0 or mano_dx_left > 0 or mano_dx_right > 0
-
-            if mano_sx_toccata and mano_dx_toccata:
-                evento = u"Sento un tocco su entrambe le mani."
-                eventi.append(evento)
-                self._ricorda_evento("entrambe_mani", evento)
-
-            elif mano_sx_toccata:
-                evento = u"Sento un tocco sulla mano sinistra."
-                eventi.append(evento)
-                self._ricorda_evento("mano_sinistra", evento)
-
-            elif mano_dx_toccata:
-                evento = u"Sento un tocco sulla mano destra."
-                eventi.append(evento)
-                self._ricorda_evento("mano_destra", evento)
-
-        except:
-            pass
-
-        # 5. PARAURTI TATTILI / BUMPER PIEDI
-        try:
-            lb_left = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value")
-            lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
-            rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
-            rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
-
-            piede_sx_toccato = lb_left > 0 or lb_right > 0
-            piede_dx_toccato = rb_left > 0 or rb_right > 0
-
-            if piede_sx_toccato or piede_dx_toccato:
-                if tempo_attuale - self.ultimo_urto > 2:
-                    if piede_sx_toccato and piede_dx_toccato:
-                        evento = u"URTO TATTILE! Ostacolo frontale ai piedi."
-                        eventi.append(evento)
-                        self._ricorda_evento("urto_piedi", evento)
-
-                    elif piede_sx_toccato:
-                        evento = u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto."
-                        eventi.append(evento)
-                        self._ricorda_evento("piede_sinistro", evento)
-
-                    elif piede_dx_toccato:
-                        evento = u"URTO TATTILE! Ostacolo a destra. Piede destro premuto."
-                        eventi.append(evento)
-                        self._ricorda_evento("piede_destro", evento)
-
-                    self.ultimo_urto = tempo_attuale
-
-        except Exception as e:
-            print("[DEBUG BUMPER ERROR] {}".format(e))
-
-        # 6. PERICOLO CADUTA
+        # 4. PERICOLO CADUTA
         try:
             peso_sx = self.memory.getData("Device/SubDeviceList/LFoot/FSR/TotalWeight/Sensor/Value")
             peso_dx = self.memory.getData("Device/SubDeviceList/RFoot/FSR/TotalWeight/Sensor/Value")
@@ -263,19 +349,36 @@ class NaoSenses:
         except:
             pass
 
-        # 7. BATTERIA
+        # 5. BATTERIA
         try:
             carica = self.memory.getData("Device/SubDeviceList/Battery/Charge/Sensor/Value") * 100
             eventi.append(u"La mia batteria è al {}%.".format(int(carica)))
         except:
             pass
 
-        # 8. FUSIONE EVENTI RECENTI
-        # Qui uniamo gli eventi rilevati ora con quelli degli ultimi secondi.
+        # 6. FUSIONE EVENTI RECENTI
+        # Gli eventi recenti servono come contesto per combinazioni,
+        # ma non devono duplicarsi né contenere "Evento recente:" annidati.
         eventi_memoria = self._eventi_recenti_validi()
 
         for evento in eventi_memoria:
-            if evento not in eventi:
-                eventi.append(evento)
+            if not evento:
+                continue
+
+            evento_pulito = evento.strip()
+
+            # Evita "Evento recente: Evento recente: ..."
+            while evento_pulito.lower().startswith("evento recente:"):
+                evento_pulito = evento_pulito.split(":", 1)[1].strip()
+
+            # Non ha senso memorizzare/interpolare marker generici
+            if evento_pulito in [u"INTERAZIONE_UTENTE", u"INTERAZIONE_UTENTE."]:
+                continue
+
+            frase_recente = u"Evento recente: {}".format(evento_pulito)
+
+            # Evita duplicati sia nella forma normale sia nella forma recente
+            if evento_pulito not in eventi and frase_recente not in eventi:
+                eventi.append(frase_recente)
 
         return u"REPORT: " + u" ".join(eventi)
