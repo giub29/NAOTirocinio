@@ -119,7 +119,7 @@ class NaoSenses:
         except:
             pass
 
-                # 4. TESTA E MANI
+        # 4. TESTA E MANI
         try:
             head_front = self.memory.getData("Device/SubDeviceList/Head/Touch/Front/Sensor/Value")
             head_middle = self.memory.getData("Device/SubDeviceList/Head/Touch/Middle/Sensor/Value")
@@ -149,19 +149,36 @@ class NaoSenses:
         except:
             pass
 
-        # 5. PARAURTI TATTILI
+        # 5. PARAURTI TATTILI / BUMPER PIEDI
         try:
             lb_left = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Left/Sensor/Value")
             lb_right = self.memory.getData("Device/SubDeviceList/LFoot/Bumper/Right/Sensor/Value")
             rb_left = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Left/Sensor/Value")
             rb_right = self.memory.getData("Device/SubDeviceList/RFoot/Bumper/Right/Sensor/Value")
 
-            if lb_left > 0 or lb_right > 0 or rb_left > 0 or rb_right > 0:
-                if tempo_attuale - self.ultimo_urto > 5:
-                    eventi.append(u"URTO TATTILE! Ostacolo ai piedi.")
+            print("[DEBUG BUMPER] LFoot Left={}, LFoot Right={}, RFoot Left={}, RFoot Right={}".format(
+                lb_left,
+                lb_right,
+                rb_left,
+                rb_right
+            ))
+
+            piede_sx_toccato = lb_left > 0 or lb_right > 0
+            piede_dx_toccato = rb_left > 0 or rb_right > 0
+
+            if piede_sx_toccato or piede_dx_toccato:
+                if tempo_attuale - self.ultimo_urto > 2:
+                    if piede_sx_toccato and piede_dx_toccato:
+                        eventi.append(u"URTO TATTILE! Ostacolo frontale ai piedi.")
+                    elif piede_sx_toccato:
+                        eventi.append(u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto.")
+                    elif piede_dx_toccato:
+                        eventi.append(u"URTO TATTILE! Ostacolo a destra. Piede destro premuto.")
+
                     self.ultimo_urto = tempo_attuale
-        except:
-            pass
+
+        except Exception as e:
+            print("[DEBUG BUMPER ERROR] {}".format(e))
 
         # 6. PERICOLO CADUTA
         try:
