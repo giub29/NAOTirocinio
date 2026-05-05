@@ -218,14 +218,14 @@ def _slug_testo(testo):
     if ha_carezza:
         return "carezza_testa"
 
+    if ha_entrambe_mani:
+        return "tocco_entrambe_mani"
+    
     if ha_mano_sx:
         return "tocco_mano_sinistra"
 
     if ha_mano_dx:
         return "tocco_mano_destra"
-
-    if ha_entrambe_mani:
-        return "tocco_entrambe_mani"
 
     if ha_volto_noto:
         return "volto_riconosciuto"
@@ -863,20 +863,24 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
 
     # Eventi utili. Bastano a far partire la generazione.
     eventi_generabili = [
+        "sento un tocco su entrambe le mani",
+        "ostacolo frontale ai piedi",
+        "urto tattile",
+        "piede sinistro premuto",
+        "piede destro premuto",
+
         "sento una carezza sulla testa",
         "sento un tocco sulla mano sinistra",
         "sento un tocco sulla mano destra",
-        "sento un tocco su entrambe le mani",
+
         "vedo qualcosa vicino",
+        "ostacolo frontale",
         "ostacolo a sinistra",
         "ostacolo a destra",
-        "ostacolo frontale",
-        "urto tattile",
-        "ostacolo ai piedi",
-        "piede sinistro premuto",
-        "piede destro premuto",
+
         "riconosco",
         "volto ignoto",
+
         "pericolo caduta",
         "pavimento mancante",
         "sollevamento"
