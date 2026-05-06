@@ -774,14 +774,31 @@ def main():
                 )
 
                 if evento_composto:
-                    if time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 2.5:
+                    safety_recente = (
+                        time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 2.5
+                    )
+
+                    evento_ancora_safety = (
+                        u"URTO" in mondo or
+                        u"PERICOLO" in mondo or
+                        u"Ostacolo frontale ai piedi" in mondo or
+                        u"Piede sinistro premuto" in mondo or
+                        u"Piede destro premuto" in mondo
+                    )
+
+                    evento_sociale_tattile = (
+                        u"Sento una carezza" in mondo or
+                        u"Sento un tocco sulla mano" in mondo or
+                        u"Sento un tocco su entrambe le mani" in mondo
+                    )
+
+                    if safety_recente and evento_ancora_safety and not evento_sociale_tattile:
                         logger.info(u"[SOUL] Evento composto ignorato: safety appena gestita")
-                        
                         stato_precedente = mondo
                         time.sleep(0.1)
                         continue
 
-                    logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
+                        logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
 
                 # Gestione volto.
                 # Resta dopo il rilevamento dell'evento composto,
