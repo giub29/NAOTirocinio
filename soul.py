@@ -291,11 +291,19 @@ def _processa_batteria(mondo):
         match_bat = re.search(u"La mia batteria.*?(\\d+)%[.]?", mondo)
 
         if match_bat:
-            if ultima_batteria_letta == -1:
-                ultima_batteria_letta = int(match_bat.group(1))
-            else:
-                mondo = mondo.replace(match_bat.group(0), u"").strip()
+            batteria = int(match_bat.group(1))
 
+            if ultima_batteria_letta == -1:
+                ultima_batteria_letta = batteria
+                mondo = mondo.replace(match_bat.group(0), u"").strip()
+            else:
+                if batteria == ultima_batteria_letta:
+                    mondo = mondo.replace(match_bat.group(0), u"").strip()
+                else:
+                    ultima_batteria_letta = batteria
+                    mondo = mondo.replace(match_bat.group(0), u"").strip()
+
+    mondo = re.sub(r"\s+", " ", mondo).strip()
     return mondo
 
 
@@ -674,6 +682,15 @@ def main():
 
             mondo = _normalizza_mondo_fermo(mondo, corpo)
             mondo = _processa_batteria(mondo)
+            if mondo.strip() in [
+                u"REPORT:",
+                u"REPORT: SONO FERMO.",
+                u"SONO FERMO.",
+                u""
+            ]:
+                stato_precedente = mondo
+                time.sleep(0.1)
+                continue
 
             interazione_reale = _valuta_interazione_reale(mondo)
 

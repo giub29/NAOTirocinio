@@ -758,7 +758,35 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         azioni = comportamento.get("azioni", [])
 
         nome_base = _slug_testo(mondo_originale)
+        condizione_tattile = (
+            "mano" in nome_base or
+            "carezza" in nome_base or
+            "entrambe" in nome_base
+        )
 
+        condizione_identita = (
+            "volto" in nome_base or
+            "riconosciuto" in nome_base or
+            "ignoto" in nome_base
+        )
+
+        frasi_identita = [
+            "chi sei",
+            "come ti chiami",
+            "non ti riconosco",
+            "sei nuovo",
+            "sei nuova"
+        ]
+
+        if condizione_tattile and not condizione_identita:
+            for azione in azioni:
+                if azione.get("tipo", "") == "parla":
+                    testo_azione = azione.get("testo", "").lower()
+
+                    for frase in frasi_identita:
+                        if frase in testo_azione:
+                            return False, "Frase di identita' non coerente con condizione tattile"
+                        
         condizione_sociale = (
             "carezza" in nome_base or
             "mano" in nome_base or
@@ -1060,8 +1088,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
             return False
 
         if os.path.exists(path_rifiutato):
-            logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
-            return False
+            logger.warning(u"[GENERATOR] Esiste una vecchia condizione rifiutata, ma posso rigenerarla dopo correzione validatore: {}".format(nome_file))
 
         logger.info(u"[GENERATOR] Evento utile rilevato, genero condizione: {} -> {}".format(
             evento_rilevato,
@@ -1357,8 +1384,7 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             return None
 
         if os.path.exists(path_rifiutato):
-            logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
-            return None
+            logger.warning(u"[GENERATOR] Esiste una vecchia condizione rifiutata, ma posso rigenerarla dopo correzione validatore: {}".format(nome_file))
 
         path_quarantine = os.path.join(QUARANTINE_DIR, nome_file)
 

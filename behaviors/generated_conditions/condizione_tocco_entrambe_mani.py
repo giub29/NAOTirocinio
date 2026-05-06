@@ -9,11 +9,11 @@ def condizione(mondo, stato_runtime):
 def comportamento():
     return {
         "stato_interno": "curioso",
-        "obiettivo": "esplorare la fonte del tocco",
+        "obiettivo": "esplorare l'interazione",
         "azioni": [
             {"tipo": "occhi", "colore": "green"},
             {"tipo": "guarda", "x": 0.0, "y": -0.2},
-            {"tipo": "parla", "testo": "Chi sei?"},
+            {"tipo": "parla", "testo": "Ciao! Sento che mi stai toccando."},
             {"tipo": "fermati"}
         ],
         "memoria": []
