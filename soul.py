@@ -704,47 +704,22 @@ def main():
                 if mondo_cambiato and mondo_valido:
                     logger.info(u"SENSORI: {}".format(testo_per_log(mondo)))
 
-                # APPRENDIMENTO DI EVENTI COMPOSTI:
-                # Deve avvenire PRIMA di:
-                # - gestisci_volto_durante_cammino()
-                # - valuta_condizioni_generate()
-                # altrimenti una condizione semplice, tipo carezza_testa,
-                # intercetta il report e impedisce di creare quella composta.
+                # EVENTI COMPOSTI:
+                # soul.py li riconosce solo per log/debug.
+                # La decisione se generare una condizione composta appartiene
+                # al supervisore autonomo.
                 evento_composto = (
                     mondo_cambiato and
                     mondo_valido and
                     _mondo_ha_eventi_multipli(mondo)
                 )
 
-                condizione_composta_creata = False
-
                 if evento_composto:
-                    logger.info(u"[SOUL] Evento composto rilevato: provo generazione autonoma prima delle condizioni semplici")
+                    logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
 
-                    if valuta_se_generare_condizione(
-                        mondo,
-                        ultima_decisione,
-                        memoria_fisica,
-                        stato_robot,
-                        CHIAVE_PRIVATA
-                    ):
-                        nuova_condizione = genera_condizione_autonoma(
-                            mondo,
-                            memoria_fisica,
-                            stato_robot,
-                            CHIAVE_PRIVATA
-                        )
-
-                        if nuova_condizione:
-                            condizione_composta_creata = True
-                            logger.info(u"[SOUL] Nuova condizione composta creata: {}".format(
-                                nuova_condizione
-                            ))
-
-                # Dopo aver tentato l'apprendimento composto, posso gestire il volto.
-                # Lo faccio dopo, così casi tipo:
-                # "Riconosco Giulia + carezza"
-                # possono generare una condizione composta prima del saluto.
+                # Gestione volto.
+                # Resta dopo il rilevamento dell'evento composto,
+                # ma NON deve stare dentro if evento_composto.
                 if mondo_cambiato and mondo_valido:
                     if gestisci_volto_durante_cammino(
                         mondo,
@@ -758,13 +733,17 @@ def main():
                         continue
 
                 decisione_condizione = None
+
                 stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
+                stato_runtime["memoria"] = memoria_fisica
+                stato_runtime["stato_robot"] = stato_robot
                 stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-                if not evento_composto:
-                    decisione_condizione = autonomy_supervisor.gestisci_autonomia(
-                        mondo,
-                        stato_runtime
-                    )
+                stato_runtime["evento_composto"] = evento_composto
+
+                decisione_condizione = autonomy_supervisor.gestisci_autonomia(
+                    mondo,
+                    stato_runtime
+                )
 
                 if decisione_condizione:
                     logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
@@ -784,7 +763,7 @@ def main():
                     ultima_decisione = decisione_condizione
                     ultimo_evento_tempo = time.time()
 
-                elif mondo_cambiato and mondo_valido:
+            elif mondo_cambiato and mondo_valido:
                     ultima_decisione = _elabora_decisione(
                         mondo,
                         corpo,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Autonomy Supervisor - FASE B
+Autonomy Supervisor 
 
 Questo modulo centralizza la gestione autonoma delle condizioni.
 
@@ -94,79 +94,167 @@ def situazione_merita_generazione(mondo, stato_runtime):
     """
     Decide se la situazione osservata merita una nuova condizione autonoma.
 
-    Questa funzione e' volutamente prudente:
-    evita di generare condizioni per stati banali come solo batteria/fermo.
+    FASE A:
+    - non si basa solo su parole chiave scritte dalla programmatrice
+    - costruisce una firma della situazione
+    - evita situazioni vuote, banali o gia' tentate
+    - riconosce situazioni composte
     """
 
-    if not mondo:
+    firma = costruisci_firma_situazione(mondo, stato_runtime)
+    logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
+    
+    if firma["mondo_vuoto"]:
         return False, "mondo vuoto"
 
-    testo = mondo.lower()
+    if firma["gia_tentata"]:
+        return False, "situazione gia' tentata"
 
-    elementi_utili = [
-        "evento recente",
-        "sento",
-        "tocco",
-        "carezza",
-        "urto",
-        "ostacolo",
-        "qualcosa a sinistra",
-        "qualcosa a destra",
-        "volto",
-        "riconosco",
-        "sconosciuto",
-        "interazione_utente"
-    ]
-
-    elementi_banali = [
-        "la mia batteria",
-        "sono fermo"
-    ]
-
-    ha_elemento_utile = any(e in testo for e in elementi_utili)
-
-    solo_banale = True
-    for parte in elementi_utili:
-        if parte in testo:
-            solo_banale = False
-            break
-
-    if not ha_elemento_utile:
-        return False, "nessun evento utile"
-
-    if solo_banale:
+    if firma["banale"]:
         return False, "situazione banale"
 
-    eventi = stato_runtime.get("eventi", {})
+    if firma["eventi_multipli"]:
+        return True, "eventi multipli rilevati"
 
-    if isinstance(eventi, dict):
-        if len(eventi.keys()) >= 2:
-            return True, "eventi multipli rilevati"
-
-    # Caso importante: piu' indizi nello stesso mondo
-    indicatori_presenti = 0
-
-    gruppi = [
-        ["mano sinistra", "mano_sinistra"],
-        ["mano destra", "mano_destra"],
-        ["piede sinistro", "piede_sinistro"],
-        ["piede destro", "piede_destro"],
-        ["testa"],
-        ["sinistra"],
-        ["destra"],
-        ["volto", "riconosco", "sconosciuto"],
-        ["ostacolo", "qualcosa"]
-    ]
-
-    for gruppo in gruppi:
-        if any(g in testo for g in gruppo):
-            indicatori_presenti += 1
-
-    if indicatori_presenti >= 2:
+    if firma["situazione_composta"]:
         return True, "situazione composta non banale"
 
-    return False, "evento utile ma non abbastanza specifico"
+    if firma["ha_novita_runtime"]:
+        return True, "novita' runtime non ancora coperta"
 
+    if firma["ha_testo_sensoriale_non_banale"]:
+        return True, "situazione sensoriale non banale"
+
+    return False, "situazione non abbastanza significativa"
+
+def costruisci_firma_situazione(mondo, stato_runtime):
+    """
+    Trasforma il mondo attuale in una descrizione piu' astratta.
+
+    L'obiettivo e' non dipendere solo da condizioni scritte a mano
+    come tocco testa, tocco piede, ostacolo, volto, ecc.
+    """
+
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    testo = (mondo or "").strip().lower()
+    eventi = stato_runtime.get("eventi", {})
+
+    if not isinstance(eventi, dict):
+        eventi = {}
+
+    parole_banali = [
+        "la mia batteria",
+        "batteria",
+        "sono fermo",
+        "fermo",
+        "nessun evento",
+        "nessuna interazione"
+    ]
+
+    parole_sensoriali_generiche = [
+        "sento",
+        "percepisco",
+        "rilevo",
+        "vedo",
+        "tocca",
+        "tocco",
+        "pressione",
+        "contatto",
+        "movimento",
+        "ostacolo",
+        "volto",
+        "rumore",
+        "suono",
+        "voce",
+        "interazione",
+        "evento"
+    ]
+
+    chiavi_runtime_banali = [
+        "batteria",
+        "battery",
+        "livello_batteria",
+        "postura",
+        "stato_movimento",
+        "fermo",
+        "timestamp",
+        "tempo"
+    ]
+
+    eventi_attivi = {}
+
+    for chiave, valore in eventi.items():
+        chiave_norm = str(chiave).lower()
+
+        if chiave_norm in chiavi_runtime_banali:
+            continue
+
+        if valore not in [None, False, "", [], {}]:
+            eventi_attivi[chiave] = valore
+
+    indicatori_composti = [
+        ["sinistra", "destra"],
+        ["mano", "piede"],
+        ["testa", "mano"],
+        ["volto", "voce"],
+        ["ostacolo", "fermo"],
+        ["tocco", "fermo"],
+        ["interazione", "movimento"]
+    ]
+
+    mondo_vuoto = not testo
+
+    solo_banale = False
+    if testo:
+        contiene_banale = any(p in testo for p in parole_banali)
+        contiene_sensoriale = any(p in testo for p in parole_sensoriali_generiche)
+        solo_banale = contiene_banale and not contiene_sensoriale and len(eventi_attivi) == 0
+
+    eventi_multipli = len(eventi_attivi.keys()) >= 2
+
+    situazione_composta = False
+
+    for gruppo in indicatori_composti:
+        if all(parola in testo for parola in gruppo):
+            situazione_composta = True
+            break
+
+    chiavi_eventi_attivi = " ".join(str(k).lower() for k in eventi_attivi.keys())
+
+    if not situazione_composta:
+        for gruppo in indicatori_composti:
+            if all(parola in chiavi_eventi_attivi for parola in gruppo):
+                situazione_composta = True
+                break
+
+    ha_novita_runtime = len(eventi_attivi.keys()) > 0
+
+    ha_testo_sensoriale_non_banale = (
+        bool(testo)
+        and not solo_banale
+        and (
+            any(p in testo for p in parole_sensoriali_generiche)
+            or len(testo.split()) >= 8
+        )
+    )
+
+    mondo_normalizzato = testo
+    gia_tentata = mondo_normalizzato == ULTIMO_MONDO_GENERATO
+
+    return {
+        "testo": testo,
+        "eventi": eventi,
+        "eventi_attivi": eventi_attivi,
+        "mondo_vuoto": mondo_vuoto,
+        "banale": solo_banale,
+        "eventi_multipli": eventi_multipli,
+        "situazione_composta": situazione_composta,
+        "ha_novita_runtime": ha_novita_runtime,
+        "ha_testo_sensoriale_non_banale": ha_testo_sensoriale_non_banale,
+        "gia_tentata": gia_tentata
+    }
 
 def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     """
@@ -183,7 +271,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     global ULTIMO_MONDO_GENERATO
 
     adesso = time.time()
-    mondo_normalizzato = mondo.strip().lower()
+    mondo_normalizzato = (mondo or "").strip().lower()
 
     if ULTIMO_MONDO_GENERATO == mondo_normalizzato:
         logger.info("[AUTONOMIA] Generazione saltata: situazione gia' tentata")
@@ -207,7 +295,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 stato_runtime.get("openai_api_key")
                 or os.environ.get("OPENAI_API_KEY")
             )
-            
+
             ULTIMO_MONDO_GENERATO = mondo_normalizzato
 
             path_nuova_condizione = condition_generator.genera_condizione_autonoma(
