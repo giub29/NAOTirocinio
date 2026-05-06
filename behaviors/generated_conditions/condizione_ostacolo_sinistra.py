@@ -1,29 +1,19 @@
 # -*- coding: utf-8 -*-
 
 def condizione(mondo, stato_runtime):
-    if u"Sento una carezza" in mondo:
-        return False
-
-    if u"Riconosco" in mondo or u"Vedo un volto ignoto" in mondo:
-        return False
-
-    if u"PRENDI L'INIZIATIVA" in mondo:
-        return False
-
-    if u"STO CAMMINANDO" in mondo:
-        return False
-
-    return u"C'è qualcosa a sinistra" in mondo and u"SONO FERMO" in mondo
+    testo = mondo.lower()
+    eventi = stato_runtime.get("eventi", {})
+    return eventi.get("ostacolo_sinistra", False)
 
 
 def comportamento():
     return {
         "stato_interno": "prudente",
-        "obiettivo": "gestire ostacolo sinistro appreso",
+        "obiettivo": "osservare l'oggetto a sinistra",
         "azioni": [
             {"tipo": "occhi", "colore": "yellow"},
-            {"tipo": "guarda", "x": -0.2, "y": -0.25},
-            {"tipo": "parla", "testo": "Ho riconosciuto qualcosa a sinistra."}
+            {"tipo": "guarda", "x": -0.5, "y": -0.2},
+            {"tipo": "parla", "testo": "Cosa c'è a sinistra?"}
         ],
         "memoria": []
     }

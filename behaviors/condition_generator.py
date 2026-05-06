@@ -74,6 +74,49 @@ def estrai_eventi(mondo, stato_runtime):
     piede_sinistro = "piede sinistro" in testo
     piede_destro = "piede destro" in testo
 
+    evento_tattile_umano = (
+        "mano sinistra" in testo or
+        "mano destra" in testo or
+        "entrambe le mani" in testo or
+        "carezza" in testo or
+        "testa" in testo
+    )
+
+    robot_fermo = "sono fermo" in testo
+    robot_cammina = "sto camminando" in testo
+
+    qualcosa_sinistra = "qualcosa" in testo and "sinistra" in testo
+    qualcosa_destra = "qualcosa" in testo and "destra" in testo
+
+    ostacolo_sinistra_reale = (
+        "ostacolo a sinistra" in testo or
+        ("urto tattile" in testo and "sinistra" in testo) or
+        (
+            qualcosa_sinistra and
+            not (robot_fermo and evento_tattile_umano)
+        )
+    )
+
+    ostacolo_destra_reale = (
+        "ostacolo a destra" in testo or
+        ("urto tattile" in testo and "destra" in testo) or
+        (
+            qualcosa_destra and
+            not (robot_fermo and evento_tattile_umano)
+        )
+    )
+
+    ostacolo_frontale_reale = (
+        "ostacolo frontale" in testo or
+        (
+            (
+                "vedo qualcosa vicino" in testo or
+                "qualcosa vicino" in testo
+            ) and
+            not (robot_fermo and evento_tattile_umano)
+        )
+    )
+
     return {
         "carezza_testa": "testa" in testo and ("tocc" in testo or "carezza" in testo),
 
@@ -98,13 +141,9 @@ def estrai_eventi(mondo, stato_runtime):
             )
         ),
 
-        "ostacolo_sinistra": ("ostacolo" in testo or "qualcosa" in testo) and "sinistra" in testo,
-        "ostacolo_destra": ("ostacolo" in testo or "qualcosa" in testo) and "destra" in testo,
-        "ostacolo_frontale": (
-            "ostacolo frontale" in testo or
-            "vedo qualcosa vicino" in testo or
-            "qualcosa vicino" in testo
-        ),
+        "ostacolo_sinistra": ostacolo_sinistra_reale,
+        "ostacolo_destra": ostacolo_destra_reale,
+        "ostacolo_frontale": ostacolo_frontale_reale,
 
         "fermo": "sono fermo" in testo,
         "camminando": "sto camminando" in testo,
@@ -142,16 +181,32 @@ def _slug_testo(testo):
     ha_mano_sx = "mano sinistra" in testo
     ha_mano_dx = "mano destra" in testo
     ha_entrambe_mani = "entrambe le mani" in testo
+    ha_evento_tattile_umano = (
+        ha_carezza or
+        ha_mano_sx or
+        ha_mano_dx or
+        ha_entrambe_mani
+    )
     ha_volto_noto = "riconosco" in testo
     ha_volto_ignoto = "volto ignoto" in testo
     ha_oggetto_vicino = "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo
     ha_ostacolo_sx = (
-        ("ostacolo" in testo or "qualcosa" in testo)
-        and "sinistra" in testo
+        "ostacolo a sinistra" in testo or
+        ("urto tattile" in testo and "sinistra" in testo) or
+        (
+            "qualcosa" in testo and
+            "sinistra" in testo and
+            not (fermo and ha_evento_tattile_umano)
+        )
     )
     ha_ostacolo_dx = (
-        ("ostacolo" in testo or "qualcosa" in testo)
-        and "destra" in testo
+        "ostacolo a destra" in testo or
+        ("urto tattile" in testo and "destra" in testo) or
+        (
+            "qualcosa" in testo and
+            "destra" in testo and
+            not (fermo and ha_evento_tattile_umano)
+        )
     )
     ha_urto_piede_sx = "piede sinistro" in testo
     ha_urto_piede_dx = "piede destro" in testo
@@ -1272,13 +1327,16 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
         righe.append('    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo')
 
     elif nome_base == "ostacolo_sinistra":
-        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_sinistra", False)')
 
     elif nome_base == "ostacolo_destra":
-        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"destra" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_destra", False)')
 
     elif nome_base == "ostacolo_frontale":
-        righe.append('    return u"ostacolo frontale" in testo or u"qualcosa davanti" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_frontale", False)')
 
     elif nome_base == "urto_piedi":
         righe.append('    eventi = stato_runtime.get("eventi", {})')

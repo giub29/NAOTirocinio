@@ -2,7 +2,7 @@
 
 def condizione(mondo, stato_runtime):
     testo = mondo.lower()
-    return u"ostacolo" in testo and u"sinistra" in testo and u"sto camminando" in testo
+    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo and u"sto camminando" in testo
 
 
 def comportamento():
