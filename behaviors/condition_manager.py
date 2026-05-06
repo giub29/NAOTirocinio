@@ -247,15 +247,22 @@ def _decisione_coerente_con_mondo(decisione, mondo, nome_condizione):
     testo_mondo = (mondo or "").lower()
     nome = (nome_condizione or "").lower()
 
-    mondo_spaziale = (
-        "ostacolo" in testo_mondo or
-        "qualcosa a destra" in testo_mondo or
-        "qualcosa a sinistra" in testo_mondo or
-        "vedo qualcosa vicino" in testo_mondo or
+    nome_spaziale = (
         "ostacolo" in nome or
+        "oggetto_vicino" in nome or
+        "sinistra" in nome or
         "destra" in nome or
-        "sinistra" in nome
+        "frontale" in nome
     )
+
+    nome_sociale = (
+        "carezza" in nome or
+        "mano" in nome or
+        "volto" in nome or
+        "entrambe" in nome
+    )
+
+    mondo_spaziale = nome_spaziale and not nome_sociale
 
     mondo_sociale = (
         "carezza" in testo_mondo or

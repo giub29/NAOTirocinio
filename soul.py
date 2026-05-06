@@ -65,6 +65,11 @@ root_logger = logging.getLogger()
 root_logger.handlers = []
 root_logger.addHandler(handler)
 root_logger.setLevel(logging.INFO)
+logging.getLogger("WATCHDOG").setLevel(logging.WARNING)
+logging.getLogger("behaviors.autonomy_supervisor").setLevel(logging.WARNING)
+logging.getLogger("behaviors.condition_generator").setLevel(logging.WARNING)
+logging.getLogger("behaviors.safety_behavior").setLevel(logging.WARNING)
+logging.getLogger("behaviors.condition_manager").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -816,7 +821,7 @@ def main():
                     ultima_decisione = decisione_condizione
                     ultimo_evento_tempo = time.time()
 
-            elif mondo_cambiato and mondo_valido:
+                if not decisione_condizione and mondo_cambiato and mondo_valido:
                     ultima_decisione = _elabora_decisione(
                         mondo,
                         corpo,
@@ -824,6 +829,30 @@ def main():
                         vista,
                         sistema
                     )
+
+                    if not evento_composto:
+                        if valuta_se_generare_condizione(
+                            mondo,
+                            ultima_decisione,
+                            memoria_fisica,
+                            stato_robot,
+                            CHIAVE_PRIVATA
+                        ):
+                            logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
+
+                            nuova_condizione = genera_condizione_autonoma(
+                                mondo,
+                                memoria_fisica,
+                                stato_robot,
+                                CHIAVE_PRIVATA
+                            )
+
+                            if nuova_condizione:
+                                logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
+                                    nuova_condizione
+                                ))
+
+                    ultimo_evento_tempo = time.time()
 
                     # Se era gia' un evento composto, la generazione e' gia' stata tentata sopra.
                     # Qui generiamo solo condizioni semplici normali.

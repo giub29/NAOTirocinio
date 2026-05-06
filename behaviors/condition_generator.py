@@ -157,15 +157,11 @@ def _slug_testo(testo):
     ha_urto_piede_dx = "piede destro" in testo
     ha_urto_piedi = (
         "ostacolo frontale ai piedi" in testo or
-        "urto tattile" in testo and "pied" in testo or
+        ("urto tattile" in testo and "pied" in testo) or
         (ha_urto_piede_sx and ha_urto_piede_dx)
     )
-
-     # COMBINAZIONI OSTACOLI / SPAZIO
-    if ha_ostacolo_sx and ha_ostacolo_dx:
-        return "ostacoli_sinistra_e_destra"
-    
     # COMBINAZIONI CON CAMMINO
+    # Queste hanno priorita' assoluta per sicurezza.
     if camminando and ha_carezza:
         return "carezza_durante_cammino"
 
@@ -192,11 +188,14 @@ def _slug_testo(testo):
 
     if camminando and ha_urto_piede_dx:
         return "piede_destro_durante_cammino"
-    
+
     if camminando and ha_urto_piedi:
         return "urto_piedi_durante_cammino"
 
     # COMBINAZIONI SOCIALI / TATTILI
+    # Devono stare PRIMA degli ostacoli.
+    # Altrimenti "C'e' qualcosa a sinistra + carezza + mano"
+    # viene classificato come ostacolo invece che come interazione sociale composta.
     if ha_carezza and ha_mano_sx:
         return "carezza_e_mano_sinistra"
 
@@ -221,8 +220,16 @@ def _slug_testo(testo):
     if ha_mano_dx and ha_volto_ignoto:
         return "mano_destra_e_volto_ignoto"
 
+    if ha_entrambe_mani:
+        return "tocco_entrambe_mani"
+
     if ha_mano_sx and ha_mano_dx:
         return "tocco_entrambe_mani"
+
+    # COMBINAZIONI OSTACOLI / SPAZIO
+    # Dopo i casi sociali.
+    if ha_ostacolo_sx and ha_ostacolo_dx:
+        return "ostacoli_sinistra_e_destra"
 
     # CASI SINGOLI
     if ha_carezza:
@@ -750,11 +757,23 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         comportamento = modulo.comportamento()
         azioni = comportamento.get("azioni", [])
 
+        nome_base = _slug_testo(mondo_originale)
+
+        condizione_sociale = (
+            "carezza" in nome_base or
+            "mano" in nome_base or
+            "volto" in nome_base or
+            "entrambe" in nome_base
+        )
+
         mondo_spaziale = (
-            "ostacolo" in testo or
-            "qualcosa a destra" in testo or
-            "qualcosa a sinistra" in testo or
-            "vedo qualcosa vicino" in testo
+            not condizione_sociale and
+            (
+                "ostacolo" in testo or
+                "qualcosa a destra" in testo or
+                "qualcosa a sinistra" in testo or
+                "vedo qualcosa vicino" in testo
+            )
         )
 
         frasi_sociali_non_coerenti = [
@@ -774,30 +793,38 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                         if frase in testo_azione:
                             return False, "Frase sociale non coerente con condizione spaziale/ostacolo"
 
-        if "sinistra" in testo and "destra" in testo:
-            casi_negativi.append((
-                u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.",
-                {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.", {})}
-            ))
+        # I test sinistra/destra valgono solo per condizioni spaziali pure.
+        # Per condizioni sociali/tattili come:
+        # - carezza_e_mano_sinistra
+        # - tocco_entrambe_mani
+        # - carezza_e_volto_riconosciuto
+        # non devo bocciare la condizione solo perche' nel mondo appare anche
+        # "qualcosa a sinistra/destra".
+        if not condizione_sociale:
+            if "sinistra" in testo and "destra" in testo:
+                casi_negativi.append((
+                    u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.",
+                    {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.", {})}
+                ))
 
-            casi_negativi.append((
-                u"REPORT: C'e' qualcosa a destra. SONO FERMO.",
-                {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a destra. SONO FERMO.", {})}
-            ))
+                casi_negativi.append((
+                    u"REPORT: C'e' qualcosa a destra. SONO FERMO.",
+                    {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a destra. SONO FERMO.", {})}
+                ))
 
-        elif "sinistra" in testo and "destra" not in testo:
-            mondo_invertito = mondo_originale.replace("sinistra", "destra")
-            casi_negativi.append((
-                mondo_invertito,
-                {"eventi": estrai_eventi(mondo_invertito, {})}
-            ))
+            elif "sinistra" in testo and "destra" not in testo:
+                mondo_invertito = mondo_originale.replace("sinistra", "destra")
+                casi_negativi.append((
+                    mondo_invertito,
+                    {"eventi": estrai_eventi(mondo_invertito, {})}
+                ))
 
-        elif "destra" in testo and "sinistra" not in testo:
-            mondo_invertito = mondo_originale.replace("destra", "sinistra")
-            casi_negativi.append((
-                mondo_invertito,
-                {"eventi": estrai_eventi(mondo_invertito, {})}
-            ))
+            elif "destra" in testo and "sinistra" not in testo:
+                mondo_invertito = mondo_originale.replace("destra", "sinistra")
+                casi_negativi.append((
+                    mondo_invertito,
+                    {"eventi": estrai_eventi(mondo_invertito, {})}
+                ))
 
         if "sto camminando" in testo:
             mondo_fermo = mondo_originale.replace("STO CAMMINANDO", "SONO FERMO").replace("sto camminando", "sono fermo")
@@ -1152,13 +1179,13 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
         righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"sto camminando" in testo')
 
     elif nome_base == "ostacolo_sinistra_durante_cammino":
-        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo and u"sto camminando" in testo')
+        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo and u"sto camminando" in testo')
 
     elif nome_base == "ostacolo_destra_durante_cammino":
-        righe.append('    return u"ostacolo" in testo and u"destra" in testo and u"sto camminando" in testo')
+        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"destra" in testo and u"sto camminando" in testo')
 
     elif nome_base == "ostacolo_frontale_durante_cammino":
-        righe.append('    return (u"ostacolo frontale" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
+        righe.append('    return (u"ostacolo frontale" in testo or u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
 
     elif nome_base == "urto_piedi_durante_cammino":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
@@ -1218,10 +1245,10 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
         righe.append('    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo')
 
     elif nome_base == "ostacolo_sinistra":
-        righe.append('    return u"ostacolo" in testo and u"sinistra" in testo')
+        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo')
 
     elif nome_base == "ostacolo_destra":
-        righe.append('    return u"ostacolo" in testo and u"destra" in testo')
+        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"destra" in testo')
 
     elif nome_base == "ostacolo_frontale":
         righe.append('    return u"ostacolo frontale" in testo or u"qualcosa davanti" in testo')

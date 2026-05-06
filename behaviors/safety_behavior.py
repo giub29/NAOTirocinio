@@ -5,9 +5,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 COOLDOWN_CONTATTO_FERMO = 8.0
-COOLDOWN_URTO_MOVIMENTO = 5.0
+COOLDOWN_URTO_CAMMINO = 4.0
+COOLDOWN_OSTACOLO_FRONT_CAMMINO = 5.0
+COOLDOWN_OSTACOLO_LATERALE_CAMMINO = 3.0
 COOLDOWN_PERICOLO_CADUTA = 8.0
-COOLDOWN_OSTACOLO_CAMMINO = 3.0
 
 
 def _reset_sicurezza(stato_runtime):
@@ -15,20 +16,23 @@ def _reset_sicurezza(stato_runtime):
     stato_runtime["riprendi_dopo_nome"] = False
 
 
-def _in_cooldown(stato_runtime, chiave, cooldown):
+def _evento_in_cooldown(stato_runtime, chiave, cooldown):
+    """
+    Ritorna True se l'evento deve essere ignorato perché troppo recente.
+    Aggiorna il tempo solo quando l'evento viene accettato.
+    """
     adesso = time.time()
     ultimo = stato_runtime.get(chiave, 0)
-    delta = adesso - ultimo
 
-    if delta < cooldown:
-        logger.info(u"[SAFETY] Evento ignorato per cooldown: {} delta={:.1f}s".format(
+    if adesso - ultimo < cooldown:
+        logger.debug(u"[SAFETY] Evento ignorato per cooldown: {} delta={:.1f}s".format(
             chiave,
-            delta
+            adesso - ultimo
         ))
         return True
 
     stato_runtime[chiave] = adesso
-    logger.info(u"[SAFETY] Evento accettato: {}".format(chiave))
+    logger.debug(u"[SAFETY] Evento accettato: {}".format(chiave))
     return False
 
 
@@ -39,17 +43,25 @@ def gestisci_emergenza(mondo, corpo, voce, stato_runtime):
     )
 
     if u"URTO TATTILE" in mondo or u"URTO LATERALE" in mondo:
+        if robot_in_movimento:
+            if _evento_in_cooldown(
+                stato_runtime,
+                "ultimo_urto_cammino_tempo",
+                COOLDOWN_URTO_CAMMINO
+            ):
+                return True
+        else:
+            if _evento_in_cooldown(
+                stato_runtime,
+                "ultimo_contatto_fermo_tempo",
+                COOLDOWN_CONTATTO_FERMO
+            ):
+                return True
+
         corpo.fermati()
         _reset_sicurezza(stato_runtime)
 
         if robot_in_movimento:
-            if _in_cooldown(
-                stato_runtime,
-                "ultimo_urto_movimento_tempo",
-                COOLDOWN_URTO_MOVIMENTO
-            ):
-                return True
-
             corpo.cammina(-0.1, 0.0)
             time.sleep(0.6)
 
@@ -58,22 +70,13 @@ def gestisci_emergenza(mondo, corpo, voce, stato_runtime):
 
             corpo.fermati()
             voce.parla(u"Ho sentito un ostacolo, mi sposto.")
-
         else:
-            if _in_cooldown(
-                stato_runtime,
-                "ultimo_contatto_fermo_tempo",
-                COOLDOWN_CONTATTO_FERMO
-            ):
-                return True
-
             voce.parla(u"Ho sentito un contatto. Resto fermo.")
 
-        stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
         return True
 
     if u"PERICOLO CADUTA" in mondo:
-        if _in_cooldown(
+        if _evento_in_cooldown(
             stato_runtime,
             "ultimo_pericolo_caduta_tempo",
             COOLDOWN_PERICOLO_CADUTA
@@ -87,7 +90,6 @@ def gestisci_emergenza(mondo, corpo, voce, stato_runtime):
         corpo.vai_in_posa("Stand")
         voce.parla(u"Mi fermo, rischio di cadere.")
 
-        stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
         return True
 
     return False
@@ -104,10 +106,10 @@ def gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
         u"Ostacolo frontale molto vicino" in mondo or
         u"Vedo qualcosa vicino" in mondo
     ):
-        if _in_cooldown(
+        if _evento_in_cooldown(
             stato_runtime,
             "ultimo_ostacolo_frontale_cammino_tempo",
-            COOLDOWN_OSTACOLO_CAMMINO
+            COOLDOWN_OSTACOLO_FRONT_CAMMINO
         ):
             return True
 
@@ -126,35 +128,30 @@ def gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
         if stato_runtime.get("in_pattugliamento", False):
             corpo.cammina(0.25, 0.0)
 
-        stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
         return True
 
     if u"Ostacolo a sinistra" in mondo:
-        if _in_cooldown(
+        if _evento_in_cooldown(
             stato_runtime,
             "ultimo_ostacolo_laterale_cammino_tempo",
-            COOLDOWN_OSTACOLO_CAMMINO
+            COOLDOWN_OSTACOLO_LATERALE_CAMMINO
         ):
             return True
 
         corpo.imposta_colore_occhi("red")
         corpo.cammina(0.25, -0.12)
-
-        stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
         return True
 
     if u"Ostacolo a destra" in mondo:
-        if _in_cooldown(
+        if _evento_in_cooldown(
             stato_runtime,
             "ultimo_ostacolo_laterale_cammino_tempo",
-            COOLDOWN_OSTACOLO_CAMMINO
+            COOLDOWN_OSTACOLO_LATERALE_CAMMINO
         ):
             return True
 
         corpo.imposta_colore_occhi("red")
         corpo.cammina(0.25, 0.12)
-
-        stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
         return True
 
     return False
