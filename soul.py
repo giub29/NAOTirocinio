@@ -759,7 +759,7 @@ def main():
 
                 decisione_condizione = None
                 stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-
+                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
                 if not evento_composto:
                     decisione_condizione = autonomy_supervisor.gestisci_autonomia(
                         mondo,

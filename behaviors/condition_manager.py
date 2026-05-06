@@ -125,7 +125,7 @@ def carica_condizioni_generate():
 
     condizioni = []
 
-    for nome_file in os.listdir(CONDIZIONI_DIR):
+    for nome_file in ordina_condizioni_per_priorita(os.listdir(CONDIZIONI_DIR)):
         if not nome_file.endswith(".py"):
             continue
 
@@ -167,6 +167,68 @@ def carica_condizioni_generate():
 
     _condizioni_cache = condizioni
     return condizioni
+
+def punteggio_specificita_condizione(nome_file):
+    """
+    Assegna un punteggio alla condizione.
+    Piu' il punteggio e' alto, prima viene valutata.
+
+    Obiettivo:
+    - condizioni composte prima delle semplici
+    - volto riconosciuto prima di tocco generico
+    - ostacolo + tocco prima di solo ostacolo
+    """
+
+    nome = nome_file.lower()
+    punteggio = 0
+
+    # Le condizioni composte spesso hanno "_e_"
+    if "_e_" in nome:
+        punteggio += 100
+
+    # Più parole specifiche contiene, più è importante
+    parole_specifiche = [
+        "volto_riconosciuto",
+        "volto",
+        "riconosciuto",
+        "ostacolo",
+        "sinistra",
+        "destra",
+        "mano",
+        "piede",
+        "testa",
+        "fermo",
+        "interazione",
+        "utente"
+    ]
+
+    for parola in parole_specifiche:
+        if parola in nome:
+            punteggio += 10
+
+    # Le condizioni troppo generiche devono arrivare dopo
+    if "tocco_mano_sinistra" in nome:
+        punteggio -= 5
+
+    if "tocco_mano_destra" in nome:
+        punteggio -= 5
+
+    if "carezza_testa" in nome:
+        punteggio -= 5
+
+    return punteggio
+
+
+def ordina_condizioni_per_priorita(lista_file):
+    """
+    Ordina i file condizione dalla piu' specifica alla piu' generica.
+    """
+
+    return sorted(
+        lista_file,
+        key=lambda nome: punteggio_specificita_condizione(nome),
+        reverse=True
+    )
 
 def valuta_condizioni_generate(mondo, stato_runtime):
     """
