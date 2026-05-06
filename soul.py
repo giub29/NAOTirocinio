@@ -10,6 +10,7 @@ import os
 import re
 import logging
 import sys
+import signal
 
 utente_sta_scrivendo = False
 ultimo_input_tempo = 0
@@ -102,6 +103,10 @@ def aggiorna_heartbeat():
 messaggio_utente = ""
 input_ricevuto = False
 STOP_PROGRAMMA = False
+
+ULTIMA_GENERAZIONE_SAFETY_TEMPO = 0
+ULTIMO_MONDO_SAFETY_GENERATO = ""
+INTERVALLO_GENERAZIONE_SAFETY = 8
 
 memoria_fisica = {}
 ultima_batteria_letta = -1
@@ -227,8 +232,10 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
 
         elif "vai" in testo_user or "cammina" in testo_user:
             stato_runtime["in_pattugliamento"] = True
+            stato_runtime["ultimo_comando_vai_tempo"] = time.time()
             corpo.guarda(*ANGOLO_SGUARDO_NEUTRO)
-            logger.debug(u"Comando vai/cammina ricevuto")
+            corpo.cammina(VELOCITA_CAMMINO, 0.0)
+            logger.info(u"Comando vai/cammina ricevuto: avvio pattugliamento")
 
         elif "stop" in testo_user or "fermati" in testo_user or "ferma" in testo_user:
             stato_runtime["in_pattugliamento"] = False
@@ -435,19 +442,33 @@ def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
     Permette di generare condizioni anche quando un evento fisico viene
     intercettato dalla safety prima del normale flusso decisionale.
 
-    Serve per casi come:
-    - carezza durante cammino;
-    - urto ai piedi;
-    - pericolo caduta;
-    - ostacolo durante movimento.
-
-    La safety resta prioritaria, ma l'evento non viene perso.
+    Per evitare spam di generazione:
+    - non ritenta la stessa situazione continuamente;
+    - applica un cooldown temporale;
+    - lascia comunque la safety prioritaria.
     """
+
+    global ULTIMA_GENERAZIONE_SAFETY_TEMPO
+    global ULTIMO_MONDO_SAFETY_GENERATO
 
     try:
         if not CHIAVE_PRIVATA:
             logger.warning(u"[SOUL] Non posso generare condizione da safety: OPENAI_API_KEY assente")
             return
+
+        adesso = time.time()
+        mondo_norm = (mondo or "").strip().lower()
+
+        if mondo_norm == ULTIMO_MONDO_SAFETY_GENERATO:
+            logger.debug(u"[SOUL] Generazione safety saltata: situazione gia' tentata")
+            return
+
+        if adesso - ULTIMA_GENERAZIONE_SAFETY_TEMPO < INTERVALLO_GENERAZIONE_SAFETY:
+            logger.debug(u"[SOUL] Generazione safety saltata: cooldown attivo")
+            return
+
+        ULTIMA_GENERAZIONE_SAFETY_TEMPO = adesso
+        ULTIMO_MONDO_SAFETY_GENERATO = mondo_norm
 
         decisione_safety = {
             "stato_interno": "sicurezza",
@@ -491,18 +512,25 @@ def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
         logger.warning(u"[SOUL] Errore generazione condizione da evento safety: {}".format(e))
 
 def _riprendi_cammino_automatico(corpo, ultima_decisione):
-    if stato_runtime["in_pattugliamento"] and not corpo.sta_camminando():
-        azioni_testo = json.dumps(ultima_decisione.get("azioni", []))
+    if not stato_runtime.get("in_pattugliamento", False):
+        return
 
-        if (
-            "cammina" not in azioni_testo and
-            "gira" not in azioni_testo and
-            "fermati" not in azioni_testo
-        ):
-            corpo.cammina(VELOCITA_CAMMINO, 0.0)
-            logger.debug(u"Cammino automatico ripreso")
+    if corpo.sta_camminando():
+        return
 
-import signal
+    # Non riprendere subito dopo un evento fisico/safety.
+    if time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 3.0:
+        return
+
+    azioni_testo = json.dumps(ultima_decisione.get("azioni", []), ensure_ascii=False)
+
+    if (
+        "cammina" not in azioni_testo and
+        "gira" not in azioni_testo and
+        "fermati" not in azioni_testo
+    ):
+        corpo.cammina(VELOCITA_CAMMINO, 0.0)
+        logger.debug(u"Cammino automatico ripreso")
 
 def handle_exit(sig, frame):
     print("Soul arrestato pulitamente")
@@ -601,14 +629,23 @@ def main():
                 ))
 
             if gestisci_emergenza(mondo, corpo, voce, stato_runtime):
+                stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
+                stato_precedente = mondo
+                time.sleep(0.2)
                 continue
 
             if gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
+                stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()
+
                 mondo_evento = mondo + u" STO CAMMINANDO."
+
                 _tenta_generare_condizione_da_evento_safety(
                     mondo_evento,
                     u"ostacolo o urto durante il cammino"
                 )
+
+                stato_precedente = mondo_evento
+                time.sleep(0.2)
                 continue
 
             if stato_runtime["attesa_nome"] and input_ricevuto:
@@ -684,7 +721,7 @@ def main():
                     mondo_evento,
                     u"evento fisico sensibile durante il cammino"
                 )
-
+                
                 stato_precedente = mondo_evento
                 time.sleep(0.2)
                 continue
@@ -715,6 +752,13 @@ def main():
                 )
 
                 if evento_composto:
+                    if time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 2.5:
+                        logger.info(u"[SOUL] Evento composto ignorato: safety appena gestita")
+                        
+                        stato_precedente = mondo
+                        time.sleep(0.1)
+                        continue
+
                     logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
 
                 # Gestione volto.
@@ -734,16 +778,25 @@ def main():
 
                 decisione_condizione = None
 
-                stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-                stato_runtime["memoria"] = memoria_fisica
-                stato_runtime["stato_robot"] = stato_robot
-                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-                stato_runtime["evento_composto"] = evento_composto
+                if mondo_cambiato and mondo_valido:
+                    stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
+                    stato_runtime["memoria"] = memoria_fisica
+                    stato_runtime["stato_robot"] = stato_robot
+                    stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+                    stato_runtime["evento_composto"] = evento_composto
 
-                decisione_condizione = autonomy_supervisor.gestisci_autonomia(
-                    mondo,
-                    stato_runtime
-                )
+                    salta_autonomia_per_vai = (
+                        stato_runtime.get("in_pattugliamento", False) and
+                        time.time() - stato_runtime.get("ultimo_comando_vai_tempo", 0) < 2.0
+                    )
+
+                    if salta_autonomia_per_vai:
+                        logger.info(u"[SOUL] Salto autonomia per avvio pattugliamento appena richiesto")
+                    else:
+                        decisione_condizione = autonomy_supervisor.gestisci_autonomia(
+                            mondo,
+                            stato_runtime
+                        )
 
                 if decisione_condizione:
                     logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
@@ -798,6 +851,7 @@ def main():
 
                     ultimo_evento_tempo = time.time()
 
+            _riprendi_cammino_automatico(corpo, ultima_decisione)
             stato_precedente = mondo
             time.sleep(0.1)
 

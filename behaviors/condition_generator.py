@@ -145,8 +145,14 @@ def _slug_testo(testo):
     ha_volto_noto = "riconosco" in testo
     ha_volto_ignoto = "volto ignoto" in testo
     ha_oggetto_vicino = "vedo qualcosa vicino" in testo or "qualcosa vicino" in testo
-    ha_ostacolo_sx = "ostacolo" in testo and "sinistra" in testo
-    ha_ostacolo_dx = "ostacolo" in testo and "destra" in testo
+    ha_ostacolo_sx = (
+        ("ostacolo" in testo or "qualcosa" in testo)
+        and "sinistra" in testo
+    )
+    ha_ostacolo_dx = (
+        ("ostacolo" in testo or "qualcosa" in testo)
+        and "destra" in testo
+    )
     ha_urto_piede_sx = "piede sinistro" in testo
     ha_urto_piede_dx = "piede destro" in testo
     ha_urto_piedi = (
@@ -155,6 +161,10 @@ def _slug_testo(testo):
         (ha_urto_piede_sx and ha_urto_piede_dx)
     )
 
+     # COMBINAZIONI OSTACOLI / SPAZIO
+    if ha_ostacolo_sx and ha_ostacolo_dx:
+        return "ostacoli_sinistra_e_destra"
+    
     # COMBINAZIONI CON CAMMINO
     if camminando and ha_carezza:
         return "carezza_durante_cammino"
@@ -273,13 +283,15 @@ def _slug_testo(testo):
     parole_vietate = [
         "report", "sono", "fermo", "sto", "camminando",
         "interazione", "utente", "mia", "mio",
+        "evento", "recente", "recenti",
+        "sento", "vedo", "rilevo",
+        "destra", "sinistra",
         "la", "il", "lo", "gli", "le",
         "un", "una", "di", "a", "da", "in", "con", "per",
         "che", "sulla", "sullo", "sul",
         "del", "della", "dei", "degli", "delle",
         "qualcosa"
     ]
-
     parole_utili = []
 
     for parola in testo.split(" "):
@@ -403,7 +415,7 @@ def _costruisci_condizione_automatica(mondo):
         parola = parola.replace('"', "").replace("'", "")
         controlli.append('u"{}" in testo'.format(parola))
 
-    righe.append("    return " + " or ".join(controlli))
+    righe.append("    return " + " and ".join(controlli))
     righe.append("")
 
     return "\n".join(righe)
@@ -693,6 +705,117 @@ def _valida_modulo_python(path_file):
     except Exception as e:
         return False, "Errore import/test modulo: {}".format(e)
 
+def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_originale=None):
+    """
+    Verifica che la condizione generata:
+    - si attivi sul mondo originale;
+    - non si attivi su situazioni banali;
+    - non si attivi su casi simili ma diversi.
+    """
+
+    if stato_runtime_originale is None:
+        stato_runtime_originale = {}
+
+    nome_modulo = os.path.basename(path_file).replace(".py", "")
+
+    try:
+        modulo = imp.load_source(nome_modulo + "_semantica", path_file)
+
+        if not hasattr(modulo, "condizione"):
+            return False, "Funzione condizione assente nella validazione semantica"
+
+        eventi_originali = estrai_eventi(mondo_originale, stato_runtime_originale)
+
+        runtime_positivo = {
+            "eventi": eventi_originali
+        }
+
+        positivo = modulo.condizione(mondo_originale, runtime_positivo)
+
+        if positivo is not True:
+            return False, "La condizione non si attiva sul mondo originale"
+
+        casi_negativi = [
+            (
+                u"REPORT: SONO FERMO.",
+                {"eventi": estrai_eventi(u"REPORT: SONO FERMO.", {})}
+            ),
+            (
+                u"REPORT: La mia batteria e' al 90%. SONO FERMO.",
+                {"eventi": estrai_eventi(u"REPORT: La mia batteria e' al 90%. SONO FERMO.", {})}
+            )
+        ]
+
+        testo = mondo_originale.lower()
+        comportamento = modulo.comportamento()
+        azioni = comportamento.get("azioni", [])
+
+        mondo_spaziale = (
+            "ostacolo" in testo or
+            "qualcosa a destra" in testo or
+            "qualcosa a sinistra" in testo or
+            "vedo qualcosa vicino" in testo
+        )
+
+        frasi_sociali_non_coerenti = [
+            "ciao",
+            "come stai",
+            "cosa stai facendo",
+            "come posso aiutarti",
+            "come ti senti"
+        ]
+
+        if mondo_spaziale:
+            for azione in azioni:
+                if azione.get("tipo", "") == "parla":
+                    testo_azione = azione.get("testo", "").lower()
+
+                    for frase in frasi_sociali_non_coerenti:
+                        if frase in testo_azione:
+                            return False, "Frase sociale non coerente con condizione spaziale/ostacolo"
+
+        if "sinistra" in testo and "destra" in testo:
+            casi_negativi.append((
+                u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.",
+                {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.", {})}
+            ))
+
+            casi_negativi.append((
+                u"REPORT: C'e' qualcosa a destra. SONO FERMO.",
+                {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a destra. SONO FERMO.", {})}
+            ))
+
+        elif "sinistra" in testo and "destra" not in testo:
+            mondo_invertito = mondo_originale.replace("sinistra", "destra")
+            casi_negativi.append((
+                mondo_invertito,
+                {"eventi": estrai_eventi(mondo_invertito, {})}
+            ))
+
+        elif "destra" in testo and "sinistra" not in testo:
+            mondo_invertito = mondo_originale.replace("destra", "sinistra")
+            casi_negativi.append((
+                mondo_invertito,
+                {"eventi": estrai_eventi(mondo_invertito, {})}
+            ))
+
+        if "sto camminando" in testo:
+            mondo_fermo = mondo_originale.replace("STO CAMMINANDO", "SONO FERMO").replace("sto camminando", "sono fermo")
+            casi_negativi.append((
+                mondo_fermo,
+                {"eventi": estrai_eventi(mondo_fermo, {})}
+            ))
+
+        for mondo_negativo, runtime_negativo in casi_negativi:
+            risultato = modulo.condizione(mondo_negativo, runtime_negativo)
+
+            if risultato is True:
+                return False, "La condizione si attiva su caso negativo: {}".format(mondo_negativo)
+
+        return True, "ok"
+
+    except Exception as e:
+        return False, "Errore validazione semantica: {}".format(e)
 
 def _sposta_in_rejected(path_file, motivo):
     _assicura_cartelle()
@@ -1004,8 +1127,13 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     righe.append("def condizione(mondo, stato_runtime):")
     righe.append("    testo = mondo.lower()")
 
+    # COMBINAZIONI OSTACOLI / SPAZIO
+    if nome_base == "ostacoli_sinistra_e_destra":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_sinistra", False) and eventi.get("ostacolo_destra", False)')
+
     # COMBINAZIONI DURANTE CAMMINO
-    if nome_base == "carezza_durante_cammino":
+    elif nome_base == "carezza_durante_cammino":
         righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
 
     elif nome_base == "mano_sinistra_durante_cammino":
@@ -1191,6 +1319,20 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         nome_base = _slug_testo(mondo)
         nome_file = "condizione_{}.py".format(nome_base)
 
+        path_generato = os.path.join(GENERATED_DIR, nome_file)
+        path_rifiutato = os.path.join(
+            REJECTED_DIR,
+            nome_file.replace(".py", "_rejected.py")
+        )
+
+        if os.path.exists(path_generato):
+            logger.info(u"[GENERATOR] Condizione gia' esistente, non genero duplicato: {}".format(nome_file))
+            return None
+
+        if os.path.exists(path_rifiutato):
+            logger.info(u"[GENERATOR] Condizione gia' rifiutata in passato, non rigenero: {}".format(nome_file))
+            return None
+
         path_quarantine = os.path.join(QUARANTINE_DIR, nome_file)
 
         _scrivi_file(path_quarantine, codice)
@@ -1202,6 +1344,19 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             return None
 
         valido, motivo = _valida_modulo_python(path_quarantine)
+
+        if not valido:
+            _sposta_in_rejected(path_quarantine, motivo)
+            return None
+
+        valido, motivo = _valida_semantica_condizione(
+            path_quarantine,
+            mondo,
+            {
+                "memoria": dati_memoria,
+                "stato_robot": stato_robot
+            }
+        )
 
         if not valido:
             _sposta_in_rejected(path_quarantine, motivo)

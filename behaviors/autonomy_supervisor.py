@@ -38,7 +38,52 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     logger.info("[AUTONOMIA] Supervisore attivo")
 
-    # 1. Prova prima a usare condizioni Python gia' generate
+    firma = costruisci_firma_situazione(mondo, stato_runtime)
+    logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
+
+    evento_composto = (
+        stato_runtime.get("evento_composto", False)
+        or firma.get("eventi_multipli", False)
+        or firma.get("situazione_composta", False)
+    )
+
+    # CASO SPECIALE:
+    # se la situazione e' composta, proviamo prima a generare/imparare
+    # la condizione composta. Altrimenti una condizione semplice gia'
+    # esistente potrebbe intercettare l'evento e impedire l'apprendimento.
+    if evento_composto:
+        logger.info("[AUTONOMIA] Evento composto: priorita' alla generazione autonoma")
+
+        deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
+
+        logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
+            deve_generare,
+            motivo
+        ))
+
+        if deve_generare:
+            nuova_decisione = prova_generazione_autonoma(
+                mondo,
+                stato_runtime,
+                "evento composto prioritario: {}".format(motivo)
+            )
+
+            if nuova_decisione is not None:
+                logger.info("[AUTONOMIA] Decisione ottenuta dopo generazione autonoma composta")
+                return nuova_decisione
+
+        logger.info("[AUTONOMIA] Generazione composta non riuscita: provo condizioni esistenti")
+
+        decisione = valuta_condizioni_generate_sicure(mondo, stato_runtime)
+
+        if decisione is not None:
+            logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata esistente")
+            return decisione
+
+        return None
+
+    # CASO NORMALE:
+    # per situazioni semplici, prima uso condizioni gia' generate.
     decisione = valuta_condizioni_generate_sicure(mondo, stato_runtime)
 
     if decisione is not None:
@@ -48,6 +93,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
 
     deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
+
     logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
         deve_generare,
         motivo
@@ -103,7 +149,7 @@ def situazione_merita_generazione(mondo, stato_runtime):
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
     logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
-    
+
     if firma["mondo_vuoto"]:
         return False, "mondo vuoto"
 

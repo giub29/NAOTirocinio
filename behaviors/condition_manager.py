@@ -230,6 +230,89 @@ def ordina_condizioni_per_priorita(lista_file):
         reverse=True
     )
 
+def _decisione_coerente_con_mondo(decisione, mondo, nome_condizione):
+    """
+    Controlla che una decisione generata sia coerente con il mondo attuale.
+    Serve a impedire che vecchie condizioni sbagliate restino attive.
+    """
+
+    if not isinstance(decisione, dict):
+        return False, "decisione non e' un dizionario"
+
+    azioni = decisione.get("azioni", [])
+
+    if not isinstance(azioni, list):
+        return False, "azioni non e' una lista"
+
+    testo_mondo = (mondo or "").lower()
+    nome = (nome_condizione or "").lower()
+
+    mondo_spaziale = (
+        "ostacolo" in testo_mondo or
+        "qualcosa a destra" in testo_mondo or
+        "qualcosa a sinistra" in testo_mondo or
+        "vedo qualcosa vicino" in testo_mondo or
+        "ostacolo" in nome or
+        "destra" in nome or
+        "sinistra" in nome
+    )
+
+    mondo_sociale = (
+        "carezza" in testo_mondo or
+        "mano" in testo_mondo or
+        "volto" in testo_mondo or
+        "riconosco" in testo_mondo
+    )
+
+    frasi_sociali_non_coerenti = [
+        "ciao",
+        "come stai",
+        "cosa stai facendo",
+        "come posso aiutarti",
+        "come ti senti",
+        "cosa c'e' qui",
+        "cosa c'è qui",
+        "cosa c'e' intorno",
+        "cosa c'è intorno",
+        "cosa vedi"
+    ]
+
+    frasi_spostamento = [
+        "mi sposto",
+        "mi muovo",
+        "mi allontano",
+        "evito",
+        "aggiro"
+    ]
+
+    robot_fermo = "sono fermo" in testo_mondo
+    robot_camminando = "sto camminando" in testo_mondo
+
+    for azione in azioni:
+        if not isinstance(azione, dict):
+            return False, "azione non e' un dizionario"
+
+        tipo = azione.get("tipo", "")
+
+        if tipo == "parla":
+            testo_azione = azione.get("testo", "").lower()
+
+            if mondo_spaziale:
+                for frase in frasi_sociali_non_coerenti:
+                    if frase in testo_azione:
+                        return False, "frase sociale non coerente con mondo spaziale"
+
+            if robot_fermo and not robot_camminando:
+                for frase in frasi_spostamento:
+                    if frase in testo_azione:
+                        return False, "frase di spostamento non coerente da fermo"
+
+        if tipo in ["cammina", "gira"]:
+            if robot_fermo and not robot_camminando:
+                return False, "movimento non coerente quando il robot e' fermo"
+
+    return True, "ok"
+
 def valuta_condizioni_generate(mondo, stato_runtime):
     """
     Valuta tutte le condizioni generate.
@@ -255,19 +338,35 @@ def valuta_condizioni_generate(mondo, stato_runtime):
 
             if condizione_vera:
                 logger.info(u"[CONDIZIONI] Attivata condizione generata: {}".format(nome))
-                _ultima_attivazione_condizione[nome] = adesso
 
                 try:
-                    return modulo.comportamento()
+                    decisione = modulo.comportamento()
                 except Exception as e:
                     _registra_errore(nome, e)
-                    return None
+                    continue
+
+                coerente, motivo = _decisione_coerente_con_mondo(
+                    decisione,
+                    mondo,
+                    nome
+                )
+
+                if not coerente:
+                    logger.warning(u"[CONDIZIONI] Condizione incoerente, sposto in rejected: {} | {}".format(
+                        nome,
+                        motivo
+                    ))
+                    _sposta_in_rejected(nome.replace(".py", ""), motivo)
+                    continue
+
+                _ultima_attivazione_condizione[nome] = adesso
+                return decisione
 
         except Exception as e:
             _registra_errore(nome, e)
+            continue
 
     return None
-
 
 def esegui_condizione_per_nome(nome, mondo, stato_runtime):
     """
