@@ -33,6 +33,7 @@ from sensi import NaoSenses
 from core.memory_manager import carica_memoria, salva_memoria
 from core.robot_state import crea_stato_robot, aggiorna_stato_robot
 
+from behaviors import autonomy_supervisor
 from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
@@ -533,6 +534,7 @@ def main():
         thread_input.start()
 
         logger.info(u"Sistemi pronti")
+        aggiorna_heartbeat()
 
         voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO.".format(
             memoria_fisica.get("nome_utente", "amico")
@@ -757,14 +759,15 @@ def main():
 
                 decisione_condizione = None
                 stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-                # Se il mondo era composto, NON faccio partire subito una condizione semplice
-                # nello stesso ciclo. Questo evita che carezza_testa/tocco_mano rubino
-                # l'evento alla nuova condizione composta.
+
                 if not evento_composto:
-                    decisione_condizione = valuta_condizioni_generate(mondo, stato_runtime)
+                    decisione_condizione = autonomy_supervisor.gestisci_autonomia(
+                        mondo,
+                        stato_runtime
+                    )
 
                 if decisione_condizione:
-                    logger.info(u"[SOUL] Uso condizione Python generata/caricata")
+                    logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
 
                     decisione_condizione = valida_decisione(decisione_condizione, mondo)
 
