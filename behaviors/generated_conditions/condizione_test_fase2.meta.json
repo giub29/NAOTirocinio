@@ -1,0 +1,68 @@
+{
+  "aggiornata_il": "2026-05-06 15:18:40",
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "tipo": "fermati"
+          },
+          {
+            "colore": "red",
+            "tipo": "occhi"
+          },
+          {
+            "testo": "Ho visto un ostacolo a destra.",
+            "tipo": "parla"
+          }
+        ],
+        "obiettivo": "evitare ostacolo a destra",
+        "stato_interno": "sicurezza"
+      },
+      "mondo": "REPORT: Ostacolo a destra. STO CAMMINANDO.",
+      "tempo": "2026-05-06 15:18:40"
+    }
+  ],
+  "creata_il": "2026-05-06 15:18:40",
+  "errori_recenti": [
+    {
+      "errore": "errore simulato di test",
+      "tempo": "2026-05-06 15:18:40"
+    }
+  ],
+  "eventi_attivi_origine": [
+    "ostacolo_destra",
+    "camminando"
+  ],
+  "eventi_completi_origine": {
+    "camminando": true,
+    "carezza_testa": false,
+    "ostacolo_destra": true
+  },
+  "file_python": "condizione_test_fase2.py",
+  "mondo_origine": "REPORT: Ostacolo a destra. STO CAMMINANDO.",
+  "nome": "condizione_test_fase2",
+  "note": [
+    "Condizione generata autonomamente da NAO.",
+    "Il file Python contiene la logica eseguibile.",
+    "Questo JSON contiene la memoria e la tracciabilità della condizione."
+  ],
+  "origine": "test_fase2",
+  "statistiche": {
+    "attivazioni": 1,
+    "errori_runtime": 1,
+    "rifiuti": 0,
+    "ultima_attivazione": "2026-05-06 15:18:40",
+    "ultimo_errore": "errore simulato di test"
+  },
+  "stato": "promossa",
+  "stato_robot_origine": {
+    "obiettivo_corrente": "pattugliamento",
+    "stato_motorio": "cammina"
+  },
+  "validazione": {
+    "modulo": "ok",
+    "semantica": "ok",
+    "struttura": "ok"
+  }
+}

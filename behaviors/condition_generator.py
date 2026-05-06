@@ -22,6 +22,7 @@ import imp
 import ast
 
 from behaviors.condition_manager import reset_cache_condizioni
+from behaviors.condition_memory import salva_metadati_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -1473,7 +1474,31 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             _sposta_in_rejected(path_quarantine, motivo)
             return None
 
-        return _promuovi_in_generated(path_quarantine)
+        path_finale = _promuovi_in_generated(path_quarantine)
+
+        try:
+            nome_condizione = os.path.basename(path_finale).replace(".py", "")
+
+            eventi_origine = estrai_eventi(
+                mondo,
+                {
+                    "memoria": dati_memoria,
+                    "stato_robot": stato_robot
+                }
+            )
+
+            salva_metadati_condizione(
+                nome_condizione,
+                mondo,
+                eventi_origine,
+                stato_robot,
+                origine="autogenerata_llm"
+            )
+
+        except Exception as e:
+            logger.warning(u"[GENERATOR] Condizione promossa, ma metadati non creati: {}".format(e))
+
+        return path_finale
 
     except Exception as e:
         logger.warning(u"[GENERATOR] Errore generazione condizione: {}".format(e))

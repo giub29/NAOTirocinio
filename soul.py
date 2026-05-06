@@ -798,7 +798,7 @@ def main():
                         time.sleep(0.1)
                         continue
 
-                        logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
+                    logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
 
                 # Gestione volto.
                 # Resta dopo il rilevamento dell'evento composto,
@@ -856,6 +856,10 @@ def main():
                     ultimo_evento_tempo = time.time()
 
                 if not decisione_condizione and mondo_cambiato and mondo_valido:
+                    # Nessuna condizione autonoma applicabile/generata dal supervisore:
+                    # uso il normale comportamento LLM, ma NON genero qui nuove condizioni.
+                    # La generazione autonoma ordinaria deve rimanere centralizzata in
+                    # behaviors/autonomy_supervisor.py, per evitare doppioni e chiamate LLM duplicate.
                     ultima_decisione = _elabora_decisione(
                         mondo,
                         corpo,
@@ -863,28 +867,6 @@ def main():
                         vista,
                         sistema
                     )
-
-                    if not evento_composto:
-                        if valuta_se_generare_condizione(
-                            mondo,
-                            ultima_decisione,
-                            memoria_fisica,
-                            stato_robot,
-                            CHIAVE_PRIVATA
-                        ):
-                            logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
-
-                            nuova_condizione = genera_condizione_autonoma(
-                                mondo,
-                                memoria_fisica,
-                                stato_robot,
-                                CHIAVE_PRIVATA
-                            )
-
-                            if nuova_condizione:
-                                logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
-                                    nuova_condizione
-                                ))
 
                     ultimo_evento_tempo = time.time()
 

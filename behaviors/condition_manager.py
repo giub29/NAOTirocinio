@@ -15,6 +15,7 @@ import imp
 import time
 import shutil
 
+from behaviors.condition_memory import registra_attivazione, registra_errore_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,11 @@ def _sposta_in_rejected(nome_modulo, motivo):
 def _registra_errore(nome_modulo, errore):
     numero_errori = _errori_condizione.get(nome_modulo, 0) + 1
     _errori_condizione[nome_modulo] = numero_errori
+
+    try:
+        registra_errore_condizione(nome_modulo.replace(".py", ""), errore)
+    except Exception as e:
+        logger.warning(u"[CONDIZIONI] Errore aggiornamento memoria condizione: {}".format(e))
 
     logger.warning(u"[CONDIZIONI] Errore runtime in {} ({}/{}): {}".format(
         nome_modulo,
@@ -367,6 +373,16 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                     continue
 
                 _ultima_attivazione_condizione[nome] = adesso
+
+                try:
+                    registra_attivazione(
+                        nome.replace(".py", ""),
+                        mondo,
+                        decisione
+                    )
+                except Exception as e:
+                    logger.warning(u"[CONDIZIONI] Errore registrazione attivazione condizione: {}".format(e))
+
                 return decisione
 
         except Exception as e:
