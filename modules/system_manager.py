@@ -29,11 +29,22 @@ class NaoSystem:
         self.life.setState(nuovo_stato)
 
     def controlla_batteria(self):
-        """Restituisce la percentuale e avvisa se è bassa"""
-        carica = self.battery.getBatteryCharge()
-        if carica < 15:
-            return "ATTENZIONE: Batteria critica ({}%)!".format(carica)
-        return "Batteria: {}%".format(carica)
+        """
+        Restituisce una frase semantica sulla batteria.
+        Deve essere leggibile da soul.py e dal supervisore autonomo.
+        """
+        try:
+            carica = self.battery.getBatteryCharge()
+        except Exception:
+            return ""
+
+        if carica <= 15:
+            return "La mia batteria è critica: {}%.".format(carica)
+
+        if carica <= 25:
+            return "La mia batteria è bassa: {}%.".format(carica)
+
+        return "La mia batteria è al {}%.".format(carica)
 
     def spegni_robot(self):
         """Spegne il robot via software (usare con cautela!)"""

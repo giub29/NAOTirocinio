@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 11:10:04", 
+  "aggiornata_il": "2026-05-12 11:50:05", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -48,6 +48,54 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Vedo qualcosa vicino. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-12 11:10:04"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a sinistra?", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 11:49:21"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a sinistra?", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 11:50:05"
     }
   ], 
   "creata_il": "2026-05-12 10:59:39", 
@@ -55,10 +103,10 @@
   "nome": "condizione_ostacolo_sinistra", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 2, 
+    "attivazioni": 4, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 11:10:04", 
+    "ultima_attivazione": "2026-05-12 11:50:05", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

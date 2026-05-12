@@ -293,6 +293,14 @@ def _processa_batteria(mondo):
         if match_bat:
             batteria = int(match_bat.group(1))
 
+            # Caso importante: batteria bassa.
+            # NON rimuovo l'informazione dal mondo, perché serve al supervisore.
+            if batteria <= 25:
+                ultima_batteria_letta = batteria
+                return mondo
+
+            # Caso normale: batteria stabile/non critica.
+            # La rimuovo per non far ragionare NAO sempre sulla batteria.
             if ultima_batteria_letta == -1:
                 ultima_batteria_letta = batteria
                 mondo = mondo.replace(match_bat.group(0), u"").strip()

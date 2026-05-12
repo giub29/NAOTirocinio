@@ -1,0 +1,71 @@
+{
+  "aggiornata_il": "2026-05-12 11:50:31", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 11:49:29"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: Sento un tocco su entrambe le mani. SONO FERMO.", 
+      "tempo": "2026-05-12 11:50:31"
+    }
+  ], 
+  "creata_il": "2026-05-12 11:49:29", 
+  "file_python": "condizione_tocco_entrambe_mani.py", 
+  "nome": "condizione_tocco_entrambe_mani", 
+  "origine": "sconosciuta", 
+  "statistiche": {
+    "attivazioni": 2, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-05-12 11:50:31", 
+    "ultimo_errore": ""
+  }, 
+  "stato": "attiva"
+}

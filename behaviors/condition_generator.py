@@ -90,6 +90,15 @@ TOKEN_VIETATI = [
 def estrai_eventi(mondo, stato_runtime):
     testo = mondo.lower()
 
+    batteria_valore = None
+
+    try:
+        match_batteria = re.search(r"batteria.*?(\d+)%", testo)
+        if match_batteria:
+            batteria_valore = int(match_batteria.group(1))
+    except Exception:
+        batteria_valore = None
+
     piede_sinistro = "piede sinistro" in testo
     piede_destro = "piede destro" in testo
 
@@ -137,6 +146,10 @@ def estrai_eventi(mondo, stato_runtime):
     )
 
     return {
+        "batteria_percentuale": batteria_valore,
+        "batteria_bassa": batteria_valore is not None and batteria_valore <= 25,
+        "batteria_critica": batteria_valore is not None and batteria_valore <= 15,
+
         "carezza_testa": "testa" in testo and ("tocc" in testo or "carezza" in testo),
 
         "mano_sinistra": "mano sinistra" in testo,
@@ -216,6 +229,14 @@ def _slug_testo(testo):
     camminando = "sto camminando" in testo
     fermo = "sono fermo" in testo
 
+    ha_batteria_bassa = False
+    try:
+        match_batteria = re.search(r"batteria.*?(\d+)%", testo)
+        if match_batteria:
+            ha_batteria_bassa = int(match_batteria.group(1)) <= 25
+    except Exception:
+        ha_batteria_bassa = False
+
     ha_carezza = "carezza" in testo and "testa" in testo
     ha_mano_sx = "mano sinistra" in testo
     ha_mano_dx = "mano destra" in testo
@@ -254,6 +275,10 @@ def _slug_testo(testo):
         ("urto tattile" in testo and "pied" in testo) or
         (ha_urto_piede_sx and ha_urto_piede_dx)
     )
+
+    if ha_batteria_bassa and ha_volto_noto:
+        return "batteria_bassa_e_volto_riconosciuto"
+    
     # COMBINAZIONI CON CAMMINO
     # Queste hanno priorita' assoluta per sicurezza.
     if camminando and ha_carezza:
@@ -285,7 +310,7 @@ def _slug_testo(testo):
 
     if camminando and ha_urto_piedi:
         return "urto_piedi_durante_cammino"
-
+    
     # COMBINAZIONI SOCIALI / TATTILI
     # Devono stare PRIMA degli ostacoli.
     # Altrimenti "C'e' qualcosa a sinistra + carezza + mano"
@@ -1275,11 +1300,16 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     righe.append("def condizione(mondo, stato_runtime):")
     righe.append("    testo = mondo.lower()")
 
+
     # COMBINAZIONI OSTACOLI / SPAZIO
     if nome_base == "ostacoli_sinistra_e_destra":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
         righe.append('    return eventi.get("ostacolo_sinistra", False) and eventi.get("ostacolo_destra", False)')
 
+    elif nome_base == "batteria_bassa_e_volto_riconosciuto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("batteria_bassa", False) and eventi.get("volto_riconosciuto", False)')
+        
     # COMBINAZIONI DURANTE CAMMINO
     elif nome_base == "carezza_durante_cammino":
         righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
