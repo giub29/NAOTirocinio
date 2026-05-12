@@ -18,7 +18,15 @@ import shutil
 import logging
 import requests
 import json
-import importlib.util
+try:
+    import importlib.util
+except ImportError:
+    importlib = None
+
+try:
+    import imp
+except ImportError:
+    imp = None
 import ast
 
 try:
@@ -170,6 +178,26 @@ def estrai_eventi(mondo, stato_runtime):
             "pavimento mancante" in testo
         ),
     }
+
+def _carica_modulo_da_file(nome_modulo, path_file):
+    """
+    Carica un modulo Python da file.
+    Compatibile sia con Python 3 sia con Python 2.7/NAO.
+    """
+
+    if importlib is not None:
+        try:
+            spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
+            modulo = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(modulo)
+            return modulo
+        except Exception:
+            pass
+
+    if imp is not None:
+        return imp.load_source(nome_modulo, path_file)
+
+    raise ImportError("Nessun sistema disponibile per caricare il modulo")
 
 def _assicura_cartelle():
     for cartella in [QUARANTINE_DIR, GENERATED_DIR, REJECTED_DIR]:
@@ -646,9 +674,7 @@ def _valida_modulo_python(path_file):
     nome_modulo = os.path.basename(path_file).replace(".py", "")
 
     try:
-        spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
-        modulo = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(modulo)
+        modulo = _carica_modulo_da_file(nome_modulo, path_file)
 
         if not hasattr(modulo, "condizione"):
             return False, "Funzione condizione assente"
@@ -794,9 +820,7 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
     nome_modulo = os.path.basename(path_file).replace(".py", "")
 
     try:
-        spec = importlib.util.spec_from_file_location(nome_modulo + "_semantica", path_file)
-        modulo = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(modulo)
+        modulo = _carica_modulo_da_file(nome_modulo + "_semantica", path_file)
 
         if not hasattr(modulo, "condizione"):
             return False, "Funzione condizione assente nella validazione semantica"

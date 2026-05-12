@@ -11,7 +11,15 @@ Questo modulo permette a NAO di:
 
 import os
 import logging
-import importlib.util
+try:
+    import importlib.util
+except ImportError:
+    importlib = None
+
+try:
+    import imp
+except ImportError:
+    imp = None
 import time
 import shutil
 
@@ -212,6 +220,26 @@ def _priorita_condizione(nome):
 
     return punteggio
 
+def _carica_modulo_da_file(nome_modulo, path_file):
+    """
+    Carica un modulo Python da file.
+    Compatibile sia con Python 3 sia con Python 2.7/NAO.
+    """
+
+    if importlib is not None:
+        try:
+            spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
+            modulo = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(modulo)
+            return modulo
+        except Exception:
+            pass
+
+    if imp is not None:
+        return imp.load_source(nome_modulo, path_file)
+
+    raise ImportError("Nessun sistema disponibile per caricare il modulo")
+
 def carica_condizioni_generate():
     global _condizioni_cache
 
@@ -233,9 +261,7 @@ def carica_condizioni_generate():
         path_file = os.path.join(CONDIZIONI_DIR, nome_file)
 
         try:
-            spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
-            modulo = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(modulo)
+            modulo = _carica_modulo_da_file(nome_modulo, path_file)
 
             if not hasattr(modulo, "condizione"):
                 _sposta_in_rejected(nome_modulo, "manca funzione condizione")

@@ -1,0 +1,86 @@
+{
+  "aggiornata_il": "2026-05-12 11:00:37", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "cyan", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa faresti tu?", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'ambiente", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: C'è qualcosa a destra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: L'immagine mostra una parte del corpo di una persona, indossando una maglietta grigia e jeans, con i capelli lunghi visibili ai lati. Sullo sfondo si intravede un ambiente interno, probabilmente un ufficio o una scuola.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 11:00:37"
+    }
+  ], 
+  "creata_il": "2026-05-12 11:00:37", 
+  "eventi_attivi_origine": [
+    "ostacolo_destra", 
+    "fermo", 
+    "ostacolo_sinistra"
+  ], 
+  "eventi_completi_origine": {
+    "camminando": false, 
+    "carezza_testa": false, 
+    "entrambe_mani": false, 
+    "entrambi_piedi": false, 
+    "fermo": true, 
+    "mano_destra": false, 
+    "mano_sinistra": false, 
+    "ostacolo_destra": true, 
+    "ostacolo_frontale": false, 
+    "ostacolo_sinistra": true, 
+    "pericolo": false, 
+    "piede_destro": false, 
+    "piede_sinistro": false, 
+    "urto": false, 
+    "urto_piedi": false, 
+    "volto_ignoto": false, 
+    "volto_riconosciuto": false
+  }, 
+  "file_python": "condizione_ostacoli_sinistra_e_destra.py", 
+  "mondo_origine": "REPORT: C'è qualcosa a sinistra. Evento recente: C'è qualcosa a destra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: L'immagine mostra una parte del corpo di una persona, indossando una maglietta grigia e jeans, con i capelli lunghi visibili ai lati. Sullo sfondo si intravede un ambiente interno, probabilmente un ufficio o una scuola.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+  "nome": "condizione_ostacoli_sinistra_e_destra", 
+  "note": [
+    "Condizione generata autonomamente da NAO.", 
+    "Il file Python contiene la logica eseguibile.", 
+    "Questo JSON contiene la memoria e la tracciabilità della condizione."
+  ], 
+  "origine": "autogenerata_llm", 
+  "statistiche": {
+    "attivazioni": 1, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-05-12 11:00:37", 
+    "ultimo_errore": ""
+  }, 
+  "stato": "promossa", 
+  "stato_robot_origine": {
+    "energia": 100, 
+    "livello_allerta": 1, 
+    "modalita": "osservazione", 
+    "obiettivo_corrente": "evitare ostacolo", 
+    "persona_attuale": null, 
+    "sta_camminando": false, 
+    "ultimo_evento": "ostacolo rilevato", 
+    "umore": "prudente"
+  }, 
+  "validazione": {
+    "modulo": "ok", 
+    "semantica": "ok", 
+    "struttura": "ok"
+  }
+}
