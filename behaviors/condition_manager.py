@@ -11,11 +11,17 @@ Questo modulo permette a NAO di:
 
 import os
 import logging
-import imp
+import importlib.util
 import time
 import shutil
 
-from behaviors.condition_memory import registra_attivazione, registra_errore_condizione
+from behaviors.condition_memory import (
+    registra_attivazione,
+    registra_errore_condizione,
+    marca_condizione_rifiutata
+)
+
+from behaviors.condition_repair import tenta_riparazione_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -48,33 +54,95 @@ def _assicura_cartelle():
 
 
 def _path_condizione(nome_modulo):
+    if nome_modulo.endswith(".py"):
+        nome_modulo = nome_modulo[:-3]
+
     return os.path.join(CONDIZIONI_DIR, nome_modulo + ".py")
 
 
-def _sposta_in_rejected(nome_modulo, motivo):
+def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
     """
     Sposta una condizione difettosa fuori da generated_conditions.
-    In questo modo NAO non continuerà a ricaricarla nei cicli successivi.
+
+    Fase 4:
+    - sposta il file .py in rejected_conditions;
+    - aggiorna e sposta il file .meta.json;
+    - prova a riparare automaticamente la condizione, se possibile.
     """
+
     _assicura_cartelle()
 
-    origine = _path_condizione(nome_modulo)
+    if nome_modulo.endswith(".py"):
+        nome_modulo = nome_modulo[:-3]
 
-    if not os.path.exists(origine):
-        return
+    origine_py = os.path.join(CONDIZIONI_DIR, nome_modulo + ".py")
+    origine_meta = os.path.join(CONDIZIONI_DIR, nome_modulo + ".meta.json")
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    destinazione = os.path.join(
+
+    destinazione_py = os.path.join(
         REJECTED_DIR,
         nome_modulo + "_rejected_" + timestamp + ".py"
     )
 
+    destinazione_meta = os.path.join(
+        REJECTED_DIR,
+        nome_modulo + "_rejected_" + timestamp + ".meta.json"
+    )
+
     try:
-        shutil.move(origine, destinazione)
+        try:
+            marca_condizione_rifiutata(nome_modulo, motivo)
+        except Exception as e:
+            logger.warning(u"[CONDIZIONI] Impossibile aggiornare metadati rifiuto {}: {}".format(
+                nome_modulo,
+                e
+            ))
+
+        if os.path.exists(origine_py):
+            shutil.move(origine_py, destinazione_py)
+
+        if os.path.exists(origine_meta):
+            shutil.move(origine_meta, destinazione_meta)
+
         logger.warning(u"[CONDIZIONI] Condizione spostata in rejected_conditions: {} | motivo: {}".format(
             nome_modulo,
             motivo
         ))
+
+        try:
+            esito_riparazione = tenta_riparazione_condizione(
+                nome_modulo,
+                motivo,
+                mondo,
+                stato_runtime
+            )
+
+            if not isinstance(esito_riparazione, dict):
+                logger.warning(u"[CONDIZIONI] Riparazione fallita per {} | esito non valido: {}".format(
+                    nome_modulo,
+                    esito_riparazione
+                ))
+
+            elif esito_riparazione.get("success"):
+                logger.warning(u"[CONDIZIONI] Riparazione riuscita per {} | nuova condizione: {}".format(
+                    nome_modulo,
+                    esito_riparazione.get("new_path")
+                ))
+
+            else:
+                logger.warning(u"[CONDIZIONI] Riparazione fallita per {} | stato: {} | motivo: {}".format(
+                    nome_modulo,
+                    esito_riparazione.get("status"),
+                    esito_riparazione.get("reason")
+                ))
+
+        except Exception as e:
+            logger.warning(u"[CONDIZIONI] Errore imprevisto nella riparazione automatica di {}: {}".format(
+                nome_modulo,
+                e
+            ))
+
     except Exception as e:
         logger.error(u"[CONDIZIONI] Impossibile spostare {} in rejected_conditions: {}".format(
             nome_modulo,
@@ -84,24 +152,47 @@ def _sposta_in_rejected(nome_modulo, motivo):
     reset_cache_condizioni()
 
 
-def _registra_errore(nome_modulo, errore):
-    numero_errori = _errori_condizione.get(nome_modulo, 0) + 1
-    _errori_condizione[nome_modulo] = numero_errori
+def _registra_errore(nome_modulo, errore, mondo=None, stato_runtime=None):
+    """
+    Registra un errore runtime di una condizione.
+
+    Fase 4:
+    - aggiorna il contatore interno;
+    - aggiorna il .meta.json;
+    - se gli errori sono troppi, sposta la condizione in rejected_conditions;
+    - dopo il rifiuto prova la riparazione automatica.
+    """
+
+    if nome_modulo.endswith(".py"):
+        nome_base = nome_modulo[:-3]
+    else:
+        nome_base = nome_modulo
+
+    numero_errori = _errori_condizione.get(nome_base, 0) + 1
+    _errori_condizione[nome_base] = numero_errori
 
     try:
-        registra_errore_condizione(nome_modulo.replace(".py", ""), errore)
+        registra_errore_condizione(nome_base, errore)
     except Exception as e:
-        logger.warning(u"[CONDIZIONI] Errore aggiornamento memoria condizione: {}".format(e))
+        logger.warning(u"[CONDIZIONI] Errore aggiornamento memoria condizione {}: {}".format(
+            nome_base,
+            e
+        ))
 
     logger.warning(u"[CONDIZIONI] Errore runtime in {} ({}/{}): {}".format(
-        nome_modulo,
+        nome_base,
         numero_errori,
         MAX_ERRORI_CONDIZIONE,
         errore
     ))
 
     if numero_errori >= MAX_ERRORI_CONDIZIONE:
-        _sposta_in_rejected(nome_modulo, errore)
+        _sposta_in_rejected(
+            nome_base,
+            errore,
+            mondo,
+            stato_runtime
+        )
 
 def _priorita_condizione(nome):
     nome = nome.lower()
@@ -142,7 +233,9 @@ def carica_condizioni_generate():
         path_file = os.path.join(CONDIZIONI_DIR, nome_file)
 
         try:
-            modulo = imp.load_source(nome_modulo, path_file)
+            spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
+            modulo = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(modulo)
 
             if not hasattr(modulo, "condizione"):
                 _sposta_in_rejected(nome_modulo, "manca funzione condizione")
@@ -353,9 +446,22 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                 logger.info(u"[CONDIZIONI] Attivata condizione generata: {}".format(nome))
 
                 try:
-                    decisione = modulo.comportamento()
+                    try:
+                        decisione = modulo.comportamento(
+                            None,
+                            stato_runtime.get("memoria", {}),
+                            stato_runtime
+                        )
+                    except TypeError:
+                        decisione = modulo.comportamento()
+
                 except Exception as e:
-                    _registra_errore(nome, e)
+                    _registra_errore(
+                        nome,
+                        e,
+                        mondo,
+                        stato_runtime
+                    )
                     continue
 
                 coerente, motivo = _decisione_coerente_con_mondo(
@@ -369,7 +475,14 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                         nome,
                         motivo
                     ))
-                    _sposta_in_rejected(nome.replace(".py", ""), motivo)
+
+                    _sposta_in_rejected(
+                        nome.replace(".py", ""),
+                        motivo,
+                        mondo,
+                        stato_runtime
+                    )
+
                     continue
 
                 _ultima_attivazione_condizione[nome] = adesso
@@ -386,7 +499,12 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                 return decisione
 
         except Exception as e:
-            _registra_errore(nome, e)
+            _registra_errore(
+                nome,
+                e,
+                mondo,
+                stato_runtime
+            )
             continue
 
     return None

@@ -18,8 +18,18 @@ import shutil
 import logging
 import requests
 import json
-import imp
+import importlib.util
 import ast
+
+try:
+    unicode
+except NameError:
+    unicode = str
+
+try:
+    basestring
+except NameError:
+    basestring = str
 
 from behaviors.condition_manager import reset_cache_condizioni
 from behaviors.condition_memory import salva_metadati_condizione
@@ -636,7 +646,9 @@ def _valida_modulo_python(path_file):
     nome_modulo = os.path.basename(path_file).replace(".py", "")
 
     try:
-        modulo = imp.load_source(nome_modulo, path_file)
+        spec = importlib.util.spec_from_file_location(nome_modulo, path_file)
+        modulo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modulo)
 
         if not hasattr(modulo, "condizione"):
             return False, "Funzione condizione assente"
@@ -782,7 +794,9 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
     nome_modulo = os.path.basename(path_file).replace(".py", "")
 
     try:
-        modulo = imp.load_source(nome_modulo + "_semantica", path_file)
+        spec = importlib.util.spec_from_file_location(nome_modulo + "_semantica", path_file)
+        modulo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modulo)
 
         if not hasattr(modulo, "condizione"):
             return False, "Funzione condizione assente nella validazione semantica"
