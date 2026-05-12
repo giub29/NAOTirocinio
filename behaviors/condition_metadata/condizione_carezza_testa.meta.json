@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 12:36:35", 
+  "aggiornata_il": "2026-05-12 15:00:37", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -28,6 +28,90 @@
       }, 
       "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: Sento una carezza sulla testa. Evento recente: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-12 12:36:35"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Grazie per la carezza!", 
+            "tipo": "parla"
+          }, 
+          {
+            "path": "animations/Stand/Gestures/Hey_1", 
+            "tipo": "animazione"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere alla carezza", 
+        "stato_interno": "sociale"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento una carezza sulla testa. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 13:58:14"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Grazie per la carezza!", 
+            "tipo": "parla"
+          }, 
+          {
+            "path": "animations/Stand/Gestures/Hey_1", 
+            "tipo": "animazione"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere alla carezza", 
+        "stato_interno": "sociale"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento una carezza sulla testa. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 14:43:58"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Grazie per la carezza!", 
+            "tipo": "parla"
+          }, 
+          {
+            "path": "animations/Stand/Gestures/Hey_1", 
+            "tipo": "animazione"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere alla carezza", 
+        "stato_interno": "sociale"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento una carezza sulla testa. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 15:00:37"
     }
   ], 
   "creata_il": "2026-05-12 12:36:35", 
@@ -35,10 +119,10 @@
   "nome": "condizione_carezza_testa", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 1, 
+    "attivazioni": 4, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 12:36:35", 
+    "ultima_attivazione": "2026-05-12 15:00:37", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

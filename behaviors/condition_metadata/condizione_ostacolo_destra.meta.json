@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 13:55:39", 
+  "aggiornata_il": "2026-05-12 14:43:52", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -26,34 +26,7 @@
         "stato_interno": "prudente"
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 12:45:35"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: In un ambiente di lavoro, si vede un armadietto grigio con appese diverse immagini e fogli, mentre davanti c'è un contenitore di raccolta differenziata con indicazioni su cosa conferire. A lato, è appesa una giacca.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
-      "tempo": "2026-05-12 12:48:44"
+      "tempo": "2026-05-12 14:18:20"
     }, 
     {
       "decisione": {
@@ -80,7 +53,7 @@
         "stato_interno": "prudente"
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 12:58:01"
+      "tempo": "2026-05-12 14:20:45"
     }, 
     {
       "decisione": {
@@ -106,8 +79,8 @@
         "obiettivo": "osservare l'oggetto a destra", 
         "stato_interno": "prudente"
       }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vedono un armadietto con alcune immagini appese, un contenitore per la raccolta differenziata e un cappotto appeso accanto a una borsa blu.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
-      "tempo": "2026-05-12 12:58:48"
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vede una parete con un armadio che ha sopra alcune stampe e disegni, un cartello con indicazioni per la raccolta differenziata e una giacca appesa accanto a un monitor.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 14:20:50"
     }, 
     {
       "decisione": {
@@ -133,8 +106,35 @@
         "obiettivo": "osservare l'oggetto a destra", 
         "stato_interno": "prudente"
       }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vede parzialmente un braccio e una giacca di pelle nera, insieme a un'area di una parete dove sono affissi vari fogli e un cartello informativo su un servizio di raccolta differenziata.. Usa la memoria e chiedi 'Cosa faresti tu?'. STO CAMMINANDO.", 
-      "tempo": "2026-05-12 13:55:39"
+      "mondo": "REPORT: C'è qualcosa a destra. SONO FERMO.", 
+      "tempo": "2026-05-12 14:42:44"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
+      "tempo": "2026-05-12 14:43:52"
     }
   ], 
   "creata_il": "2026-05-12 12:30:33", 
@@ -181,10 +181,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 12, 
+    "attivazioni": 23, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 13:55:39", 
+    "ultima_attivazione": "2026-05-12 14:43:52", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

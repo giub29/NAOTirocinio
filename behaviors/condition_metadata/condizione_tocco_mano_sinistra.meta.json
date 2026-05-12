@@ -1,24 +1,24 @@
 {
-  "aggiornata_il": "2026-05-12 14:59:36", 
-  "creata_il": "2026-05-12 14:59:36", 
+  "aggiornata_il": "2026-05-12 14:18:55", 
+  "creata_il": "2026-05-12 14:18:55", 
   "eventi_attivi_origine": [
-    "camminando", 
-    "ostacolo_sinistra"
+    "mano_sinistra", 
+    "fermo"
   ], 
   "eventi_completi_origine": {
     "batteria_bassa": false, 
     "batteria_critica": false, 
-    "batteria_percentuale": 55, 
-    "camminando": true, 
+    "batteria_percentuale": null, 
+    "camminando": false, 
     "carezza_testa": false, 
     "entrambe_mani": false, 
     "entrambi_piedi": false, 
-    "fermo": false, 
+    "fermo": true, 
     "mano_destra": false, 
-    "mano_sinistra": false, 
+    "mano_sinistra": true, 
     "ostacolo_destra": false, 
     "ostacolo_frontale": false, 
-    "ostacolo_sinistra": true, 
+    "ostacolo_sinistra": false, 
     "pericolo": false, 
     "piede_destro": false, 
     "piede_sinistro": false, 
@@ -27,9 +27,9 @@
     "volto_ignoto": false, 
     "volto_riconosciuto": false
   }, 
-  "file_python": "condizione_ostacolo_sinistra_durante_cammino.py", 
-  "mondo_origine": "REPORT: Ostacolo a sinistra. La mia batteria e' al 55%. STO CAMMINANDO.", 
-  "nome": "condizione_ostacolo_sinistra_durante_cammino", 
+  "file_python": "condizione_tocco_mano_sinistra.py", 
+  "mondo_origine": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+  "nome": "condizione_tocco_mano_sinistra", 
   "note": [
     "Condizione generata autonomamente da NAO.", 
     "Il file Python contiene la logica eseguibile.", 
@@ -52,14 +52,14 @@
   }, 
   "stato": "promossa", 
   "stato_robot_origine": {
-    "energia": 55, 
-    "livello_allerta": 1, 
-    "modalita": "esplorazione", 
-    "obiettivo_corrente": "evitare ostacolo", 
+    "energia": 67, 
+    "livello_allerta": 0, 
+    "modalita": "osservazione", 
+    "obiettivo_corrente": "esplorare", 
     "persona_attuale": null, 
-    "sta_camminando": true, 
+    "sta_camminando": false, 
     "ultimo_evento": "ostacolo rilevato", 
-    "umore": "prudente"
+    "umore": "neutro"
   }, 
   "validazione": {
     "modulo": "ok", 

@@ -128,9 +128,10 @@ stato_runtime = {
     "ultimo_messaggio_safety_tempo": 0,
     "volti_salutati": [],
     "in_pattugliamento": False,
-    "comando_stop_immediato": False
+    "comando_stop_immediato": False,
+    "ultima_curiosita_stop_tempo": 0,
+    "ultimo_volto_ignoto_rilevato": False
 }
-
 
 def _estrai_ricordi_dalla_decisione(elementi):
     ricordi = []
@@ -243,6 +244,13 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
             corpo.guarda(*ANGOLO_SGUARDO_NEUTRO)
             corpo.cammina(VELOCITA_CAMMINO, 0.0)
             logger.info(u"Comando vai/cammina ricevuto: avvio pattugliamento")
+        
+        elif "registra volto" in testo_user or "impara volto" in testo_user:
+            stato_runtime["attesa_nome"] = True
+            stato_runtime["riprendi_dopo_nome"] = False
+            corpo.fermati()
+            corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
+            voce.parla(u"Va bene, dimmi il nome della persona.")
 
         elif "stop" in testo_user or "fermati" in testo_user or "ferma" in testo_user:
             stato_runtime["in_pattugliamento"] = False
@@ -598,12 +606,68 @@ def main():
 
             if stato_runtime.get("comando_stop_immediato", False):
                 logger.warning(u"[SAFETY] Stop immediato richiesto dall'utente")
+
                 stato_runtime["comando_stop_immediato"] = False
                 stato_runtime["in_pattugliamento"] = False
+                stato_runtime["mantieni_pattugliamento"] = False
                 input_ricevuto = False
                 messaggio_utente = ""
+
                 corpo.fermati()
-                voce.parla(u"Mi fermo.")
+                aggiorna_heartbeat()
+
+                adesso = time.time()
+                if adesso - stato_runtime.get("ultima_curiosita_stop_tempo", 0) < 60:
+                    voce.parla(u"Mi fermo.")
+                    stato_precedente = ""
+                    time.sleep(0.1)
+                    continue
+
+                stato_runtime["ultima_curiosita_stop_tempo"] = adesso
+
+                voce.parla(u"Mi fermo. Ora osservo l'ambiente.")
+                aggiorna_heartbeat()
+
+                try:
+                    corpo.imposta_colore_occhi("yellow")
+                    corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
+                    time.sleep(1)
+
+                    img_b64 = corpo.scatta_foto(camera_id=0, nome_file="curiosita_stop.jpg")
+                    aggiorna_heartbeat()
+
+                    if img_b64:
+                        descrizione = analizza_immagine(
+                            img_b64,
+                            CHIAVE_PRIVATA,
+                            contesto="ambiente dopo stop"
+                        )
+                        aggiorna_heartbeat()
+                    else:
+                        descrizione = u"non riesco a vedere chiaramente l'ambiente"
+
+                    voce.parla(u"Ho osservato l'ambiente. Ti descrivo cosa vedo.")
+                    voce.parla(descrizione[:180])
+
+                    mondo_curioso = u"REPORT: PRENDI L'INIZIATIVA. SONO FERMO. VEDO: {}.".format(
+                        descrizione
+                    )
+
+                    decisione_curiosa = _elabora_decisione(
+                        mondo_curioso,
+                        corpo,
+                        voce,
+                        vista,
+                        sistema
+                    )
+
+                    ultima_decisione = decisione_curiosa
+                    aggiorna_heartbeat()
+                    ultimo_evento_tempo = time.time()
+
+                except Exception as e:
+                    logger.warning(u"[SOUL] Curiosita dopo stop fallita: {}".format(e))
+
                 stato_precedente = ""
                 time.sleep(0.1)
                 continue
@@ -612,6 +676,27 @@ def main():
             mondo = normalizza_testo_ascii(mondo)
             _sincronizza_nome_runtime_da_mondo(mondo)
 
+            if stato_runtime.get("attesa_nome", False) and input_ricevuto and messaggio_utente:
+                gestisci_input_nome(
+                    corpo,
+                    voce,
+                    vista,
+                    stato_runtime,
+                    messaggio_utente,
+                    VELOCITA_CAMMINO
+                )
+
+                messaggio_utente = ""
+                input_ricevuto = False
+                stato_precedente = ""
+                ultimo_evento_tempo = time.time()
+                continue
+
+            mondo = _processa_input_utente(mondo, corpo, voce, vista, sistema)
+
+            if STOP_PROGRAMMA:
+                break
+
             if (
                 not corpo.sta_camminando() and
                 not stato_runtime["in_pattugliamento"] and
@@ -619,14 +704,9 @@ def main():
                 (
                     u"Sento una carezza" in mondo or
                     u"Sento un tocco sulla mano" in mondo or
-                    u"Vedo qualcosa vicino" in mondo or
-                    u"C'è qualcosa a sinistra" in mondo or
-                    u"C'è qualcosa a destra" in mondo or
-                    u"Ostacolo a sinistra" in mondo or
-                    u"Ostacolo a destra" in mondo
+                    u"Vedo qualcosa vicino" in mondo
                 )
             ):
-
                 mondo += u" INTERAZIONE_UTENTE."
 
             stato_robot = aggiorna_stato_robot(
@@ -694,13 +774,31 @@ def main():
                 time.sleep(0.2)
                 continue
 
-            mondo = _processa_input_utente(mondo, corpo, voce, vista, sistema)
-
-            if STOP_PROGRAMMA:
-                break
-
             mondo = _normalizza_mondo_fermo(mondo, corpo)
             mondo = _processa_batteria(mondo)
+            testo_mondo = mondo.lower()
+
+            solo_percezione_spaziale_fermo = (
+                not stato_runtime["in_pattugliamento"] and
+                not corpo.sta_camminando() and
+                "sono fermo" in testo_mondo and
+                (
+                    "c'e' qualcosa a destra" in testo_mondo or
+                    "c'è qualcosa a destra" in testo_mondo or
+                    "c'e' qualcosa a sinistra" in testo_mondo or
+                    "c'è qualcosa a sinistra" in testo_mondo
+                ) and
+                "urto" not in testo_mondo and
+                "tocco" not in testo_mondo and
+                "volto" not in testo_mondo and
+                "riconosco" not in testo_mondo
+            )
+
+            if solo_percezione_spaziale_fermo:
+                stato_precedente = mondo
+                time.sleep(0.1)
+                continue
+
             if mondo.strip() in [
                 u"REPORT:",
                 u"REPORT: SONO FERMO.",

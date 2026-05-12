@@ -24,7 +24,7 @@ SOUL_DIR = os.path.dirname(SOUL_PATH)
 RUNTIME_DIR = os.path.join(SOUL_DIR, "runtime")
 HEARTBEAT_FILE = os.path.join(RUNTIME_DIR, "heartbeat.txt")
 
-TIMEOUT_HEARTBEAT = 20
+TIMEOUT_HEARTBEAT = 60
 CONTROLLO_INTERVALLO = 2
 MAX_RIAVVII_CONSECUTIVI = 5
 PAUSA_RIAVVIO = 3
@@ -132,7 +132,7 @@ def main():
                 time.sleep(CONTROLLO_INTERVALLO)
 
                 if processo.poll() is not None:
-                    logger.warning("soul.py terminato/crashato")
+                    logger.warning("soul.py terminato/crashato con codice: {}".format(processo.returncode))
                     break
 
                 if heartbeat_scaduto():

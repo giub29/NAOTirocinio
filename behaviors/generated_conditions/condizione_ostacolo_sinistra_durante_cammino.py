@@ -11,9 +11,9 @@ def comportamento():
         "stato_interno": "prudente",
         "obiettivo": "evitare ostacolo a sinistra",
         "azioni": [
-            {"tipo": "occhi", "colore": "yellow"},
+            {"tipo": "occhi", "colore": "red"},
             {"tipo": "guarda", "x": -0.5, "y": -0.2},
-            {"tipo": "cammina", "x": 0.1, "g": 0.0},
+            {"tipo": "cammina", "x": 0.16, "g": -0.12},
             {"tipo": "parla", "testo": "Attenzione, ostacolo a sinistra!"}
         ],
         "memoria": []

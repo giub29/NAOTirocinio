@@ -1107,8 +1107,8 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"- Per interazioni sociali positive, usa occhi verdi/cyan, guarda verso la persona e rispondi con tono amichevole.\n"
         u"- Per ostacoli frontali, urti ai piedi, caduta o pericolo reale, usa fermati, occhi rossi/gialli, guarda e parla.\n"
         u"- Per ostacoli laterali durante il cammino, NON usare fermati: usa occhi rossi/gialli, guarda verso il lato dell'ostacolo e cammina/gira con micro-correzione prudente.\n"
-        u"- Ostacolo a destra durante cammino significa correggere la traiettoria, non arrestarsi.\n"
-        u"- Ostacolo a sinistra durante cammino significa correggere la traiettoria, non arrestarsi.\n"
+        u"- Se ostacolo a destra durante cammino: usa cammina con x almeno 0.12 e g positivo, esempio {\"tipo\": \"cammina\", \"x\": 0.16, \"g\": 0.12}.\n"
+        u"- Se ostacolo a sinistra durante cammino: usa cammina con x almeno 0.12 e g negativo, esempio {\"tipo\": \"cammina\", \"x\": 0.16, \"g\": -0.12}.\n"
         u"- Non usare cammina se il robot è fermo e non c'è una richiesta esplicita o una situazione di evitamento.\n"
         u"- Non usare gira/cammina per eventi sociali come carezza o volto.\n"
         u"- Massimo 4 azioni.\n"
@@ -1604,11 +1604,6 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         return None
     
 def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
-    """
-    Valida che le azioni siano coerenti con il tipo di evento.
-    Non corregge manualmente le condizioni: le rifiuta se incoerenti.
-    """
-
     tipi_azioni = []
 
     for azione in azioni:
@@ -1634,6 +1629,31 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
 
     if ostacolo_laterale_cammino and not ha_cammina_o_gira:
         return False, "Ostacolo laterale durante cammino: serve micro-correzione con cammina o gira"
+
+    if ostacolo_laterale_cammino:
+        ha_schivata_valida = False
+
+        for azione in azioni:
+            if not isinstance(azione, dict):
+                continue
+
+            if azione.get("tipo") == "cammina":
+                x = azione.get("x", 0.0)
+                g = azione.get("g", 0.0)
+
+                if x < 0.12:
+                    return False, "Schivata troppo debole: cammina.x deve essere almeno 0.12"
+
+                if eventi_originali.get("ostacolo_destra", False) and g <= 0.05:
+                    return False, "Ostacolo a destra durante cammino: serve g positivo"
+
+                if eventi_originali.get("ostacolo_sinistra", False) and g >= -0.05:
+                    return False, "Ostacolo a sinistra durante cammino: serve g negativo"
+
+                ha_schivata_valida = True
+
+        if not ha_schivata_valida:
+            return False, "Ostacolo laterale durante cammino: serve azione cammina con direzione valida"
 
     pericolo_reale = (
         eventi_originali.get("ostacolo_frontale", False) or

@@ -15,7 +15,7 @@ TEMPO_SLEEP_FOTO = 1.0
 LUNGHEZZA_MIN_NOME = 2
 
 MSG_RICONOSCIMENTO = u"Ciao {}, ti ho riconosciuto."
-MSG_NO_RICONOSCIMENTO = u"Non ti conosco. Ho scattato una foto. Come ti chiami?"
+MSG_NO_RICONOSCIMENTO = u"Non ti conosco. Ho scattato una foto."
 MSG_CONTINUO = u"Va bene, continuo."
 MSG_ATTENDI_NOME = u"Sto aspettando un nome. Scrivi per esempio: nome Giulia."
 MSG_NOME_CORTO = u"Il nome è troppo corto. Riprova."
@@ -81,16 +81,14 @@ def _attendi_stabilita_volto(stato_runtime):
     return True
 
 
-def _chiedi_nome_volto_ignoto(corpo, voce, stato_runtime):
+def _segnala_volto_ignoto(corpo, voce, stato_runtime):
     corpo.imposta_colore_occhi("red")
 
     stava_camminando = corpo.sta_camminando() or stato_runtime["in_pattugliamento"]
-    stato_runtime["riprendi_dopo_nome"] = stava_camminando
 
     if stava_camminando:
-        stato_runtime["in_pattugliamento"] = False
         corpo.fermati()
-        time.sleep(1.0)
+        time.sleep(0.5)
 
     corpo.guarda(*ANGOLO_SGUARDO_VOLTO)
     time.sleep(TEMPO_SLEEP_FOTO)
@@ -98,8 +96,14 @@ def _chiedi_nome_volto_ignoto(corpo, voce, stato_runtime):
     corpo.scatta_foto(camera_id=0, nome_file="sconosciuto.jpg")
     voce.parla(MSG_NO_RICONOSCIMENTO)
 
-    logger.info(u"Richiesta del nome per volto ignoto")
-    stato_runtime["attesa_nome"] = True
+    stato_runtime["attesa_nome"] = False
+    stato_runtime["riprendi_dopo_nome"] = False
+
+    if stava_camminando:
+        stato_runtime["in_pattugliamento"] = True
+        corpo.cammina(0.3, 0.0)
+
+    logger.info(u"Volto ignoto segnalato senza bloccare il ciclo")
 
 
 def gestisci_volto_durante_cammino(mondo, corpo, voce, vista, stato_runtime):
@@ -129,7 +133,7 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista, stato_runtime):
         if stato_runtime["attesa_nome"]:
             return True
 
-        _chiedi_nome_volto_ignoto(corpo, voce, stato_runtime)
+        _segnala_volto_ignoto(corpo, voce, stato_runtime)
         return True
 
     return False
