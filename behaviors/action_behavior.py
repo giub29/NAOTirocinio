@@ -88,6 +88,29 @@ def valida_decisione(decisione, mondo):
                     "file": file_foto
                 })
 
+        testo_mondo = mondo.lower()
+
+    evento_safety_cammino = (
+        "sto camminando" in testo_mondo and
+        (
+            "ostacolo" in testo_mondo or
+            "urto" in testo_mondo or
+            "piede sinistro" in testo_mondo or
+            "piede destro" in testo_mondo
+        )
+    )
+
+    if evento_safety_cammino:
+        ha_fermati = False
+
+        for azione in azioni_valide:
+            if azione.get("tipo") == "fermati":
+                ha_fermati = True
+                break
+
+        if not ha_fermati:
+            azioni_valide.insert(0, {"tipo": "fermati"})
+            
     decisione["azioni"] = azioni_valide
     return decisione
 
