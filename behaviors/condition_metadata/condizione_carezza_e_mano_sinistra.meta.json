@@ -1,0 +1,44 @@
+{
+  "aggiornata_il": "2026-05-12 15:36:46", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Cosa stai facendo?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: C'è qualcosa a destra. Evento recente: Sento un tocco sulla mano sinistra. Evento recente: Sento una carezza sulla testa. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 15:36:46"
+    }
+  ], 
+  "creata_il": "2026-05-12 15:36:46", 
+  "file_python": "condizione_carezza_e_mano_sinistra.py", 
+  "nome": "condizione_carezza_e_mano_sinistra", 
+  "origine": "sconosciuta", 
+  "statistiche": {
+    "attivazioni": 1, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-05-12 15:36:46", 
+    "ultimo_errore": ""
+  }, 
+  "stato": "attiva"
+}

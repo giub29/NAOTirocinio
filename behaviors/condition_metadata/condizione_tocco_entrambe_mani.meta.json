@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-12 12:36:46", 
+  "aggiornata_il": "2026-05-12 15:55:05", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.0, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Ciao! Sento che mi stai toccando.", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "esplorare l'interazione", 
-        "stato_interno": "curioso"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 11:49:29"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -81,6 +54,87 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-12 12:36:46"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco su entrambe le mani. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si possono vedere armadi grigi con dei documenti attaccati, sopra i quali ci sono due scatole di cartone e un monitor posizionato in alto con uno sfondo di design astratto.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 15:36:37"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 15:40:43"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco su entrambe le mani. SONO FERMO.", 
+      "tempo": "2026-05-12 15:55:05"
     }
   ], 
   "creata_il": "2026-05-12 11:49:29", 
@@ -88,10 +142,10 @@
   "nome": "condizione_tocco_entrambe_mani", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 3, 
+    "attivazioni": 6, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 12:36:46", 
+    "ultima_attivazione": "2026-05-12 15:55:05", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

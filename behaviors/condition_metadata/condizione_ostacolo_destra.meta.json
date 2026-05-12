@@ -1,114 +1,6 @@
 {
-  "aggiornata_il": "2026-05-12 14:43:52", 
+  "aggiornata_il": "2026-05-12 15:54:40", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 14:18:20"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 14:20:45"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vede una parete con un armadio che ha sopra alcune stampe e disegni, un cartello con indicazioni per la raccolta differenziata e una giacca appesa accanto a un monitor.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
-      "tempo": "2026-05-12 14:20:50"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a destra. SONO FERMO.", 
-      "tempo": "2026-05-12 14:42:44"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +27,114 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
       "tempo": "2026-05-12 14:43:52"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a destra. SONO FERMO.", 
+      "tempo": "2026-05-12 15:36:43"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vedono dei cassetti grigi, alcuni scatoloni sopra di essi e alcuni documenti o immagini attaccati alla parete.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 15:41:18"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
+      "tempo": "2026-05-12 15:49:34"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 15:54:40"
     }
   ], 
   "creata_il": "2026-05-12 12:30:33", 
@@ -181,10 +181,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 23, 
+    "attivazioni": 27, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 14:43:52", 
+    "ultima_attivazione": "2026-05-12 15:54:40", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

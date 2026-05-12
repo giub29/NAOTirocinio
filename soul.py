@@ -130,7 +130,8 @@ stato_runtime = {
     "in_pattugliamento": False,
     "comando_stop_immediato": False,
     "ultima_curiosita_stop_tempo": 0,
-    "ultimo_volto_ignoto_rilevato": False
+    "ultimo_volto_ignoto_rilevato": False,
+    "ultimo_evento_reale_tempo": 0
 }
 
 def _estrai_ricordi_dalla_decisione(elementi):
@@ -326,13 +327,22 @@ def _processa_batteria(mondo):
 
 
 def _valuta_interazione_reale(mondo):
+    testo = mondo.lower()
+
     return (
         messaggio_utente != "" or
-        u"Riconosco" in mondo or
-        u"Vedo un volto ignoto" in mondo or
-        u"carezza" in mondo or
-        u"URTO" in mondo or
-        u"PERICOLO" in mondo
+        u"riconosco" in testo or
+        u"volto ignoto" in testo or
+        u"carezza" in testo or
+        u"tocco" in testo or
+        u"mano" in testo or
+        u"entrambe le mani" in testo or
+        u"urto" in testo or
+        u"pericolo" in testo or
+        u"qualcosa a destra" in testo or
+        u"qualcosa a sinistra" in testo or
+        u"ostacolo a destra" in testo or
+        u"ostacolo a sinistra" in testo
     )
 
 def _mondo_ha_eventi_multipli(mondo):
@@ -409,23 +419,35 @@ def _sincronizza_nome_runtime_da_mondo(mondo):
         stato_runtime["ultimo_volto_noto_tempo"] = 0
         
 def _gestisci_iniziativa_robot(corpo, voce):
-    logger.info(u"Robot prende l'iniziativa")
+    logger.info(u"[SOUL] Nessuna condizione rilevata: osservo l'ambiente")
 
     corpo.imposta_colore_occhi("yellow")
     corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
+
     time.sleep(1)
 
-    img_b64 = corpo.scatta_foto(camera_id=0, nome_file="curiosita.jpg")
+    img_b64 = corpo.scatta_foto(
+        camera_id=0,
+        nome_file="osservazione_autonoma.jpg"
+    )
 
     if img_b64:
-        desc = analizza_immagine(img_b64, CHIAVE_PRIVATA, contesto="stanza")
+        descrizione = analizza_immagine(
+            img_b64,
+            CHIAVE_PRIVATA,
+            contesto="osservazione autonoma ambiente"
+        )
     else:
-        desc = u"una stanza tranquilla"
+        descrizione = u"non riesco a vedere chiaramente l'ambiente"
 
-    voce.parla(u"Cosa faresti tu?")
+    voce.parla(u"Sto osservando l'ambiente.")
+    voce.parla(descrizione[:200])
 
-    return u" PRENDI L'INIZIATIVA. Vedi: {}. Usa la memoria e chiedi 'Cosa faresti tu?'.".format(desc)
-
+    return (
+        u" OSSERVAZIONE_AUTONOMA. "
+        u"NESSUNA_CONDIZIONE_ATTIVA. "
+        u"VEDO: {}.".format(descrizione)
+    )
 
 def _pulisci_mondo_da_volti_salutati(mondo):
     for nome in stato_runtime["volti_salutati"]:
@@ -579,7 +601,7 @@ def main():
         voce = NaoVoice(IP_ROBOT)
         vista = NaoVision(IP_ROBOT)
         sistema = NaoSystem(IP_ROBOT)
-
+        sistema.configura_autonomous_life_da_env()
         _inizializza_robot(corpo, voce, vista, sistema)
 
         thread_input = threading.Thread(target=_thread_input_utente)
@@ -615,6 +637,18 @@ def main():
 
                 corpo.fermati()
                 aggiorna_heartbeat()
+
+                # Se lo stop arriva subito dopo un evento reale,
+                # non avvio curiosità: mi limito a fermarmi.
+                ultimo_evento = stato_runtime.get("ultimo_evento_reale_tempo", 0)
+                adesso = time.time()
+
+                if adesso - ultimo_evento < 10:
+                    voce.parla(u"Mi fermo.")
+                    logger.info(u"[SOUL] Curiosita dopo stop saltata: evento reale recente.")
+                    stato_precedente = ""
+                    time.sleep(0.1)
+                    continue
 
                 adesso = time.time()
                 if adesso - stato_runtime.get("ultima_curiosita_stop_tempo", 0) < 60:
@@ -675,6 +709,23 @@ def main():
             mondo = sensi.ottieni_report_semantico()
             mondo = normalizza_testo_ascii(mondo)
             _sincronizza_nome_runtime_da_mondo(mondo)
+
+            # Filtro anti-falso-positivo: mano sinistra ripetuta da ferma
+            if (
+                u"Sento un tocco sulla mano sinistra" in mondo and
+                not corpo.sta_camminando() and
+                not stato_runtime.get("in_pattugliamento", False)
+            ):
+                adesso = time.time()
+                ultimo = stato_runtime.get("ultimo_tocco_mano_sinistra_tempo", 0)
+
+                if adesso - ultimo < 5:
+                    logger.info(u"[SOUL] Tocco mano sinistra ignorato: possibile falso positivo.")
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
+
+                stato_runtime["ultimo_tocco_mano_sinistra_tempo"] = adesso
 
             if stato_runtime.get("attesa_nome", False) and input_ricevuto and messaggio_utente:
                 gestisci_input_nome(
@@ -813,6 +864,7 @@ def main():
 
             if interazione_reale:
                 ultimo_evento_tempo = time.time()
+                stato_runtime["ultimo_evento_reale_tempo"] = time.time()
 
             else:
                 tempo_di_inerzia = time.time() - ultimo_evento_tempo
@@ -821,9 +873,21 @@ def main():
                     not corpo.sta_camminando() and
                     messaggio_utente == "" and
                     tempo_di_inerzia > TEMPO_INERZIA_INIZIATIVA
+                    and mondo.strip() in [
+                        u"REPORT:",
+                        u"REPORT: SONO FERMO.",
+                        u"SONO FERMO.",
+                        u""
+                    ]
                 ):
-                    mondo += _gestisci_iniziativa_robot(corpo, voce)
-                    ultimo_evento_tempo = time.time()
+                    ultimo_evento = stato_runtime.get("ultimo_evento_reale_tempo", 0)
+                    adesso = time.time()
+
+                    if adesso - ultimo_evento < 10:
+                        logger.info(u"[SOUL] Iniziativa saltata: evento reale recente.")
+                    else:
+                        mondo += _gestisci_iniziativa_robot(corpo, voce)
+                        ultimo_evento_tempo = time.time()
 
             mondo = _pulisci_mondo_da_volti_salutati(mondo)
             mondo = re.sub(r"\s+", " ", mondo).strip()

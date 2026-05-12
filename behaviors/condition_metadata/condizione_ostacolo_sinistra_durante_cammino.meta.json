@@ -1,5 +1,36 @@
 {
-  "aggiornata_il": "2026-05-12 14:59:36", 
+  "aggiornata_il": "2026-05-12 15:50:03", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "red", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "g": -0.12, 
+            "tipo": "cammina", 
+            "x": 0.16
+          }, 
+          {
+            "testo": "Attenzione, ostacolo a sinistra!", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 78%. STO CAMMINANDO.", 
+      "tempo": "2026-05-12 15:50:03"
+    }
+  ], 
   "creata_il": "2026-05-12 14:59:36", 
   "eventi_attivi_origine": [
     "camminando", 
@@ -44,10 +75,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 0, 
+    "attivazioni": 1, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "", 
+    "ultima_attivazione": "2026-05-12 15:50:03", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

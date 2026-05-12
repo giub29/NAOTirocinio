@@ -12,6 +12,75 @@ class NaoSystem:
         self.battery = ALProxy("ALBattery", ip, port)
         self.percorso_memoria = "memoria.json"
 
+    def configura_autonomous_life_da_env(self):
+        """
+        Attiva AutonomousLife SOLO se richiesto
+        tramite variabile ambiente.
+
+        Default:
+            non cambia nulla.
+
+        Attivazione:
+            NAO_AUTONOMOUS_LIFE=1
+        """
+
+        try:
+            valore = os.environ.get(
+                "NAO_AUTONOMOUS_LIFE",
+                ""
+            ).strip().lower()
+
+            attivo = valore in (
+                "1",
+                "true",
+                "yes",
+                "on",
+                "si",
+                "sì"
+            )
+
+            if not attivo:
+                print(
+                    "[SYSTEM] AutonomousLife disattivato "
+                    "(default sicuro)."
+                )
+                return False
+
+            stato_corrente = self.life.getState()
+
+            print(
+                "[SYSTEM] Stato AutonomousLife corrente: {}".format(
+                    stato_corrente
+                )
+            )
+
+            if stato_corrente != "solitary":
+
+                self.life.setState("solitary")
+
+                print(
+                    "[SYSTEM] AutonomousLife impostato "
+                    "su solitary."
+                )
+
+            else:
+
+                print(
+                    "[SYSTEM] AutonomousLife già attivo."
+                )
+
+            return True
+
+        except Exception as errore:
+
+            print(
+                "[SYSTEM] Errore AutonomousLife: {}".format(
+                    errore
+                )
+            )
+
+            return False
+    
     def ottieni_info_sistema(self):
         """Restituisce nome del robot e versione software"""
         nome = self.system.robotName()
