@@ -217,7 +217,23 @@ def _thread_input_utente():
             logger.debug(u"Errore nella lettura input: {}".format(e))
 
 def _inizializza_robot(corpo, voce, vista, sistema):
-    sistema.set_vita_autonoma(False)
+    valore = os.environ.get("NAO_AUTONOMOUS_LIFE", "").strip().lower()
+
+    autonomous_life_attivo = valore in (
+        "1",
+        "true",
+        "yes",
+        "on",
+        "si",
+        "sì"
+    )
+
+    if autonomous_life_attivo:
+        logger.info(u"[SYSTEM] Mantengo AutonomousLife gestito da NAOqi.")
+    else:
+        sistema.set_vita_autonoma(False)
+        logger.info(u"[SYSTEM] AutonomousLife disattivato per modalità progetto classica.")
+
     corpo.abilita_motori()
     corpo.vai_in_posa("Stand")
     vista.attiva_inseguimento_volto()
