@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 11:49:51", 
+  "aggiornata_il": "2026-05-12 12:36:56", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -27,6 +27,33 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-12 11:49:51"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Cosa stai facendo?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. Evento recente: C'è qualcosa a sinistra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 12:36:56"
     }
   ], 
   "creata_il": "2026-05-12 11:49:51", 
@@ -70,10 +97,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 1, 
+    "attivazioni": 2, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 11:49:51", 
+    "ultima_attivazione": "2026-05-12 12:36:56", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

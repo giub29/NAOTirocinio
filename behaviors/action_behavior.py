@@ -22,6 +22,26 @@ def valida_decisione(decisione, mondo):
     azioni_valide = []
     azioni = decisione.get("azioni", [])
 
+    ha_schivata = False
+
+    for az in azioni:
+        if az.get("tipo", "") in ["cammina", "gira"]:
+            ha_schivata = True
+            break
+
+    testo_mondo = mondo.lower()
+
+    evento_safety_cammino = (
+        "sto camminando" in testo_mondo and
+        (
+            "ostacolo" in testo_mondo or
+            "urto" in testo_mondo or
+            "piede sinistro" in testo_mondo or
+            "piede destro" in testo_mondo or
+            "pericolo" in testo_mondo
+        )
+    )
+
     for az in azioni:
         tipo = az.get("tipo", "")
 
@@ -34,9 +54,14 @@ def valida_decisione(decisione, mondo):
             if "SONO FERMO" in mondo and "L'utente dice" not in mondo and "URTO" not in mondo:
                 continue
 
-            x = limita_numero(az.get("x", 0.0), -0.2, 0.3, 0.0)
+            x = limita_numero(az.get("x", 0.0), -0.2, 0.2, 0.0)
             g = limita_numero(az.get("g", 0.0), -0.2, 0.2, 0.0)
-            azioni_valide.append({"tipo": "cammina", "x": x, "g": g})
+
+            azioni_valide.append({
+                "tipo": "cammina",
+                "x": x,
+                "g": g
+            })
 
         elif tipo == "gira":
             if "SONO FERMO" in mondo and "L'utente dice" not in mondo and "URTO" not in mondo:
@@ -88,18 +113,6 @@ def valida_decisione(decisione, mondo):
                     "file": file_foto
                 })
 
-        testo_mondo = mondo.lower()
-
-    evento_safety_cammino = (
-        "sto camminando" in testo_mondo and
-        (
-            "ostacolo" in testo_mondo or
-            "urto" in testo_mondo or
-            "piede sinistro" in testo_mondo or
-            "piede destro" in testo_mondo
-        )
-    )
-
     if evento_safety_cammino:
         ha_fermati = False
 
@@ -110,7 +123,7 @@ def valida_decisione(decisione, mondo):
 
         if not ha_fermati:
             azioni_valide.insert(0, {"tipo": "fermati"})
-            
+
     decisione["azioni"] = azioni_valide
     return decisione
 
@@ -121,6 +134,7 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema, stato_runtime, aggi
 
     azioni = decisione.get("azioni", [])
 
+    ha_schivata = False
     for az in azioni:
         tipo = az.get("tipo", "")
 
@@ -144,14 +158,19 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema, stato_runtime, aggi
                 corpo.gira(az.get("v", 0.0))
 
             elif tipo == "fermati":
-                stato_runtime["in_pattugliamento"] = False
                 corpo.fermati()
+
+                if (
+                    not stato_runtime.get("mantieni_pattugliamento", False) and
+                    not ha_schivata
+                ):
+                    stato_runtime["in_pattugliamento"] = False
 
             elif tipo == "posa":
                 corpo.vai_in_posa(az.get("nome", "Stand"))
 
             elif tipo == "guarda":
-                corpo.guarda(az.get("x", 0.0), az.get("y", 0.0))
+                corpo.guarda(az.get("x", 0.0), az.get("y", -0.25))
 
             elif tipo == "occhi":
                 corpo.imposta_colore_occhi(az.get("colore", "white"))

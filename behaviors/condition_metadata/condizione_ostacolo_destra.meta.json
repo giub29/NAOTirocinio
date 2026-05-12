@@ -1,0 +1,206 @@
+{
+  "aggiornata_il": "2026-05-12 12:58:48", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 12:42:46"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 12:45:35"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: In un ambiente di lavoro, si vede un armadietto grigio con appese diverse immagini e fogli, mentre davanti c'è un contenitore di raccolta differenziata con indicazioni su cosa conferire. A lato, è appesa una giacca.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 12:48:44"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-12 12:58:01"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vedono un armadietto con alcune immagini appese, un contenitore per la raccolta differenziata e un cappotto appeso accanto a una borsa blu.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
+      "tempo": "2026-05-12 12:58:48"
+    }
+  ], 
+  "creata_il": "2026-05-12 12:30:33", 
+  "eventi_attivi_origine": [
+    "ostacolo_destra", 
+    "fermo"
+  ], 
+  "eventi_completi_origine": {
+    "batteria_bassa": false, 
+    "batteria_critica": false, 
+    "batteria_percentuale": null, 
+    "camminando": false, 
+    "carezza_testa": false, 
+    "entrambe_mani": false, 
+    "entrambi_piedi": false, 
+    "fermo": true, 
+    "mano_destra": false, 
+    "mano_sinistra": false, 
+    "ostacolo_destra": true, 
+    "ostacolo_frontale": false, 
+    "ostacolo_sinistra": false, 
+    "pericolo": false, 
+    "piede_destro": false, 
+    "piede_sinistro": false, 
+    "urto": false, 
+    "urto_piedi": false, 
+    "volto_ignoto": false, 
+    "volto_riconosciuto": false
+  }, 
+  "file_python": "condizione_ostacolo_destra.py", 
+  "mondo_origine": "REPORT: C'è qualcosa a destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+  "nome": "condizione_ostacolo_destra", 
+  "note": [
+    "Condizione generata autonomamente da NAO.", 
+    "Il file Python contiene la logica eseguibile.", 
+    "Questo JSON contiene la memoria e la tracciabilità della condizione."
+  ], 
+  "origine": "autogenerata_llm", 
+  "riparazione": {
+    "fallimenti": 0, 
+    "successi": 0, 
+    "tentativi": 0, 
+    "ultimo_esito": "", 
+    "ultimo_motivo": ""
+  }, 
+  "statistiche": {
+    "attivazioni": 11, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-05-12 12:58:48", 
+    "ultimo_errore": ""
+  }, 
+  "stato": "promossa", 
+  "stato_robot_origine": {
+    "energia": 100, 
+    "livello_allerta": 1, 
+    "modalita": "osservazione", 
+    "obiettivo_corrente": "evitare ostacolo", 
+    "persona_attuale": null, 
+    "sta_camminando": false, 
+    "ultimo_evento": "ostacolo rilevato", 
+    "umore": "prudente"
+  }, 
+  "validazione": {
+    "modulo": "ok", 
+    "semantica": "ok", 
+    "struttura": "ok"
+  }
+}

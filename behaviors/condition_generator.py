@@ -880,11 +880,11 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
             )
         ]
 
-        testo = mondo_originale.lower()
         comportamento = modulo.comportamento()
         azioni = comportamento.get("azioni", [])
 
         nome_base = _slug_testo(mondo_originale)
+
         condizione_tattile = (
             "mano" in nome_base or
             "carezza" in nome_base or
@@ -913,7 +913,7 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                     for frase in frasi_identita:
                         if frase in testo_azione:
                             return False, "Frase di identita' non coerente con condizione tattile"
-                        
+
         condizione_sociale = (
             "carezza" in nome_base or
             "mano" in nome_base or
@@ -924,10 +924,10 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         mondo_spaziale = (
             not condizione_sociale and
             (
-                "ostacolo" in testo or
-                "qualcosa a destra" in testo or
-                "qualcosa a sinistra" in testo or
-                "vedo qualcosa vicino" in testo
+                eventi_originali.get("ostacolo_sinistra", False) or
+                eventi_originali.get("ostacolo_destra", False) or
+                eventi_originali.get("ostacolo_frontale", False) or
+                eventi_originali.get("urto_piedi", False)
             )
         )
 
@@ -948,41 +948,53 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                         if frase in testo_azione:
                             return False, "Frase sociale non coerente con condizione spaziale/ostacolo"
 
-        # I test sinistra/destra valgono solo per condizioni spaziali pure.
-        # Per condizioni sociali/tattili come:
-        # - carezza_e_mano_sinistra
-        # - tocco_entrambe_mani
-        # - carezza_e_volto_riconosciuto
-        # non devo bocciare la condizione solo perche' nel mondo appare anche
-        # "qualcosa a sinistra/destra".
         if not condizione_sociale:
-            if "sinistra" in testo and "destra" in testo:
+            if (
+                eventi_originali.get("ostacolo_sinistra", False) and
+                eventi_originali.get("ostacolo_destra", False)
+            ):
+                mondo_solo_sinistra = u"REPORT: Ostacolo a sinistra. SONO FERMO."
+                mondo_solo_destra = u"REPORT: Ostacolo a destra. SONO FERMO."
+
                 casi_negativi.append((
-                    u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.",
-                    {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a sinistra. SONO FERMO.", {})}
+                    mondo_solo_sinistra,
+                    {"eventi": estrai_eventi(mondo_solo_sinistra, {})}
                 ))
 
                 casi_negativi.append((
-                    u"REPORT: C'e' qualcosa a destra. SONO FERMO.",
-                    {"eventi": estrai_eventi(u"REPORT: C'e' qualcosa a destra. SONO FERMO.", {})}
+                    mondo_solo_destra,
+                    {"eventi": estrai_eventi(mondo_solo_destra, {})}
                 ))
 
-            elif "sinistra" in testo and "destra" not in testo:
-                mondo_invertito = mondo_originale.replace("sinistra", "destra")
+            elif eventi_originali.get("ostacolo_sinistra", False):
+                mondo_invertito = u"REPORT: Ostacolo a destra. "
+
+                if eventi_originali.get("camminando", False):
+                    mondo_invertito += u"STO CAMMINANDO."
+                else:
+                    mondo_invertito += u"SONO FERMO."
+
                 casi_negativi.append((
                     mondo_invertito,
                     {"eventi": estrai_eventi(mondo_invertito, {})}
                 ))
 
-            elif "destra" in testo and "sinistra" not in testo:
-                mondo_invertito = mondo_originale.replace("destra", "sinistra")
+            elif eventi_originali.get("ostacolo_destra", False):
+                mondo_invertito = u"REPORT: Ostacolo a sinistra. "
+
+                if eventi_originali.get("camminando", False):
+                    mondo_invertito += u"STO CAMMINANDO."
+                else:
+                    mondo_invertito += u"SONO FERMO."
+
                 casi_negativi.append((
                     mondo_invertito,
                     {"eventi": estrai_eventi(mondo_invertito, {})}
                 ))
 
-        if "sto camminando" in testo:
+        if eventi_originali.get("camminando", False):
             mondo_fermo = mondo_originale.replace("STO CAMMINANDO", "SONO FERMO").replace("sto camminando", "sono fermo")
+
             casi_negativi.append((
                 mondo_fermo,
                 {"eventi": estrai_eventi(mondo_fermo, {})}
@@ -1324,38 +1336,48 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
 
     # COMBINAZIONI DURANTE CAMMINO
     elif nome_base == "carezza_durante_cammino":
-        righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False) and eventi.get("camminando", False)')
 
     elif nome_base == "mano_sinistra_durante_cammino":
-        righe.append('    return u"mano sinistra" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_sinistra", False) and eventi.get("camminando", False)')
 
     elif nome_base == "mano_destra_durante_cammino":
-        righe.append('    return u"mano destra" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_destra", False) and eventi.get("camminando", False)')
 
     elif nome_base == "volto_riconosciuto_durante_cammino":
-        righe.append('    return u"riconosco" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("volto_riconosciuto", False) and eventi.get("camminando", False)')
 
     elif nome_base == "volto_ignoto_durante_cammino":
-        righe.append('    return u"volto ignoto" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("volto_ignoto", False) and eventi.get("camminando", False)')
 
     elif nome_base == "oggetto_vicino_durante_cammino":
-        righe.append('    return (u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo) and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return (eventi.get("oggetto_vicino", False)) and eventi.get("camminando", False)')
 
     elif nome_base == "ostacolo_sinistra_durante_cammino":
-        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_sinistra", False) and eventi.get("camminando", False)')
 
     elif nome_base == "ostacolo_destra_durante_cammino":
-        righe.append('    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"destra" in testo and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_destra", False) and eventi.get("camminando", False)')
 
     elif nome_base == "ostacolo_frontale_durante_cammino":
-        righe.append('    return (u"ostacolo frontale" in testo or u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo or u"qualcosa davanti" in testo) and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("ostacolo_frontale", False) and eventi.get("camminando", False)')
 
     elif nome_base == "urto_piedi_durante_cammino":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
         righe.append('    return (eventi.get("urto_piedi", False) or eventi.get("entrambi_piedi", False)) and eventi.get("camminando", False)')
 
     elif nome_base == "pericolo_caduta_durante_cammino":
-        righe.append('    return (u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo) and u"sto camminando" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("pericolo", False) and eventi.get("camminando", False)')
 
     # COMBINAZIONI SOCIALI / MULTI-EVENTO
     elif nome_base == "carezza_e_mano_sinistra":
@@ -1396,50 +1418,36 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
 
     # EVENTI SINGOLI
     elif nome_base == "carezza_testa":
-        righe.append('    return u"carezza" in testo and u"testa" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("carezza_testa", False)')
 
     elif nome_base == "tocco_mano_sinistra":
-        righe.append('    return u"mano sinistra" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("mano_sinistra", False)')
 
     elif nome_base == "tocco_mano_destra":
-        righe.append('    return u"mano destra" in testo')
-
-    elif nome_base == "oggetto_vicino":
-        righe.append('    return u"vedo qualcosa vicino" in testo or u"qualcosa vicino" in testo')
-
-    elif nome_base == "ostacolo_sinistra":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
-        righe.append('    return eventi.get("ostacolo_sinistra", False)')
-
-    elif nome_base == "ostacolo_destra":
-        righe.append('    eventi = stato_runtime.get("eventi", {})')
-        righe.append('    return eventi.get("ostacolo_destra", False)')
-
-    elif nome_base == "ostacolo_frontale":
-        righe.append('    eventi = stato_runtime.get("eventi", {})')
-        righe.append('    return eventi.get("ostacolo_frontale", False)')
-
-    elif nome_base == "urto_piedi":
-        righe.append('    eventi = stato_runtime.get("eventi", {})')
-        righe.append('    return eventi.get("urto_piedi", False) or eventi.get("entrambi_piedi", False)')
+        righe.append('    return eventi.get("mano_destra", False)')
 
     elif nome_base == "piede_sinistro":
-        righe.append('    return u"piede sinistro" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("piede_sinistro", False)')
 
     elif nome_base == "piede_destro":
-        righe.append('    return u"piede destro" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("piede_destro", False)')
 
     elif nome_base == "pericolo_caduta":
-        righe.append('    return u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo')
-
-    elif nome_base == "battito_mani":
-        righe.append('    return u"battiti di mani" in testo or u"battito" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("pericolo", False)')
 
     elif nome_base == "volto_riconosciuto":
-        righe.append('    return u"riconosco" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("volto_riconosciuto", False)')
 
     elif nome_base == "volto_ignoto":
-        righe.append('    return u"volto ignoto" in testo')
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("volto_ignoto", False)')
 
     elif nome_base == "curiosita_dinamica":
         righe.append('    return False')

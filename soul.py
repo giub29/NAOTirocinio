@@ -81,7 +81,7 @@ TEMPO_INERZIA_INIZIATIVA = 20
 LUNGHEZZA_MAX_RICORDI = 20
 VELOCITA_CAMMINO = 0.3
 
-ANGOLO_SGUARDO_NEUTRO = (0.0, -0.35)
+ANGOLO_SGUARDO_NEUTRO = (0.0, -0.15)
 ANGOLO_SGUARDO_INIZIATIVA = (0.0, -0.2)
 HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
 HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
@@ -219,6 +219,8 @@ def _inizializza_robot(corpo, voce, vista, sistema):
     corpo.abilita_motori()
     corpo.vai_in_posa("Stand")
     vista.attiva_inseguimento_volto()
+    corpo.guarda(0.0, -0.15)
+    time.sleep(0.5)
     logger.info(u"Robot inizializzato")
 
 
@@ -398,7 +400,7 @@ def _sincronizza_nome_runtime_da_mondo(mondo):
         stato_runtime["ultimo_nome_riconosciuto"] = ""
         stato_runtime["ultimo_volto_noto_tempo"] = 0
         
-def _gestisci_iniziativa_robot(corpo):
+def _gestisci_iniziativa_robot(corpo, voce):
     logger.info(u"Robot prende l'iniziativa")
 
     corpo.imposta_colore_occhi("yellow")
@@ -411,6 +413,8 @@ def _gestisci_iniziativa_robot(corpo):
         desc = analizza_immagine(img_b64, CHIAVE_PRIVATA, contesto="stanza")
     else:
         desc = u"una stanza tranquilla"
+
+    voce.parla(u"Cosa faresti tu?")
 
     return u" PRENDI L'INIZIATIVA. Vedi: {}. Usa la memoria e chiedi 'Cosa faresti tu?'.".format(desc)
 
@@ -539,19 +543,11 @@ def _riprendi_cammino_automatico(corpo, ultima_decisione):
     if corpo.sta_camminando():
         return
 
-    # Non riprendere subito dopo un evento fisico/safety.
     if time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 3.0:
         return
 
-    azioni_testo = json.dumps(ultima_decisione.get("azioni", []), ensure_ascii=False)
-
-    if (
-        "cammina" not in azioni_testo and
-        "gira" not in azioni_testo and
-        "fermati" not in azioni_testo
-    ):
-        corpo.cammina(VELOCITA_CAMMINO, 0.0)
-        logger.debug(u"Cammino automatico ripreso")
+    corpo.cammina(VELOCITA_CAMMINO, 0.0)
+    logger.debug(u"Cammino automatico ripreso")
 
 def handle_exit(sig, frame):
     print("Soul arrestato pulitamente")
@@ -660,27 +656,42 @@ def main():
 
                 mondo_evento = mondo + u" STO CAMMINANDO."
 
-                _tenta_generare_condizione_da_evento_safety(
-                    mondo_evento,
-                    u"ostacolo o urto durante il cammino"
-                )
+                stato_runtime["eventi"] = estrai_eventi(mondo_evento, stato_runtime)
+                stato_runtime["memoria"] = memoria_fisica
+                stato_runtime["stato_robot"] = stato_robot
+                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
 
+                decisione_condizione = valuta_condizioni_generate(mondo_evento, stato_runtime)
+
+                if decisione_condizione:
+                    decisione_condizione = valida_decisione(decisione_condizione, mondo_evento)
+
+                    stato_runtime["mantieni_pattugliamento"] = True
+
+                    try:
+                        esegui_decisione(
+                            decisione_condizione,
+                            corpo,
+                            voce,
+                            vista,
+                            sistema,
+                            stato_runtime,
+                            aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                        )
+                        
+                    finally:
+                        stato_runtime["mantieni_pattugliamento"] = False
+
+                    ultima_decisione = decisione_condizione
+                    stato_runtime["in_pattugliamento"] = True
+                else:
+                    _tenta_generare_condizione_da_evento_safety(
+                        mondo_evento,
+                        u"ostacolo o urto durante il cammino"
+                    )
+                
                 stato_precedente = mondo_evento
                 time.sleep(0.2)
-                continue
-
-            if stato_runtime["attesa_nome"] and input_ricevuto:
-                gestisci_input_nome(
-                    corpo,
-                    voce,
-                    vista,
-                    stato_runtime,
-                    messaggio_utente,
-                    VELOCITA_CAMMINO
-                )
-
-                messaggio_utente = ""
-                input_ricevuto = False
                 continue
 
             mondo = _processa_input_utente(mondo, corpo, voce, vista, sistema)
@@ -713,7 +724,7 @@ def main():
                     messaggio_utente == "" and
                     tempo_di_inerzia > TEMPO_INERZIA_INIZIATIVA
                 ):
-                    mondo += _gestisci_iniziativa_robot(corpo)
+                    mondo += _gestisci_iniziativa_robot(corpo, voce)
                     ultimo_evento_tempo = time.time()
 
             mondo = _pulisci_mondo_da_volti_salutati(mondo)

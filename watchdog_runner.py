@@ -7,7 +7,7 @@ import logging
 import signal
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - WATCHDOG - %(levelname)s - %(message)s"
 )
 
@@ -53,7 +53,7 @@ def reset_heartbeat():
 def heartbeat_scaduto():
     try:
         if not os.path.exists(HEARTBEAT_FILE):
-            logger.info("Heartbeat non ancora creato da soul.py")
+            logger.debug("Heartbeat non ancora creato da soul.py")
             return False
 
         with open(HEARTBEAT_FILE, "r") as f:
@@ -66,7 +66,7 @@ def heartbeat_scaduto():
         ultimo = float(valore)
         differenza = time.time() - ultimo
 
-        logger.info("Heartbeat aggiornato {:.1f} secondi fa".format(differenza))
+        logger.debug("Heartbeat aggiornato {:.1f} secondi fa".format(differenza))
 
         return differenza > TIMEOUT_HEARTBEAT
 

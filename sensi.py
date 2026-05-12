@@ -14,7 +14,7 @@ class NaoSenses:
         # Memoria breve eventi: serve per avere piu' eventi nello stesso REPORT
         self.eventi_recenti = {}
         self.lock_eventi = threading.RLock()
-        self.durata_eventi_recenti = 10.0
+        self.durata_eventi_recenti = 4.0
 
         self.ultimo_volto_nome = None
         self.ultimo_volto_tempo = 0
@@ -314,18 +314,19 @@ class NaoSenses:
         try:
             dist_l = self.memory.getData("Device/SubDeviceList/US/Left/Sensor/Value")
             dist_r = self.memory.getData("Device/SubDeviceList/US/Right/Sensor/Value")
+            #print("[SONAR] L={} R={}".format(dist_l, dist_r))
 
-            if dist_l < 0.65 and dist_r < 0.65:
+            if dist_l < 0.35 and dist_r < 0.35:
                 evento = u"Ostacolo frontale molto vicino."
                 eventi.append(evento)
                 self._ricorda_evento("ostacolo_frontale", evento)
 
-            elif dist_l < 0.70:
+            elif dist_l < 0.35:
                 evento = u"Ostacolo a sinistra."
                 eventi.append(evento)
                 self._ricorda_evento("ostacolo_sinistra", evento)
 
-            elif dist_r < 0.70:
+            elif dist_r < 0.35:
                 evento = u"Ostacolo a destra."
                 eventi.append(evento)
                 self._ricorda_evento("ostacolo_destra", evento)
