@@ -859,7 +859,8 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
             return False, "Funzione condizione assente nella validazione semantica"
 
         eventi_originali = estrai_eventi(mondo_originale, stato_runtime_originale)
-
+        nome_base = _slug_testo(mondo_originale)
+        
         runtime_positivo = {
             "eventi": eventi_originali
         }
@@ -883,7 +884,14 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         comportamento = modulo.comportamento()
         azioni = comportamento.get("azioni", [])
 
-        nome_base = _slug_testo(mondo_originale)
+        valido_azioni, motivo_azioni = _valida_semantica_azioni(
+            nome_base,
+            eventi_originali,
+            azioni
+        )
+
+        if not valido_azioni:
+            return False, motivo_azioni
 
         condizione_tattile = (
             "mano" in nome_base or
@@ -1097,7 +1105,10 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
         u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"
         u"- Per interazioni sociali positive, usa occhi verdi/cyan, guarda verso la persona e rispondi con tono amichevole.\n"
-        u"- Per ostacoli o pericolo, usa fermati, occhi gialli/rossi, guarda verso il lato del problema e parla.\n"
+        u"- Per ostacoli frontali, urti ai piedi, caduta o pericolo reale, usa fermati, occhi rossi/gialli, guarda e parla.\n"
+        u"- Per ostacoli laterali durante il cammino, NON usare fermati: usa occhi rossi/gialli, guarda verso il lato dell'ostacolo e cammina/gira con micro-correzione prudente.\n"
+        u"- Ostacolo a destra durante cammino significa correggere la traiettoria, non arrestarsi.\n"
+        u"- Ostacolo a sinistra durante cammino significa correggere la traiettoria, non arrestarsi.\n"
         u"- Non usare cammina se il robot è fermo e non c'è una richiesta esplicita o una situazione di evitamento.\n"
         u"- Non usare gira/cammina per eventi sociali come carezza o volto.\n"
         u"- Massimo 4 azioni.\n"
@@ -1591,3 +1602,46 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
     except Exception as e:
         logger.warning(u"[GENERATOR] Errore generazione condizione: {}".format(e))
         return None
+    
+def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
+    """
+    Valida che le azioni siano coerenti con il tipo di evento.
+    Non corregge manualmente le condizioni: le rifiuta se incoerenti.
+    """
+
+    tipi_azioni = []
+
+    for azione in azioni:
+        if isinstance(azione, dict):
+            tipi_azioni.append(azione.get("tipo", ""))
+
+    ha_fermati = "fermati" in tipi_azioni
+    ha_cammina_o_gira = "cammina" in tipi_azioni or "gira" in tipi_azioni
+
+    ostacolo_laterale_cammino = (
+        eventi_originali.get("camminando", False) and
+        (
+            eventi_originali.get("ostacolo_destra", False) or
+            eventi_originali.get("ostacolo_sinistra", False)
+        ) and
+        not eventi_originali.get("ostacolo_frontale", False) and
+        not eventi_originali.get("urto_piedi", False) and
+        not eventi_originali.get("pericolo", False)
+    )
+
+    if ostacolo_laterale_cammino and ha_fermati:
+        return False, "Ostacolo laterale durante cammino: vietato usare fermati"
+
+    if ostacolo_laterale_cammino and not ha_cammina_o_gira:
+        return False, "Ostacolo laterale durante cammino: serve micro-correzione con cammina o gira"
+
+    pericolo_reale = (
+        eventi_originali.get("ostacolo_frontale", False) or
+        eventi_originali.get("urto_piedi", False) or
+        eventi_originali.get("pericolo", False)
+    )
+
+    if eventi_originali.get("camminando", False) and pericolo_reale and not ha_fermati:
+        return False, "Pericolo/frontale/urto durante cammino: serve fermati"
+
+    return True, "ok"

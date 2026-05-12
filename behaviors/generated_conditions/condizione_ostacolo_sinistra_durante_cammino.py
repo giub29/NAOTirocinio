@@ -2,17 +2,18 @@
 
 def condizione(mondo, stato_runtime):
     testo = mondo.lower()
-    return (u"ostacolo" in testo or u"qualcosa" in testo) and u"sinistra" in testo and u"sto camminando" in testo
+    eventi = stato_runtime.get("eventi", {})
+    return eventi.get("ostacolo_sinistra", False) and eventi.get("camminando", False)
 
 
 def comportamento():
     return {
-        "stato_interno": "allerta",
-        "obiettivo": "evitare ostacolo",
+        "stato_interno": "prudente",
+        "obiettivo": "evitare ostacolo a sinistra",
         "azioni": [
-            {"tipo": "fermati"},
-            {"tipo": "occhi", "colore": "red"},
+            {"tipo": "occhi", "colore": "yellow"},
             {"tipo": "guarda", "x": -0.5, "y": -0.2},
+            {"tipo": "cammina", "x": 0.1, "g": 0.0},
             {"tipo": "parla", "testo": "Attenzione, ostacolo a sinistra!"}
         ],
         "memoria": []

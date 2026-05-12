@@ -76,9 +76,9 @@ def heartbeat_scaduto():
 
 
 def avvia_soul():
-    logger.info("Avvio soul.py da {}".format(SOUL_PATH))
-    logger.info("Heartbeat file: {}".format(HEARTBEAT_FILE))
-    logger.info("Timeout heartbeat: {} secondi".format(TIMEOUT_HEARTBEAT))
+    logger.warning("Avvio soul.py da {}".format(SOUL_PATH))
+    logger.warning("Python usato: {}".format(sys.executable))
+    logger.warning("Working directory: {}".format(SOUL_DIR))
 
     return subprocess.Popen(
         [sys.executable, SOUL_PATH],

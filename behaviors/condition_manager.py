@@ -456,6 +456,35 @@ def _decisione_coerente_con_mondo(decisione, mondo, nome_condizione):
 
     return True, "ok"
 
+def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
+    nome = (nome_condizione or "").lower()
+    testo = (mondo or "").lower()
+
+    eventi = stato_runtime.get("eventi", {})
+
+    camminando = (
+        eventi.get("camminando", False) or
+        "sto camminando" in testo
+    )
+
+    ostacolo_sinistra = (
+        eventi.get("ostacolo_sinistra", False) or
+        "ostacolo a sinistra" in testo
+    )
+
+    ostacolo_destra = (
+        eventi.get("ostacolo_destra", False) or
+        "ostacolo a destra" in testo
+    )
+
+    if camminando and ostacolo_sinistra:
+        return "ostacolo_sinistra_durante_cammino" in nome
+
+    if camminando and ostacolo_destra:
+        return "ostacolo_destra_durante_cammino" in nome
+
+    return True
+
 def valuta_condizioni_generate(mondo, stato_runtime):
     """
     Valuta tutte le condizioni generate.
@@ -470,6 +499,10 @@ def valuta_condizioni_generate(mondo, stato_runtime):
     for item in condizioni:
         nome = item["nome"]
         modulo = item["modulo"]
+
+        if not _condizione_ammessa_per_evento(nome, mondo, stato_runtime):
+            logger.info(u"[CONDIZIONI] Ignoro condizione generica non adatta al contesto: {}".format(nome))
+            continue
 
         valutazione = valuta_affidabilita_condizione(nome)
 

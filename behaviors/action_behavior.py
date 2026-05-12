@@ -31,14 +31,26 @@ def valida_decisione(decisione, mondo):
 
     testo_mondo = mondo.lower()
 
-    evento_safety_cammino = (
+    ostacolo_laterale_cammino = (
         "sto camminando" in testo_mondo and
         (
-            "ostacolo" in testo_mondo or
+            "ostacolo a sinistra" in testo_mondo or
+            "ostacolo a destra" in testo_mondo
+        ) and
+        "ostacolo frontale" not in testo_mondo and
+        "pericolo" not in testo_mondo and
+        "caduta" not in testo_mondo
+    )
+
+    evento_safety_cammino = (
+        "sto camminando" in testo_mondo and
+        not ostacolo_laterale_cammino and
+        (
             "urto" in testo_mondo or
             "piede sinistro" in testo_mondo or
             "piede destro" in testo_mondo or
-            "pericolo" in testo_mondo
+            "pericolo" in testo_mondo or
+            "ostacolo frontale" in testo_mondo
         )
     )
 
@@ -134,22 +146,23 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema, stato_runtime, aggi
 
     azioni = decisione.get("azioni", [])
 
-    ha_schivata = False
+    era_in_pattugliamento = stato_runtime.get("in_pattugliamento", False)
+    ha_fermati = False
+    ha_cammina_o_gira = False
+
     for az in azioni:
         tipo = az.get("tipo", "")
+
+        if tipo == "fermati":
+            ha_fermati = True
+
+        if tipo in ["cammina", "gira"]:
+            ha_cammina_o_gira = True
 
         try:
             if tipo == "parla":
                 testo = az.get("testo", "")
                 voce.parla(testo)
-
-                if "Ciao" in testo:
-                    m = re.search(r'Ciao (.*?)!', testo)
-                    if m:
-                        stato_runtime["volti_salutati"].append(m.group(1))
-
-                if "ignoto" in testo.lower() or "sconosciuto" in testo.lower():
-                    stato_runtime["volti_salutati"].append("Sconosciuto")
 
             elif tipo == "cammina":
                 corpo.cammina(az.get("x", 0.0), az.get("g", 0.0))
@@ -159,12 +172,7 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema, stato_runtime, aggi
 
             elif tipo == "fermati":
                 corpo.fermati()
-
-                if (
-                    not stato_runtime.get("mantieni_pattugliamento", False) and
-                    not ha_schivata
-                ):
-                    stato_runtime["in_pattugliamento"] = False
+                stato_runtime["in_pattugliamento"] = False
 
             elif tipo == "posa":
                 corpo.vai_in_posa(az.get("nome", "Stand"))
@@ -189,3 +197,7 @@ def esegui_decisione(decisione, corpo, voce, vista, sistema, stato_runtime, aggi
 
         except Exception as e:
             print(u"[ERRORE AZIONE {}]: {}".format(tipo, str(e)))
+
+    if era_in_pattugliamento and ha_cammina_o_gira and not ha_fermati:
+        stato_runtime["in_pattugliamento"] = True
+        stato_runtime["mantieni_pattugliamento"] = True
