@@ -53,15 +53,15 @@ def valida_decisione(decisione, mondo):
             if nome in ["Stand", "Crouch", "Sit", "SitRelax"]:
                 azioni_valide.append({"tipo": "posa", "nome": nome})
 
-            elif tipo == "guarda":
-                x = limita_numero(az.get("x", 0.0), -1.0, 1.0, 0.0)
-                y = limita_numero(az.get("y", -0.25), -0.5, -0.1, -0.25)
+        elif tipo == "guarda":
+            x = limita_numero(az.get("x", 0.0), -1.0, 1.0, 0.0)
+            y = limita_numero(az.get("y", -0.25), -0.5, -0.1, -0.25)
 
-                azioni_valide.append({
-                    "tipo": "guarda",
-                    "x": x,
-                    "y": y
-                })
+            azioni_valide.append({
+                "tipo": "guarda",
+                "x": x,
+                "y": y
+            })
 
         elif tipo == "occhi":
             colore = az.get("colore", "white")
