@@ -507,6 +507,54 @@ def valuta_condizioni_generate(mondo, stato_runtime):
             )
             continue
 
+    # Arrivo qui solo se nessuna condizione esistente si e' attivata.
+    if stato_runtime.get("_generazione_autonoma_in_corso"):
+        logger.warning(u"[CONDIZIONI] Generazione autonoma gia' in corso: evito ricorsione")
+        return None
+
+    try:
+        chiave_api = (
+            stato_runtime.get("openai_api_key") or
+            os.getenv("OPENAI_API_KEY")
+        )
+
+        if chiave_api and mondo:
+            logger.warning(u"[CONDIZIONI] Nessuna condizione attiva. Tento generazione autonoma per mondo: {}".format(
+                mondo
+            ))
+
+            from behaviors.condition_generator import genera_condizione_autonoma
+
+            stato_runtime["_generazione_autonoma_in_corso"] = True
+
+            try:
+                nuova_condizione = genera_condizione_autonoma(
+                    mondo,
+                    stato_runtime.get("memoria", {}),
+                    stato_runtime.get("stato_robot", {}),
+                    chiave_api
+                )
+            finally:
+                stato_runtime["_generazione_autonoma_in_corso"] = False
+
+            if nuova_condizione:
+                logger.warning(u"[CONDIZIONI] Nuova condizione generata autonomamente: {}".format(
+                    nuova_condizione
+                ))
+
+                reset_cache_condizioni()
+
+            else:
+                logger.warning(u"[CONDIZIONI] Nessuna nuova condizione valida generata per il mondo corrente")
+
+        else:
+            logger.warning(u"[CONDIZIONI] Generazione autonoma non possibile: API key o mondo assente")
+
+    except Exception as e:
+        logger.warning(u"[CONDIZIONI] Errore durante generazione autonoma da mondo non coperto: {}".format(
+            e
+        ))
+
     return None
 
 def esegui_condizione_per_nome(nome, mondo, stato_runtime):
