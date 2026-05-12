@@ -174,11 +174,9 @@ def _registra_errore(nome_modulo, errore, mondo=None, stato_runtime=None):
     """
     Registra un errore runtime di una condizione.
 
-    Fase 4:
-    - aggiorna il contatore interno;
-    - aggiorna il .meta.json;
-    - se gli errori sono troppi, sposta la condizione in rejected_conditions;
-    - dopo il rifiuto prova la riparazione automatica.
+    Ritorna:
+    - True se la condizione e' stata spostata in rejected;
+    - False altrimenti.
     """
 
     if nome_modulo.endswith(".py"):
@@ -211,6 +209,9 @@ def _registra_errore(nome_modulo, errore, mondo=None, stato_runtime=None):
             mondo,
             stato_runtime
         )
+        return True
+
+    return False
 
 def _priorita_condizione(nome):
     nome = nome.lower()
@@ -501,12 +502,16 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                         decisione = modulo.comportamento()
 
                 except Exception as e:
-                    _registra_errore(
+                    spostata = _registra_errore(
                         nome,
                         e,
                         mondo,
                         stato_runtime
                     )
+
+                    if spostata:
+                        return None
+
                     continue
 
                 coerente, motivo = _decisione_coerente_con_mondo(
