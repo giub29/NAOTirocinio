@@ -27,7 +27,8 @@ from behaviors.condition_memory import (
     registra_attivazione,
     registra_errore_condizione,
     marca_condizione_rifiutata,
-    valuta_affidabilita_condizione
+    valuta_affidabilita_condizione,
+    registra_esito_riparazione
 )
 
 from behaviors.condition_repair import tenta_riparazione_condizione
@@ -126,6 +127,14 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
                 mondo,
                 stato_runtime
             )
+
+            try:
+                registra_esito_riparazione(nome_modulo, esito_riparazione)
+            except Exception as e:
+                logger.warning(u"[CONDIZIONI] Impossibile registrare esito riparazione {}: {}".format(
+                    nome_modulo,
+                    e
+                ))
 
             if not isinstance(esito_riparazione, dict):
                 logger.warning(u"[CONDIZIONI] Riparazione fallita per {} | esito non valido: {}".format(

@@ -144,6 +144,14 @@ def crea_metadati_base(nome_condizione, mondo, eventi, stato_robot=None, origine
             "semantica": "ok"
         },
 
+        "riparazione": {
+            "tentativi": 0,
+            "successi": 0,
+            "fallimenti": 0,
+            "ultimo_esito": "",
+            "ultimo_motivo": ""
+        },
+
         "note": [
             "Condizione generata autonomamente da NAO.",
             "Il file Python contiene la logica eseguibile.",
@@ -410,3 +418,42 @@ def valuta_affidabilita_condizione(nome_condizione):
         "azione": "mantieni",
         "motivo": "nessun segnale critico"
     }
+
+def registra_esito_riparazione(nome_condizione, esito):
+    if nome_condizione.endswith(".py"):
+        nome_condizione = nome_condizione[:-3]
+
+    path_file = _meta_path(nome_condizione)
+    dati = _leggi_json(path_file)
+
+    if dati is None:
+        dati = {
+            "nome": nome_condizione,
+            "file_python": nome_condizione + ".py",
+            "origine": "sconosciuta",
+            "stato": "problematica",
+            "creata_il": _adesso(),
+            "aggiornata_il": _adesso()
+        }
+
+    if "riparazione" not in dati:
+        dati["riparazione"] = {
+            "tentativi": 0,
+            "successi": 0,
+            "fallimenti": 0,
+            "ultimo_esito": "",
+            "ultimo_motivo": ""
+        }
+
+    dati["riparazione"]["tentativi"] += 1
+    dati["riparazione"]["ultimo_esito"] = esito.get("status", "")
+    dati["riparazione"]["ultimo_motivo"] = esito.get("reason", "")
+
+    if esito.get("success"):
+        dati["riparazione"]["successi"] += 1
+    else:
+        dati["riparazione"]["fallimenti"] += 1
+
+    dati["aggiornata_il"] = _adesso()
+
+    return _scrivi_json(path_file, dati)
