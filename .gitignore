@@ -29,3 +29,4 @@ NAOTirocinio/behaviors/generated_conditions/*
 
 behaviors/rejected_conditions/
 behaviors/quarantine_conditions/
+behaviors/rejected_metadata/

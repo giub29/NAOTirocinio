@@ -26,7 +26,8 @@ import shutil
 from behaviors.condition_memory import (
     registra_attivazione,
     registra_errore_condizione,
-    marca_condizione_rifiutata
+    marca_condizione_rifiutata,
+    valuta_affidabilita_condizione
 )
 
 from behaviors.condition_repair import tenta_riparazione_condizione
@@ -459,6 +460,15 @@ def valuta_condizioni_generate(mondo, stato_runtime):
     for item in condizioni:
         nome = item["nome"]
         modulo = item["modulo"]
+
+        valutazione = valuta_affidabilita_condizione(nome)
+
+        if valutazione.get("azione") == "disattiva":
+            logger.warning(u"[CONDIZIONI] Condizione ignorata per bassa affidabilita': {} | {}".format(
+                nome,
+                valutazione.get("motivo")
+            ))
+            continue
 
         try:
             ultimo_tempo = _ultima_attivazione_condizione.get(nome, 0)

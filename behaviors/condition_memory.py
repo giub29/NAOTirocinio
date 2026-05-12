@@ -2,13 +2,9 @@
 """
 Memoria delle condizioni autonome generate da NAO.
 
-Questo modulo crea e aggiorna un file .meta.json accanto a ogni condizione
-generata. Serve a rendere le condizioni apprese tracciabili, osservabili
-e correggibili nel tempo.
-
-Esempio:
-- generated_conditions/condizione_ostacolo_destra.py
-- generated_conditions/condizione_ostacolo_destra.meta.json
+Questo modulo crea e aggiorna file .meta.json separati dal codice Python
+delle condizioni. I metadati vengono salvati in condition_metadata/
+per mantenere distinta la memoria semantica dal codice eseguibile.
 """
 
 import os
@@ -20,16 +16,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(__file__)
+METADATA_DIR = os.path.join(BASE_DIR, "condition_metadata")
+REJECTED_METADATA_DIR = os.path.join(BASE_DIR, "rejected_metadata")
 GENERATED_DIR = os.path.join(BASE_DIR, "generated_conditions")
 REJECTED_DIR = os.path.join(BASE_DIR, "rejected_conditions")
 
 
 def _assicura_cartelle():
-    if not os.path.exists(GENERATED_DIR):
-        os.makedirs(GENERATED_DIR)
-
-    if not os.path.exists(REJECTED_DIR):
-        os.makedirs(REJECTED_DIR)
+    for cartella in [
+        GENERATED_DIR,
+        REJECTED_DIR,
+        METADATA_DIR,
+        REJECTED_METADATA_DIR
+    ]:
+        if not os.path.exists(cartella):
+            os.makedirs(cartella)
 
 
 def _meta_path(nome_condizione, cartella=None):
@@ -47,7 +48,7 @@ def _meta_path(nome_condizione, cartella=None):
         nome_condizione = nome_condizione[:-3]
 
     if cartella is None:
-        cartella = GENERATED_DIR
+        cartella = METADATA_DIR
 
     return os.path.join(cartella, nome_condizione + ".meta.json")
 
@@ -366,3 +367,46 @@ def marca_condizione_rifiutata(nome_condizione, motivo):
     dati["statistiche"]["rifiuti"] = dati["statistiche"].get("rifiuti", 0) + 1
 
     return _scrivi_json(path_file, dati)
+
+def valuta_affidabilita_condizione(nome_condizione):
+    """
+    Valuta se una condizione deve essere mantenuta, rigenerata o disattivata
+    usando i suoi metadati.
+    """
+
+    dati = leggi_metadati_condizione(nome_condizione)
+
+    if dati is None:
+        return {
+            "azione": "mantieni",
+            "motivo": "metadati assenti, mantengo per prudenza"
+        }
+
+    statistiche = dati.get("statistiche", {})
+
+    attivazioni = statistiche.get("attivazioni", 0)
+    errori = statistiche.get("errori_runtime", 0)
+    rifiuti = statistiche.get("rifiuti", 0)
+
+    if rifiuti >= 2:
+        return {
+            "azione": "disattiva",
+            "motivo": "troppi rifiuti registrati"
+        }
+
+    if errori >= 3:
+        return {
+            "azione": "rigenera",
+            "motivo": "troppi errori runtime"
+        }
+
+    if attivazioni >= 3 and errori == 0 and rifiuti == 0:
+        return {
+            "azione": "mantieni",
+            "motivo": "condizione affidabile"
+        }
+
+    return {
+        "azione": "mantieni",
+        "motivo": "nessun segnale critico"
+    }
