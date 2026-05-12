@@ -230,12 +230,17 @@ def _slug_testo(testo):
     fermo = "sono fermo" in testo
 
     ha_batteria_bassa = False
+    ha_batteria_critica = False
+
     try:
         match_batteria = re.search(r"batteria.*?(\d+)%", testo)
         if match_batteria:
-            ha_batteria_bassa = int(match_batteria.group(1)) <= 25
+            batteria_valore = int(match_batteria.group(1))
+            ha_batteria_bassa = batteria_valore <= 25
+            ha_batteria_critica = batteria_valore <= 15
     except Exception:
         ha_batteria_bassa = False
+        ha_batteria_critica = False
 
     ha_carezza = "carezza" in testo and "testa" in testo
     ha_mano_sx = "mano sinistra" in testo
@@ -275,6 +280,9 @@ def _slug_testo(testo):
         ("urto tattile" in testo and "pied" in testo) or
         (ha_urto_piede_sx and ha_urto_piede_dx)
     )
+
+    if ha_batteria_critica and ha_volto_noto:
+        return "batteria_critica_e_volto_riconosciuto"
 
     if ha_batteria_bassa and ha_volto_noto:
         return "batteria_bassa_e_volto_riconosciuto"
@@ -1309,7 +1317,11 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     elif nome_base == "batteria_bassa_e_volto_riconosciuto":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
         righe.append('    return eventi.get("batteria_bassa", False) and eventi.get("volto_riconosciuto", False)')
-        
+    
+    elif nome_base == "batteria_critica_e_volto_riconosciuto":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("batteria_critica", False) and eventi.get("volto_riconosciuto", False)')
+
     # COMBINAZIONI DURANTE CAMMINO
     elif nome_base == "carezza_durante_cammino":
         righe.append('    return u"carezza" in testo and u"testa" in testo and u"sto camminando" in testo')
