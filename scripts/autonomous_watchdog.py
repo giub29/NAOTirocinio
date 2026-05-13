@@ -26,7 +26,8 @@ HEARTBEAT_FILE = os.path.join(RUNTIME_DIR, "heartbeat.txt")
 TIMEOUT_HEARTBEAT = 60
 CONTROLLO_INTERVALLO = 2
 MAX_RIAVVII_CONSECUTIVI = 5
-PAUSA_RIAVVIO = 3
+PAUSA_RIAVVIO_BASE = 5
+PAUSA_RIAVVIO_MAX = 60
 
 processo = None
 STOP = False
@@ -214,8 +215,19 @@ def main():
 
                 break
 
-            time.sleep(PAUSA_RIAVVIO)
+            pausa = min(
+                PAUSA_RIAVVIO_MAX,
+                PAUSA_RIAVVIO_BASE * riavvii
+            )
 
+            logger.warning(
+                "Attendo {} secondi prima del prossimo riavvio".format(
+                    pausa
+                )
+            )
+
+            time.sleep(pausa)
+            
     except KeyboardInterrupt:
 
         logger.info("KeyboardInterrupt ricevuto")

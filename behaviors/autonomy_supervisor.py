@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Autonomy Supervisor 
+Autonomy Supervisor
 
-Questo modulo centralizza la gestione autonoma delle condizioni.
+Modulo centrale per la gestione autonoma delle condizioni.
 
-Per ora NON rende ancora NAO totalmente autonomo.
-Serve a:
-- valutare le condizioni generate
-- evitare che soul.py dipenda direttamente dai dettagli interni
-- preparare la FASE C, cioe' generazione autonoma piu' indipendente
+Responsabilità:
+- valutare automaticamente le condizioni già generate;
+- decidere se una situazione nuova merita una nuova condizione;
+- generare autonomamente nuove condizioni tramite LLM;
+- rivalutare subito le condizioni dopo la generazione;
+- proteggere soul.py da errori del generator o del condition_manager;
+- dare priorità agli eventi composti prima delle condizioni semplici.
+
+Questo modulo è il punto di passaggio tra:
+percezione → firma evento → condizione esistente/generazione → decisione.
 """
 
 import logging
@@ -186,6 +191,10 @@ def costruisci_firma_situazione(mondo, stato_runtime):
 
     testo = (mondo or "").strip().lower()
     eventi = stato_runtime.get("eventi", {})
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
 
     if not isinstance(eventi, dict):
         eventi = {}
@@ -258,7 +267,10 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         contiene_sensoriale = any(p in testo for p in parole_sensoriali_generiche)
         solo_banale = contiene_banale and not contiene_sensoriale and len(eventi_attivi) == 0
 
-    eventi_multipli = len(eventi_attivi.keys()) >= 2
+    eventi_multipli = (
+        len(eventi_attivi.keys()) >= 2
+        or evento_strutturato.get("evento_composto", False)
+    )
 
     situazione_composta = False
 
@@ -275,7 +287,10 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                 situazione_composta = True
                 break
 
-    ha_novita_runtime = len(eventi_attivi.keys()) > 0
+    ha_novita_runtime = (
+        len(eventi_attivi.keys()) > 0
+        or evento_strutturato.get("tipo", "generico") != "generico"
+    )
 
     ha_testo_sensoriale_non_banale = (
         bool(testo)
@@ -299,8 +314,10 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         "situazione_composta": situazione_composta,
         "ha_novita_runtime": ha_novita_runtime,
         "ha_testo_sensoriale_non_banale": ha_testo_sensoriale_non_banale,
+        "evento_strutturato": evento_strutturato,
         "gia_tentata": gia_tentata
     }
+    
 
 def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     """
@@ -355,6 +372,18 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 logger.info("[AUTONOMIA] Nuova condizione generata: {}".format(
                     path_nuova_condizione
                 ))
+
+                try:
+                    if hasattr(condition_generator, "reset_cache_condizioni"):
+                        condition_generator.reset_cache_condizioni()
+                except Exception:
+                    pass
+
+                try:
+                    from behaviors.condition_manager import reset_cache_condizioni
+                    reset_cache_condizioni()
+                except Exception:
+                    pass
             else:
                 logger.info("[AUTONOMIA] Nessuna nuova condizione generata")
                 return None

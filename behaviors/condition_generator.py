@@ -43,6 +43,8 @@ from behaviors.condition_manager import reset_cache_condizioni
 from behaviors.condition_memory import salva_metadati_condizione
 
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
 
 BASE_DIR = os.path.dirname(__file__)
 
@@ -1105,11 +1107,13 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
         u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"
         u"- Per interazioni sociali positive, usa occhi verdi/cyan, guarda verso la persona e rispondi con tono amichevole.\n"
-        u"- Per ostacoli frontali, urti ai piedi, caduta o pericolo reale, usa fermati, occhi rossi/gialli, guarda e parla.\n"
-        u"- Per ostacoli laterali durante il cammino, NON usare fermati: usa occhi rossi/gialli, guarda verso il lato dell'ostacolo e cammina/gira con micro-correzione prudente.\n"
+        u"- Per ostacoli frontali o laterali durante il cammino, NON fermarti subito: prova prima una micro-schivata prudente.\n"
+        u"- Usa occhi rossi/gialli, guarda verso l'ostacolo e pronuncia una frase breve di allerta.\n"
         u"- Se ostacolo a destra durante cammino: usa cammina con x almeno 0.12 e g positivo, esempio {\"tipo\": \"cammina\", \"x\": 0.16, \"g\": 0.12}.\n"
         u"- Se ostacolo a sinistra durante cammino: usa cammina con x almeno 0.12 e g negativo, esempio {\"tipo\": \"cammina\", \"x\": 0.16, \"g\": -0.12}.\n"
-        u"- Non usare cammina se il robot è fermo e non c'è una richiesta esplicita o una situazione di evitamento.\n"
+        u"- Se ostacolo frontale durante cammino: usa gira oppure una micro-correzione prudente con cammina.\n"
+        u"- Usa fermati solo se c'e' urto ai piedi, pericolo/caduta, robot bloccato oppure nessuna strada libera.\n"
+        u"- Non usare cammina se il robot e' fermo e non c'e' una richiesta esplicita o una situazione di evitamento.\n"
         u"- Non usare gira/cammina per eventi sociali come carezza o volto.\n"
         u"- Massimo 4 azioni.\n"
         u"- Vietato generare un comportamento con una sola azione di tipo parla.\n"
@@ -1624,6 +1628,13 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
         not eventi_originali.get("pericolo", False)
     )
 
+    ostacolo_frontale_cammino = (
+        eventi_originali.get("camminando", False) and
+        eventi_originali.get("ostacolo_frontale", False) and
+        not eventi_originali.get("urto_piedi", False) and
+        not eventi_originali.get("pericolo", False)
+    )
+
     if ostacolo_laterale_cammino and ha_fermati:
         return False, "Ostacolo laterale durante cammino: vietato usare fermati"
 
@@ -1654,9 +1665,13 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
 
         if not ha_schivata_valida:
             return False, "Ostacolo laterale durante cammino: serve azione cammina con direzione valida"
-
+    
+    if ostacolo_frontale_cammino and ha_fermati:
+        return False, "Ostacolo frontale durante cammino: vietato fermarsi subito, serve tentativo di schivata"
+    if ostacolo_frontale_cammino and not ha_cammina_o_gira:
+        return False, "Ostacolo frontale durante cammino: serve micro-schivata con cammina o gira"
+    
     pericolo_reale = (
-        eventi_originali.get("ostacolo_frontale", False) or
         eventi_originali.get("urto_piedi", False) or
         eventi_originali.get("pericolo", False)
     )
@@ -1665,3 +1680,122 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
         return False, "Pericolo/frontale/urto durante cammino: serve fermati"
 
     return True, "ok"
+
+def costruisci_evento_strutturato(mondo, stato_runtime=None):
+    """
+    Converte il report testuale + runtime in una firma evento strutturata.
+
+    Obiettivo:
+    - ridurre dipendenza da stringhe sparse in soul.py;
+    - distinguere eventi spaziali/sociali/safety;
+    - preparare condizioni singole e multiple;
+    - dare al supervisore una rappresentazione stabile.
+    """
+
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    eventi = estrai_eventi(mondo, stato_runtime)
+
+    tipo = "generico"
+    direzione = None
+    categoria = "neutra"
+    gravita = "bassa"
+
+    camminando = eventi.get("camminando", False)
+    fermo = eventi.get("fermo", False)
+
+    # Safety / pericolo
+    if eventi.get("pericolo", False):
+        tipo = "pericolo"
+        categoria = "safety"
+        gravita = "alta"
+
+    elif eventi.get("urto_piedi", False) or eventi.get("entrambi_piedi", False):
+        tipo = "urto_piedi"
+        categoria = "safety"
+        gravita = "alta"
+
+    # Ostacoli spaziali
+    elif eventi.get("ostacolo_frontale", False):
+        tipo = "ostacolo"
+        direzione = "frontale"
+        categoria = "spaziale"
+        gravita = "media"
+
+    elif eventi.get("ostacolo_destra", False):
+        tipo = "ostacolo"
+        direzione = "destra"
+        categoria = "spaziale"
+        gravita = "media"
+
+    elif eventi.get("ostacolo_sinistra", False):
+        tipo = "ostacolo"
+        direzione = "sinistra"
+        categoria = "spaziale"
+        gravita = "media"
+
+    # Eventi sociali / tattili
+    elif eventi.get("carezza_testa", False):
+        tipo = "carezza"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    elif eventi.get("entrambe_mani", False):
+        tipo = "tocco_mani"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    elif eventi.get("mano_sinistra", False):
+        tipo = "tocco_mano"
+        direzione = "sinistra"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    elif eventi.get("mano_destra", False):
+        tipo = "tocco_mano"
+        direzione = "destra"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    elif eventi.get("volto_riconosciuto", False):
+        tipo = "volto_riconosciuto"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    elif eventi.get("volto_ignoto", False):
+        tipo = "volto_ignoto"
+        categoria = "sociale"
+        gravita = "bassa"
+
+    # Batteria
+    elif eventi.get("batteria_critica", False):
+        tipo = "batteria_critica"
+        categoria = "sistema"
+        gravita = "alta"
+
+    elif eventi.get("batteria_bassa", False):
+        tipo = "batteria_bassa"
+        categoria = "sistema"
+        gravita = "media"
+
+    eventi_attivi = []
+
+    for chiave, valore in eventi.items():
+        if valore not in [None, False, "", [], {}]:
+            eventi_attivi.append(chiave)
+
+    firma = {
+        "tipo": tipo,
+        "direzione": direzione,
+        "categoria": categoria,
+        "gravita": gravita,
+        "camminando": camminando,
+        "fermo": fermo,
+        "durante_cammino": camminando,
+        "eventi": eventi,
+        "eventi_attivi": eventi_attivi,
+        "evento_composto": len(eventi_attivi) >= 2
+    }
+
+    return firma

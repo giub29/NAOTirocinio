@@ -14,7 +14,7 @@ import signal
 
 utente_sta_scrivendo = False
 ultimo_input_tempo = 0
-MODALITA_TEST = True
+MODALITA_TEST = False
 
 if sys.version_info[0] < 3:
     reload(sys)
@@ -43,9 +43,7 @@ from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condi
 from behaviors.condition_generator import (
     genera_condizione_autonoma,
     valuta_se_generare_condizione,
-    estrai_eventi
 )
-
 import colorlog
 
 handler = colorlog.StreamHandler()
@@ -274,7 +272,7 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
             corpo.fermati()
             logger.debug(u"Comando stop/fermati ricevuto")
 
-        elif testo_user.startswith("test condizione") or testo_user.startswith("test"):
+        elif MODALITA_TEST and (testo_user.startswith("test condizione") or testo_user.startswith("test")):
             nome = testo_user.replace("test condizione", "").replace("test", "").strip()
 
             decisione = esegui_condizione_per_nome(
@@ -620,9 +618,13 @@ def main():
         sistema.configura_autonomous_life_da_env()
         _inizializza_robot(corpo, voce, vista, sistema)
 
-        thread_input = threading.Thread(target=_thread_input_utente)
-        thread_input.daemon = True
-        thread_input.start()
+        if MODALITA_TEST:
+            thread_input = threading.Thread(target=_thread_input_utente)
+            thread_input.daemon = True
+            thread_input.start()
+            logger.info(u"Modalita test attiva: input da tastiera abilitato")
+        else:
+            logger.info(u"Modalita autonoma: input da tastiera disabilitato")
 
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
@@ -804,6 +806,10 @@ def main():
                 mondo_evento = mondo + u" STO CAMMINANDO."
 
                 stato_runtime["eventi"] = estrai_eventi(mondo_evento, stato_runtime)
+                stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+                    mondo_evento,
+                    stato_runtime
+                )
                 stato_runtime["memoria"] = memoria_fisica
                 stato_runtime["stato_robot"] = stato_robot
                 stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
@@ -1016,6 +1022,10 @@ def main():
 
                 if mondo_cambiato and mondo_valido:
                     stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
+                    stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+                        mondo,
+                        stato_runtime
+                    )
                     stato_runtime["memoria"] = memoria_fisica
                     stato_runtime["stato_robot"] = stato_robot
                     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
