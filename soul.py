@@ -1044,17 +1044,17 @@ def main():
                     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
                     stato_runtime["evento_composto"] = evento_composto
 
-                if stato_runtime.get("missione_laboratorio", False):
-                    if gestisci_navigazione_laboratorio(
-                        mondo,
-                        corpo,
-                        voce,
-                        vista,
-                        stato_runtime
-                    ):
-                        stato_precedente = mondo
-                        time.sleep(0.1)
-                        continue
+                    if stato_runtime.get("missione_laboratorio", False):
+                        if gestisci_navigazione_laboratorio(
+                            mondo,
+                            corpo,
+                            voce,
+                            vista,
+                            stato_runtime
+                        ):
+                            stato_precedente = mondo
+                            time.sleep(0.1)
+                            continue
 
                     salta_autonomia_per_vai = (
                         stato_runtime.get("in_pattugliamento", False) and
