@@ -46,6 +46,38 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     firma = costruisci_firma_situazione(mondo, stato_runtime)
     logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
 
+    if stato_runtime.get("forza_generazione_safety", False):
+        motivo_safety = stato_runtime.get(
+            "motivo_safety",
+            "evento safety prioritario"
+        )
+
+        logger.warning("[AUTONOMIA] Generazione safety richiesta: {}".format(
+            motivo_safety
+        ))
+
+        nuova_decisione = prova_generazione_autonoma(
+            mondo,
+            stato_runtime,
+            "safety: {}".format(motivo_safety)
+        )
+
+        if nuova_decisione is not None:
+            logger.info("[AUTONOMIA] Decisione ottenuta dopo generazione safety")
+            return nuova_decisione
+
+        logger.info("[AUTONOMIA] Generazione safety non riuscita: provo condizioni esistenti")
+
+        decisione = valuta_condizioni_generate_sicure(
+            mondo,
+            stato_runtime
+        )
+
+        if decisione is not None:
+            return decisione
+
+        return None
+
     evento_composto = (
         stato_runtime.get("evento_composto", False)
         or firma.get("eventi_multipli", False)
@@ -254,8 +286,6 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         ["mano", "piede"],
         ["testa", "mano"],
         ["volto", "voce"],
-        ["ostacolo", "fermo"],
-        ["tocco", "fermo"],
         ["interazione", "movimento"]
     ]
 
@@ -267,8 +297,13 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         contiene_sensoriale = any(p in testo for p in parole_sensoriali_generiche)
         solo_banale = contiene_banale and not contiene_sensoriale and len(eventi_attivi) == 0
 
+    eventi_core = evento_strutturato.get("eventi_core", [])
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
     eventi_multipli = (
-        len(eventi_attivi.keys()) >= 2
+        len(eventi_core) >= 2
         or evento_strutturato.get("evento_composto", False)
     )
 
@@ -315,6 +350,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         "ha_novita_runtime": ha_novita_runtime,
         "ha_testo_sensoriale_non_banale": ha_testo_sensoriale_non_banale,
         "evento_strutturato": evento_strutturato,
+        "eventi_core": eventi_core,
         "gia_tentata": gia_tentata
     }
     

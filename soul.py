@@ -41,9 +41,11 @@ from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
 from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
 from behaviors.condition_generator import (
-    genera_condizione_autonoma,
-    valuta_se_generare_condizione,
+    estrai_eventi,
+    costruisci_evento_strutturato
 )
+from behaviors.lab_patrol_behavior import gestisci_navigazione_laboratorio
+
 import colorlog
 
 handler = colorlog.StreamHandler()
@@ -120,6 +122,7 @@ DEBUG_STATO = False
 stato_runtime = {
     "attesa_nome": False,
     "riprendi_dopo_nome": False,
+    "missione_laboratorio": False,
     "primo_ignoto_tempo": 0,
     "ultimo_volto_noto_tempo": 0,
     "ultimo_nome_riconosciuto": "",
@@ -255,6 +258,7 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
 
         elif "vai" in testo_user or "cammina" in testo_user:
             stato_runtime["in_pattugliamento"] = True
+            stato_runtime["missione_laboratorio"] = True
             stato_runtime["ultimo_comando_vai_tempo"] = time.time()
             corpo.guarda(*ANGOLO_SGUARDO_NEUTRO)
             corpo.cammina(VELOCITA_CAMMINO, 0.0)
@@ -269,6 +273,7 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
 
         elif "stop" in testo_user or "fermati" in testo_user or "ferma" in testo_user:
             stato_runtime["in_pattugliamento"] = False
+            stato_runtime["missione_laboratorio"] = False
             corpo.fermati()
             logger.debug(u"Comando stop/fermati ricevuto")
 
@@ -507,78 +512,49 @@ def _elabora_decisione(mondo, corpo, voce, vista, sistema):
     return decisione
 
 def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
-    """
-    Permette di generare condizioni anche quando un evento fisico viene
-    intercettato dalla safety prima del normale flusso decisionale.
-
-    Per evitare spam di generazione:
-    - non ritenta la stessa situazione continuamente;
-    - applica un cooldown temporale;
-    - lascia comunque la safety prioritaria.
-    """
-
     global ULTIMA_GENERAZIONE_SAFETY_TEMPO
     global ULTIMO_MONDO_SAFETY_GENERATO
 
     try:
-        if not CHIAVE_PRIVATA:
-            logger.warning(u"[SOUL] Non posso generare condizione da safety: OPENAI_API_KEY assente")
-            return
-
         adesso = time.time()
         mondo_norm = (mondo or "").strip().lower()
 
         if mondo_norm == ULTIMO_MONDO_SAFETY_GENERATO:
             logger.debug(u"[SOUL] Generazione safety saltata: situazione gia' tentata")
-            return
+            return None
 
         if adesso - ULTIMA_GENERAZIONE_SAFETY_TEMPO < INTERVALLO_GENERAZIONE_SAFETY:
             logger.debug(u"[SOUL] Generazione safety saltata: cooldown attivo")
-            return
+            return None
 
         ULTIMA_GENERAZIONE_SAFETY_TEMPO = adesso
         ULTIMO_MONDO_SAFETY_GENERATO = mondo_norm
 
-        decisione_safety = {
-            "stato_interno": "sicurezza",
-            "obiettivo": motivo,
-            "azioni": [
-                {
-                    "tipo": "fermati"
-                },
-                {
-                    "tipo": "parla",
-                    "testo": "Mi fermo per sicurezza."
-                }
-            ],
-            "memoria": []
-        }
-
-        if valuta_se_generare_condizione(
+        stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
+        stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
             mondo,
-            decisione_safety,
-            memoria_fisica,
-            stato_robot,
-            CHIAVE_PRIVATA
-        ):
-            logger.info(u"[SOUL] Genero condizione autonoma da evento safety: {}".format(
-                testo_per_log(motivo)
-            ))
-
-            nuova_condizione = genera_condizione_autonoma(
+            stato_runtime
+        )
+        stato_runtime["memoria"] = memoria_fisica
+        stato_runtime["stato_robot"] = stato_robot
+        stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+        stato_runtime["forza_generazione_safety"] = True
+        stato_runtime["motivo_safety"] = motivo
+        
+        try:
+            decisione = autonomy_supervisor.gestisci_autonomia(
                 mondo,
-                memoria_fisica,
-                stato_robot,
-                CHIAVE_PRIVATA
+                stato_runtime
             )
+        finally:
+            stato_runtime["forza_generazione_safety"] = False
+            stato_runtime["motivo_safety"] = ""
 
-            if nuova_condizione:
-                logger.info(u"[SOUL] Nuova condizione autonoma creata da safety: {}".format(
-                    nuova_condizione
-                ))
+        return decisione
 
     except Exception as e:
-        logger.warning(u"[SOUL] Errore generazione condizione da evento safety: {}".format(e))
+        logger.warning(u"[SOUL] Errore supervisore safety: {}".format(e))
+        return None
 
 def _riprendi_cammino_automatico(corpo, ultima_decisione):
     if not stato_runtime.get("in_pattugliamento", False):
@@ -618,13 +594,14 @@ def main():
         sistema.configura_autonomous_life_da_env()
         _inizializza_robot(corpo, voce, vista, sistema)
 
+        thread_input = threading.Thread(target=_thread_input_utente)
+        thread_input.daemon = True
+        thread_input.start()
+
         if MODALITA_TEST:
-            thread_input = threading.Thread(target=_thread_input_utente)
-            thread_input.daemon = True
-            thread_input.start()
             logger.info(u"Modalita test attiva: input da tastiera abilitato")
         else:
-            logger.info(u"Modalita autonoma: input da tastiera disabilitato")
+            logger.info(u"Modalita autonoma laboratorio: input nome abilitato")
 
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
@@ -838,10 +815,31 @@ def main():
                     ultima_decisione = decisione_condizione
                     stato_runtime["in_pattugliamento"] = True
                 else:
-                    _tenta_generare_condizione_da_evento_safety(
+                    decisione_safety = _tenta_generare_condizione_da_evento_safety(
                         mondo_evento,
                         u"ostacolo o urto durante il cammino"
                     )
+
+                    if decisione_safety:
+                        decisione_safety = valida_decisione(decisione_safety, mondo_evento)
+
+                        stato_runtime["mantieni_pattugliamento"] = True
+
+                        try:
+                            esegui_decisione(
+                                decisione_safety,
+                                corpo,
+                                voce,
+                                vista,
+                                sistema,
+                                stato_runtime,
+                                aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                            )
+                        finally:
+                            stato_runtime["mantieni_pattugliamento"] = False
+
+                        ultima_decisione = decisione_safety
+                        stato_runtime["in_pattugliamento"] = True
                 
                 stato_precedente = mondo_evento
                 time.sleep(0.2)
@@ -942,10 +940,25 @@ def main():
                 if mondo_evento != stato_precedente:
                     voce.parla(u"Mi fermo per sicurezza.")
 
-                _tenta_generare_condizione_da_evento_safety(
+                decisione_safety = _tenta_generare_condizione_da_evento_safety(
                     mondo_evento,
                     u"evento fisico sensibile durante il cammino"
                 )
+
+                if decisione_safety:
+                    decisione_safety = valida_decisione(decisione_safety, mondo_evento)
+
+                    esegui_decisione(
+                        decisione_safety,
+                        corpo,
+                        voce,
+                        vista,
+                        sistema,
+                        stato_runtime,
+                        aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                    )
+
+                    ultima_decisione = decisione_safety
                 
                 stato_precedente = mondo_evento
                 time.sleep(0.2)
@@ -1031,6 +1044,18 @@ def main():
                     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
                     stato_runtime["evento_composto"] = evento_composto
 
+                if stato_runtime.get("missione_laboratorio", False):
+                    if gestisci_navigazione_laboratorio(
+                        mondo,
+                        corpo,
+                        voce,
+                        vista,
+                        stato_runtime
+                    ):
+                        stato_precedente = mondo
+                        time.sleep(0.1)
+                        continue
+
                     salta_autonomia_per_vai = (
                         stato_runtime.get("in_pattugliamento", False) and
                         time.time() - stato_runtime.get("ultimo_comando_vai_tempo", 0) < 2.0
@@ -1074,32 +1099,6 @@ def main():
                         vista,
                         sistema
                     )
-
-                    ultimo_evento_tempo = time.time()
-
-                    # Se era gia' un evento composto, la generazione e' gia' stata tentata sopra.
-                    # Qui generiamo solo condizioni semplici normali.
-                    if not evento_composto:
-                        if valuta_se_generare_condizione(
-                            mondo,
-                            ultima_decisione,
-                            memoria_fisica,
-                            stato_robot,
-                            CHIAVE_PRIVATA
-                        ):
-                            logger.info(u"[SOUL] LLM ha deciso di creare una nuova condizione autonoma")
-
-                            nuova_condizione = genera_condizione_autonoma(
-                                mondo,
-                                memoria_fisica,
-                                stato_robot,
-                                CHIAVE_PRIVATA
-                            )
-
-                            if nuova_condizione:
-                                logger.info(u"[SOUL] Nuova condizione autonoma creata: {}".format(
-                                    nuova_condizione
-                                ))
 
                     ultimo_evento_tempo = time.time()
 

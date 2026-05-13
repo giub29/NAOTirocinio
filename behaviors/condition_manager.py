@@ -457,32 +457,82 @@ def _decisione_coerente_con_mondo(decisione, mondo, nome_condizione):
     return True, "ok"
 
 def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
+    """
+    Filtra condizioni troppo generiche usando la firma evento strutturata.
+
+    Obiettivo:
+    - se NAO sta camminando e rileva un ostacolo specifico,
+      deve preferire la condizione specifica durante_cammino;
+    - evitare che una condizione semplice tipo ostacolo_destra
+      intercetti un evento composto come ostacolo_destra_durante_cammino.
+    """
+
     nome = (nome_condizione or "").lower()
-    testo = (mondo or "").lower()
 
     eventi = stato_runtime.get("eventi", {})
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+
+    if not isinstance(eventi, dict):
+        eventi = {}
+
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
 
     camminando = (
-        eventi.get("camminando", False) or
-        "sto camminando" in testo
+        evento_strutturato.get("camminando", False) or
+        eventi.get("camminando", False)
     )
 
-    ostacolo_sinistra = (
-        eventi.get("ostacolo_sinistra", False) or
-        "ostacolo a sinistra" in testo
-    )
+    tipo = evento_strutturato.get("tipo", "")
+    direzione = evento_strutturato.get("direzione", "")
 
-    ostacolo_destra = (
-        eventi.get("ostacolo_destra", False) or
-        "ostacolo a destra" in testo
-    )
+    # Ostacolo durante cammino: serve condizione specifica.
+    if camminando and tipo == "ostacolo":
 
-    if camminando and ostacolo_sinistra:
-        return "ostacolo_sinistra_durante_cammino" in nome
+        if direzione == "destra":
+            return "ostacolo_destra_durante_cammino" in nome
 
-    if camminando and ostacolo_destra:
-        return "ostacolo_destra_durante_cammino" in nome
+        if direzione == "sinistra":
+            return "ostacolo_sinistra_durante_cammino" in nome
 
+        if direzione == "frontale":
+            return "ostacolo_frontale_durante_cammino" in nome
+
+    # Urto ai piedi durante cammino: serve condizione specifica.
+    if camminando and tipo == "urto_piedi":
+        return "urto_piedi_durante_cammino" in nome
+
+    # Eventi sociali durante cammino: preferisco condizioni specifiche se esistono.
+    if camminando and tipo == "carezza":
+        return "carezza_durante_cammino" in nome
+
+    if camminando and tipo == "tocco_mano" and direzione == "sinistra":
+        return "mano_sinistra_durante_cammino" in nome
+
+    if camminando and tipo == "tocco_mano" and direzione == "destra":
+        return "mano_destra_durante_cammino" in nome
+
+    if camminando and tipo == "volto_riconosciuto":
+        return "volto_riconosciuto_durante_cammino" in nome
+
+    if camminando and tipo == "volto_ignoto":
+        return "volto_ignoto_durante_cammino" in nome
+
+    # Se l'evento e' un ostacolo frontale durante cammino,
+    # deve passare solo la condizione frontale specifica.
+    if camminando and tipo == "ostacolo" and direzione == "frontale":
+        return "ostacolo_frontale_durante_cammino" in nome
+
+    # Se l'evento e' una carezza durante cammino,
+    # deve passare solo la condizione specifica durante cammino.
+    if camminando and tipo == "carezza":
+        return "carezza_durante_cammino" in nome
+
+    # Se l'evento e' una carezza da fermo,
+    # non deve passare carezza_durante_cammino.
+    if not camminando and tipo == "carezza":
+        return "carezza_testa" in nome and "durante_cammino" not in nome
+    
     return True
 
 def valuta_condizioni_generate(mondo, stato_runtime):
@@ -591,53 +641,9 @@ def valuta_condizioni_generate(mondo, stato_runtime):
             continue
 
     # Arrivo qui solo se nessuna condizione esistente si e' attivata.
-    if stato_runtime.get("_generazione_autonoma_in_corso"):
-        logger.warning(u"[CONDIZIONI] Generazione autonoma gia' in corso: evito ricorsione")
-        return None
-
-    try:
-        chiave_api = (
-            stato_runtime.get("openai_api_key") or
-            os.getenv("OPENAI_API_KEY")
-        )
-
-        if chiave_api and mondo:
-            logger.warning(u"[CONDIZIONI] Nessuna condizione attiva. Tento generazione autonoma per mondo: {}".format(
-                mondo
-            ))
-
-            from behaviors.condition_generator import genera_condizione_autonoma
-
-            stato_runtime["_generazione_autonoma_in_corso"] = True
-
-            try:
-                nuova_condizione = genera_condizione_autonoma(
-                    mondo,
-                    stato_runtime.get("memoria", {}),
-                    stato_runtime.get("stato_robot", {}),
-                    chiave_api
-                )
-            finally:
-                stato_runtime["_generazione_autonoma_in_corso"] = False
-
-            if nuova_condizione:
-                logger.warning(u"[CONDIZIONI] Nuova condizione generata autonomamente: {}".format(
-                    nuova_condizione
-                ))
-
-                reset_cache_condizioni()
-
-            else:
-                logger.warning(u"[CONDIZIONI] Nessuna nuova condizione valida generata per il mondo corrente")
-
-        else:
-            logger.warning(u"[CONDIZIONI] Generazione autonoma non possibile: API key o mondo assente")
-
-    except Exception as e:
-        logger.warning(u"[CONDIZIONI] Errore durante generazione autonoma da mondo non coperto: {}".format(
-            e
-        ))
-
+    # La generazione autonoma NON deve stare qui.
+    # Deve essere centralizzata in autonomy_supervisor.py.
+    logger.info(u"[CONDIZIONI] Nessuna condizione generata attiva per il mondo corrente")
     return None
 
 def esegui_condizione_per_nome(nome, mondo, stato_runtime):

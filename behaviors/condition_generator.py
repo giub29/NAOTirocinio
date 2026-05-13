@@ -1785,6 +1785,26 @@ def costruisci_evento_strutturato(mondo, stato_runtime=None):
         if valore not in [None, False, "", [], {}]:
             eventi_attivi.append(chiave)
 
+    eventi_core = []
+
+    for chiave in eventi_attivi:
+        if chiave in [
+            "fermo",
+            "camminando",
+            "batteria_percentuale"
+        ]:
+            continue
+
+        eventi_core.append(chiave)
+
+    if "batteria_critica" in eventi_core and "batteria_bassa" in eventi_core:
+        eventi_core.remove("batteria_bassa")
+
+    evento_composto = len(eventi_core) >= 2
+
+    if eventi.get("camminando", False) and len(eventi_core) >= 1:
+        evento_composto = True
+
     firma = {
         "tipo": tipo,
         "direzione": direzione,
@@ -1795,7 +1815,8 @@ def costruisci_evento_strutturato(mondo, stato_runtime=None):
         "durante_cammino": camminando,
         "eventi": eventi,
         "eventi_attivi": eventi_attivi,
-        "evento_composto": len(eventi_attivi) >= 2
+        "eventi_core": eventi_core,
+        "evento_composto": evento_composto
     }
 
     return firma

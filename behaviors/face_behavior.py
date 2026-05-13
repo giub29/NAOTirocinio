@@ -41,14 +41,27 @@ def _saluta_volto_conosciuto(nome, corpo, voce, stato_runtime):
         logger.info(u"Volto riconosciuto: {}".format(nome))
 
 
-def _gestisci_volto_ignoto_durante_movimento(corpo, stato_runtime):
+def _gestisci_volto_ignoto_durante_movimento(corpo, voce, stato_runtime):
     if corpo.sta_camminando() or stato_runtime["in_pattugliamento"]:
-        logger.info(u"Volto ignoto durante movimento, fermo il robot")
+        logger.info(u"Volto ignoto durante pattugliamento: fermo temporaneamente il robot")
+
         corpo.fermati()
+        corpo.imposta_colore_occhi("yellow")
+        corpo.guarda(*ANGOLO_SGUARDO_VOLTO)
+
         stato_runtime["in_pattugliamento"] = True
         stato_runtime["riprendi_dopo_nome"] = True
-        corpo.guarda(*ANGOLO_SGUARDO_VOLTO)
+        stato_runtime["attesa_nome"] = True
+
         time.sleep(TEMPO_SLEEP_RICONOSCIMENTO)
+
+        try:
+            corpo.scatta_foto(camera_id=0, nome_file="sconosciuto_pattugliamento.jpg")
+        except Exception as e:
+            logger.warning(u"Foto volto ignoto durante pattugliamento non riuscita: {}".format(e))
+
+        voce.parla(u"Ho visto un volto che non conosco. Dimmi il nome, per esempio: nome Giulia.")
+
         return True
 
     return False
@@ -121,7 +134,7 @@ def gestisci_volto_durante_cammino(mondo, corpo, voce, vista, stato_runtime):
         return True
 
     if u"Vedo un volto ignoto" in mondo:
-        if _gestisci_volto_ignoto_durante_movimento(corpo, stato_runtime):
+        if _gestisci_volto_ignoto_durante_movimento(corpo, voce, stato_runtime):
             return True
 
         if _gestisci_falso_ignoto(stato_runtime):
