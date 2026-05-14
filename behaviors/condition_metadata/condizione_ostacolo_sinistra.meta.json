@@ -1,30 +1,6 @@
 {
-  "aggiornata_il": "2026-05-14 10:54:58", 
+  "aggiornata_il": "2026-05-14 13:09:40", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "yellow", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": -0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a sinistra?", 
-            "tipo": "parla"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a sinistra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: Evento recente: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
-      "tempo": "2026-05-12 14:18:23"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -120,6 +96,30 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Vedo qualcosa vicino. SONO FERMO.", 
       "tempo": "2026-05-14 10:54:58"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a sinistra?", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Evento recente: C'è qualcosa a sinistra. SONO FERMO.", 
+      "tempo": "2026-05-14 13:09:40"
     }
   ], 
   "creata_il": "2026-05-12 10:59:39", 
@@ -127,10 +127,10 @@
   "nome": "condizione_ostacolo_sinistra", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 24, 
+    "attivazioni": 25, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 10:54:58", 
+    "ultima_attivazione": "2026-05-14 13:09:40", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-14 10:54:36", 
+  "aggiornata_il": "2026-05-14 13:09:37", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. PRENDI L'INIZIATIVA. Vedi: Nell'immagine si vedono dei cassetti grigi, alcuni scatoloni sopra di essi e alcuni documenti o immagini attaccati alla parete.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
-      "tempo": "2026-05-12 15:41:18"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +108,33 @@
       }, 
       "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-14 10:54:36"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
+      "tempo": "2026-05-14 13:09:37"
     }
   ], 
   "creata_il": "2026-05-12 12:30:33", 
@@ -181,10 +181,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 29, 
+    "attivazioni": 30, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 10:54:36", 
+    "ultima_attivazione": "2026-05-14 13:09:37", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 
