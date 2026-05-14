@@ -2,6 +2,7 @@
 from naoqi import ALProxy
 import json
 import os
+import time
 
 class NaoSystem:
     def __init__(self, ip, port=9559):
@@ -11,6 +12,7 @@ class NaoSystem:
         self.life = ALProxy("ALAutonomousLife", ip, port)
         self.battery = ALProxy("ALBattery", ip, port)
         self.percorso_memoria = "memoria.json"
+        self.memory = ALProxy("ALMemory", ip, port)
 
     def configura_autonomous_life_da_env(self):
         """
@@ -141,3 +143,85 @@ class NaoSystem:
         with open(self.percorso_memoria, 'w') as f:
             json.dump(dati, f, indent=4)
         print(u"--- MEMORIA AGGIORNATA: " + str(info) + " ---")
+
+    # ALMEMORY - COLLEGAMENTO CON CHOREGRAPHE
+    def scrivi_memoria_naoqi(self, chiave, valore):
+        """
+        Scrive un valore nella memoria interna di NAO.
+        Questo permette a Choregraphe, soul.py e watchdog
+        di comunicare tra loro.
+        """
+        try:
+            self.memory.insertData(chiave, valore)
+            return True
+        except Exception as errore:
+            print("[SYSTEM] Errore scrittura ALMemory: {}".format(errore))
+            return False
+
+    def leggi_memoria_naoqi(self, chiave, valore_default=""):
+        """
+        Legge un valore dalla memoria interna di NAO.
+        Se la chiave non esiste restituisce valore_default.
+        """
+        try:
+            return self.memory.getData(chiave)
+        except Exception:
+            return valore_default
+
+    def heartbeat(self):
+        """
+        Segnale periodico che dice:
+        soul.py è vivo e sta funzionando.
+
+        Il watchdog può leggere questo valore per capire
+        se il sistema è bloccato o crashato.
+        """
+        return self.scrivi_memoria_naoqi(
+            "AutonomousSystem/Heartbeat",
+            time.time()
+        )
+
+    def pubblica_stato_autonomo(self, stato):
+        """
+        Pubblica lo stato corrente del sistema autonomo.
+        Esempi:
+        BOOT
+        RUNNING
+        ERROR
+        REPAIRING
+        WAITING_EVENT
+        """
+        return self.scrivi_memoria_naoqi(
+            "AutonomousSystem/Status",
+            stato
+        )
+
+    def pubblica_evento_corrente(self, evento):
+        """
+        Pubblica l'ultimo evento percepito dal robot.
+        Serve per rendere visibile a Choregraphe cosa
+        sta rilevando soul.py.
+        """
+        return self.scrivi_memoria_naoqi(
+            "AutonomousSystem/LastEvent",
+            evento
+        )
+
+    def leggi_comando_choregraphe(self):
+        """
+        Legge eventuali comandi inviati da Choregraphe.
+        """
+        return self.leggi_memoria_naoqi(
+            "AutonomousSystem/Command",
+            ""
+        )
+
+    def pulisci_comando_choregraphe(self):
+        """
+        Cancella il comando dopo averlo eseguito,
+        evitando che venga ripetuto all'infinito.
+        """
+        return self.scrivi_memoria_naoqi(
+            "AutonomousSystem/Command",
+            ""
+        )

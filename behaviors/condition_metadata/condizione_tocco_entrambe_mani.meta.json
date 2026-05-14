@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-12 15:55:05", 
+  "aggiornata_il": "2026-05-14 10:54:11", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.0, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Ciao! Sento che mi stai toccando.", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "esplorare l'interazione", 
-        "stato_interno": "curioso"
-      }, 
-      "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: Sento un tocco su entrambe le mani. SONO FERMO.", 
-      "tempo": "2026-05-12 11:50:31"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +108,33 @@
       }, 
       "mondo": "REPORT: Evento recente: Sento un tocco su entrambe le mani. SONO FERMO.", 
       "tempo": "2026-05-12 15:55:05"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Sento che mi stai toccando.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco su entrambe le mani. SONO FERMO.", 
+      "tempo": "2026-05-14 10:54:11"
     }
   ], 
   "creata_il": "2026-05-12 11:49:29", 
@@ -142,10 +142,10 @@
   "nome": "condizione_tocco_entrambe_mani", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 6, 
+    "attivazioni": 7, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 15:55:05", 
+    "ultima_attivazione": "2026-05-14 10:54:11", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

@@ -7,7 +7,7 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
     try:
         headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + chiave_privata
+            "Authorization": "Bearer " + str(chiave_privata or "")
         }
 
         testo_prompt = "Descrivi brevemente cosa vedi in una frase naturale." if contesto == "stanza" else "Cosa vedi? Max 10 parole."
@@ -61,7 +61,7 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + chiave_privata
+        "Authorization": "Bearer " + str(chiave_privata or "")
     }
 
     prompt = (

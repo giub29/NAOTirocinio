@@ -46,20 +46,37 @@ from behaviors.condition_generator import (
 )
 from behaviors.lab_patrol_behavior import gestisci_navigazione_laboratorio
 
-import colorlog
+import os
+try:
+    import colorlog
 
-handler = colorlog.StreamHandler()
+    handler = colorlog.StreamHandler()
 
-handler.setFormatter(colorlog.ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    log_colors={
-        'DEBUG':    'cyan',
-        'INFO':     'green',
-        'WARNING':  'yellow',
-        'ERROR':    'red',
-        'CRITICAL': 'red,bg_white',
-    }
-))
+    handler.setFormatter(colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        log_colors={
+            'DEBUG':    'cyan',
+            'INFO':     'green',
+            'WARNING':  'yellow',
+            'ERROR':    'red',
+            'CRITICAL': 'red,bg_white',
+        }
+    ))
+
+except Exception:
+
+    handler = logging.StreamHandler()
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    handler.setFormatter(formatter)
+
+try:
+    raw_input
+except NameError:
+    raw_input = input
 
 root_logger = logging.getLogger()
 root_logger.handlers = []
@@ -108,6 +125,7 @@ def aggiorna_heartbeat():
 messaggio_utente = ""
 input_ricevuto = False
 STOP_PROGRAMMA = False
+sistema_globale = None
 
 ULTIMA_GENERAZIONE_SAFETY_TEMPO = 0
 ULTIMO_MONDO_SAFETY_GENERATO = ""
@@ -130,6 +148,8 @@ stato_runtime = {
     "volti_salutati": [],
     "in_pattugliamento": False,
     "comando_stop_immediato": False,
+    "controllo_manuale": False,
+    "controllo_manuale_fino_a": 0,
     "ultima_curiosita_stop_tempo": 0,
     "ultimo_volto_ignoto_rilevato": False,
     "ultimo_evento_reale_tempo": 0
@@ -195,9 +215,86 @@ def aggiorna_memoria_da_decisione(decisione):
 def _thread_input_utente():
     global messaggio_utente, input_ricevuto
     global utente_sta_scrivendo, ultimo_input_tempo
+    global sistema_globale
 
     while True:
+
+        # HEARTBEAT SU FILE, utile per watchdog PC
+        aggiorna_heartbeat()
+
         try:
+            if sistema_globale is not None:
+                controllo = sistema_globale.leggi_memoria_naoqi(
+                    "AutonomousSystem/ManualControl",
+                    "OFF"
+                )
+            else:
+                controllo = "OFF"
+
+            if controllo == "ON":
+                stato_runtime["controllo_manuale"] = True
+            else:
+                stato_runtime["controllo_manuale"] = False
+
+        except Exception:
+            stato_runtime["controllo_manuale"] = False
+
+        # HEARTBEAT SU ALMEMORY, utile per Choregraphe/NAOqi
+        try:
+            if sistema_globale is not None:
+                sistema_globale.heartbeat()
+                sistema_globale.pubblica_stato_autonomo("RUNNING")
+        except Exception as e:
+            logger.debug(u"[SOUL] Heartbeat ALMemory non disponibile: {}".format(e))
+
+        # COMANDI ESTERNI DA CHOREGRAPHE
+        try:
+            if sistema_globale is not None:
+                comando = sistema_globale.leggi_comando_choregraphe()
+            else:
+                comando = ""
+        except Exception:
+            comando = ""
+
+        if comando:
+            print("[SOUL] Comando ricevuto da Choregraphe: {}".format(comando))
+            logger.info(u"[SOUL] Comando ricevuto da Choregraphe: {}".format(comando))
+            if comando == "STOP":
+                messaggio_utente = "stop"
+                input_ricevuto = True
+                stato_runtime["comando_stop_immediato"] = True
+            
+            elif comando == "SHUTDOWN":
+                logger.warning(u"[SOUL] Comando SHUTDOWN ignorato per sicurezza.")
+                messaggio_utente = ""
+                input_ricevuto = False
+
+            elif comando == "SAY_HELLO":
+                messaggio_utente = "ciao"
+                input_ricevuto = True
+
+            elif comando == "STATUS":
+                messaggio_utente = "status"
+                input_ricevuto = True
+            
+            elif comando == "VAI":
+                messaggio_utente = "vai"
+                input_ricevuto = True
+
+            elif comando == "CAMMINA":
+                messaggio_utente = "cammina"
+                input_ricevuto = True
+
+            try:
+                sistema_globale.pulisci_comando_choregraphe()
+            except Exception:
+                pass
+
+        try:
+            if os.environ.get("CHOREGRAPHE_BOOT", "") == "1":
+                time.sleep(0.2)
+                continue
+
             utente_sta_scrivendo = True
 
             t = raw_input()
@@ -205,7 +302,10 @@ def _thread_input_utente():
             utente_sta_scrivendo = False
             ultimo_input_tempo = time.time()
 
-            testo = t.decode("utf-8", "ignore").lower().strip()
+            if hasattr(t, "decode"):
+                testo = t.decode("utf-8", "ignore").lower().strip()
+            else:
+                testo = t.lower().strip()
 
             if "stop" in testo or "fermati" in testo or "ferma" in testo:
                 stato_runtime["comando_stop_immediato"] = True
@@ -240,8 +340,8 @@ def _inizializza_robot(corpo, voce, vista, sistema):
     vista.attiva_inseguimento_volto()
     corpo.guarda(0.0, -0.15)
     time.sleep(0.5)
-    logger.info(u"Robot inizializzato")
 
+    logger.info(u"Robot inizializzato")
 
 def _processa_input_utente(mondo, corpo, voce, vista, sistema):
     global input_ricevuto, messaggio_utente, STOP_PROGRAMMA
@@ -255,6 +355,14 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
             voce.parla(u"Mi sto spegnendo. A presto.")
             STOP_PROGRAMMA = True
             logger.info(u"Spegnimento richiesto dall'utente")
+
+        elif "status" in testo_user:
+            voce.parla(u"Sono attivo e sto funzionando correttamente.")
+            try:
+                sistema.pubblica_stato_autonomo("RUNNING")
+            except Exception:
+                pass
+            logger.info(u"Status richiesto da Choregraphe")
 
         elif "vai" in testo_user or "cammina" in testo_user:
             stato_runtime["in_pattugliamento"] = True
@@ -271,10 +379,19 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
             corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
             voce.parla(u"Va bene, dimmi il nome della persona.")
 
+        elif "shutdown" in testo_user or "spegni programma" in testo_user:
+            stato_runtime["in_pattugliamento"] = False
+            stato_runtime["missione_laboratorio"] = False
+            corpo.fermati()
+            voce.parla(u"Spengo il sistema autonomo.")
+            STOP_PROGRAMMA = True
+            logger.info(u"Shutdown richiesto da Choregraphe")
+
         elif "stop" in testo_user or "fermati" in testo_user or "ferma" in testo_user:
             stato_runtime["in_pattugliamento"] = False
             stato_runtime["missione_laboratorio"] = False
             corpo.fermati()
+            voce.parla(u"Mi fermo.")
             logger.debug(u"Comando stop/fermati ricevuto")
 
         elif MODALITA_TEST and (testo_user.startswith("test condizione") or testo_user.startswith("test")):
@@ -577,7 +694,7 @@ signal.signal(signal.SIGINT, handle_exit)
 
 def main():
     global messaggio_utente, input_ricevuto, STOP_PROGRAMMA
-    global memoria_fisica, stato_robot
+    global memoria_fisica, stato_robot, sistema_globale
 
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
@@ -591,7 +708,15 @@ def main():
         voce = NaoVoice(IP_ROBOT)
         vista = NaoVision(IP_ROBOT)
         sistema = NaoSystem(IP_ROBOT)
+        sistema_globale = sistema
+
         sistema.configura_autonomous_life_da_env()
+
+        try:
+            sistema.pubblica_stato_autonomo("BOOT_COMPLETED")
+        except Exception as e:
+            logger.debug(u"[SOUL] Pubblicazione stato BOOT fallita: {}".format(e))
+        
         _inizializza_robot(corpo, voce, vista, sistema)
 
         thread_input = threading.Thread(target=_thread_input_utente)
@@ -1017,10 +1142,33 @@ def main():
                     logger.info(u"[SOUL] Evento composto rilevato: delego al supervisore autonomo")
 
                 # Gestione volto.
-                # Resta dopo il rilevamento dell'evento composto,
-                # ma NON deve stare dentro if evento_composto.
-                if mondo_cambiato and mondo_valido:
-                    if gestisci_volto_durante_cammino(
+            if mondo_cambiato and mondo_valido:
+                if gestisci_volto_durante_cammino(
+                    mondo,
+                    corpo,
+                    voce,
+                    vista,
+                    stato_runtime
+                ):
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
+
+            decisione_condizione = None
+
+            if mondo_cambiato and mondo_valido:
+                stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
+                stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+                    mondo,
+                    stato_runtime
+                )
+                stato_runtime["memoria"] = memoria_fisica
+                stato_runtime["stato_robot"] = stato_robot
+                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+                stato_runtime["evento_composto"] = evento_composto
+
+                if stato_runtime.get("missione_laboratorio", False):
+                    if gestisci_navigazione_laboratorio(
                         mondo,
                         corpo,
                         voce,
@@ -1031,76 +1179,50 @@ def main():
                         time.sleep(0.1)
                         continue
 
-                decisione_condizione = None
+                salta_autonomia_per_vai = (
+                    stato_runtime.get("in_pattugliamento", False) and
+                    time.time() - stato_runtime.get("ultimo_comando_vai_tempo", 0) < 2.0
+                )
 
-                if mondo_cambiato and mondo_valido:
-                    stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-                    stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+                if salta_autonomia_per_vai:
+                    logger.info(u"[SOUL] Salto autonomia per avvio pattugliamento appena richiesto")
+                else:
+                    decisione_condizione = autonomy_supervisor.gestisci_autonomia(
                         mondo,
                         stato_runtime
                     )
-                    stato_runtime["memoria"] = memoria_fisica
-                    stato_runtime["stato_robot"] = stato_robot
-                    stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-                    stato_runtime["evento_composto"] = evento_composto
+            if decisione_condizione:
+                logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
 
-                    if stato_runtime.get("missione_laboratorio", False):
-                        if gestisci_navigazione_laboratorio(
-                            mondo,
-                            corpo,
-                            voce,
-                            vista,
-                            stato_runtime
-                        ):
-                            stato_precedente = mondo
-                            time.sleep(0.1)
-                            continue
+                decisione_condizione = valida_decisione(decisione_condizione, mondo)
 
-                    salta_autonomia_per_vai = (
-                        stato_runtime.get("in_pattugliamento", False) and
-                        time.time() - stato_runtime.get("ultimo_comando_vai_tempo", 0) < 2.0
-                    )
+                esegui_decisione(
+                    decisione_condizione,
+                    corpo,
+                    voce,
+                    vista,
+                    sistema,
+                    stato_runtime,
+                    aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                )    
 
-                    if salta_autonomia_per_vai:
-                        logger.info(u"[SOUL] Salto autonomia per avvio pattugliamento appena richiesto")
-                    else:
-                        decisione_condizione = autonomy_supervisor.gestisci_autonomia(
-                            mondo,
-                            stato_runtime
-                        )
+                ultima_decisione = decisione_condizione
+                ultimo_evento_tempo = time.time()
 
-                if decisione_condizione:
-                    logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
+            if not decisione_condizione and mondo_cambiato and mondo_valido:
+                # Nessuna condizione autonoma applicabile/generata dal supervisore:
+                # uso il normale comportamento LLM, ma NON genero qui nuove condizioni.
+                # La generazione autonoma ordinaria deve rimanere centralizzata in
+                # behaviors/autonomy_supervisor.py, per evitare doppioni e chiamate LLM duplicate.
+                ultima_decisione = _elabora_decisione(
+                    mondo,
+                    corpo,
+                    voce,
+                    vista,
+                    sistema
+                )
 
-                    decisione_condizione = valida_decisione(decisione_condizione, mondo)
-
-                    esegui_decisione(
-                        decisione_condizione,
-                        corpo,
-                        voce,
-                        vista,
-                        sistema,
-                        stato_runtime,
-                        aggiorna_memoria_callback=aggiorna_memoria_da_decisione
-                    )
-
-                    ultima_decisione = decisione_condizione
-                    ultimo_evento_tempo = time.time()
-
-                if not decisione_condizione and mondo_cambiato and mondo_valido:
-                    # Nessuna condizione autonoma applicabile/generata dal supervisore:
-                    # uso il normale comportamento LLM, ma NON genero qui nuove condizioni.
-                    # La generazione autonoma ordinaria deve rimanere centralizzata in
-                    # behaviors/autonomy_supervisor.py, per evitare doppioni e chiamate LLM duplicate.
-                    ultima_decisione = _elabora_decisione(
-                        mondo,
-                        corpo,
-                        voce,
-                        vista,
-                        sistema
-                    )
-
-                    ultimo_evento_tempo = time.time()
+                ultimo_evento_tempo = time.time()
 
             _riprendi_cammino_automatico(corpo, ultima_decisione)
             stato_precedente = mondo

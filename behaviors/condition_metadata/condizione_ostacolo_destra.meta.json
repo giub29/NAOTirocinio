@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-12 16:01:08", 
+  "aggiornata_il": "2026-05-14 10:54:36", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a destra. SONO FERMO.", 
-      "tempo": "2026-05-12 15:36:43"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +108,33 @@
       }, 
       "mondo": "REPORT: Vedo qualcosa vicino. SONO FERMO.", 
       "tempo": "2026-05-12 16:01:08"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-14 10:54:36"
     }
   ], 
   "creata_il": "2026-05-12 12:30:33", 
@@ -181,10 +181,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 28, 
+    "attivazioni": 29, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 16:01:08", 
+    "ultima_attivazione": "2026-05-14 10:54:36", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 
