@@ -3,58 +3,88 @@
 import os
 import sys
 import subprocess
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
+
+try:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
+except ImportError:
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+    from SocketServer import ThreadingMixIn
+
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 WATCHDOG_PATH = os.path.join(PROJECT_ROOT, "scripts", "autonomous_watchdog.py")
 
 WATCHDOG_PROCESS = None
+LOCK = threading.Lock()
+
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 
 class AutostartHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
-        return
+        print("[HTTP] %s - %s" % (self.client_address[0], format % args))
 
     def _send(self, code, message):
+        if not isinstance(message, bytes):
+            message = message.encode("utf-8")
+
         self.send_response(code)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(message)))
+        self.send_header("Connection", "close")
         self.end_headers()
-        self.wfile.write(message.encode("utf-8"))
+        self.wfile.write(message)
+        self.wfile.flush()
+        self.close_connection = True
 
     def do_GET(self):
         global WATCHDOG_PROCESS
+
+        print("[AUTOSTART] Richiesta da %s: %s" % (self.client_address[0], self.path))
 
         if self.path == "/ping":
             self._send(200, "PC_AUTOSTART_SERVER_OK")
             return
 
-        if self.path == "/start":
-            if WATCHDOG_PROCESS is not None and WATCHDOG_PROCESS.poll() is None:
-                self._send(200, "WATCHDOG_ALREADY_RUNNING")
-                return
-
-            try:
-                print("[AUTOSTART] Avvio watchdog:", WATCHDOG_PATH)
-
-                WATCHDOG_PROCESS = subprocess.Popen(
-                    [sys.executable, WATCHDOG_PATH],
-                    cwd=PROJECT_ROOT
-                )
-
-                self._send(200, "WATCHDOG_STARTED")
-
-            except Exception as e:
-                self._send(500, "ERROR_STARTING_WATCHDOG: %s" % str(e))
-
-            return
-
         if self.path == "/status":
-            if WATCHDOG_PROCESS is not None and WATCHDOG_PROCESS.poll() is None:
+            with LOCK:
+                running = WATCHDOG_PROCESS is not None and WATCHDOG_PROCESS.poll() is None
+
+            if running:
                 self._send(200, "WATCHDOG_RUNNING")
             else:
                 self._send(200, "WATCHDOG_STOPPED")
             return
+
+        if self.path == "/start":
+            with LOCK:
+                if WATCHDOG_PROCESS is not None and WATCHDOG_PROCESS.poll() is None:
+                    self._send(200, "WATCHDOG_ALREADY_RUNNING")
+                    return
+
+                try:
+                    print("[AUTOSTART] Avvio watchdog: %s" % WATCHDOG_PATH)
+
+                    python_exe = os.environ.get("NAO_PYTHON", sys.executable)
+
+                print("[AUTOSTART] Python per watchdog: %s" % python_exe)
+
+                WATCHDOG_PROCESS = subprocess.Popen(
+                    [python_exe, WATCHDOG_PATH],
+                    cwd=PROJECT_ROOT
+                )
+
+                    self._send(200, "WATCHDOG_STARTED")
+                    return
+
+                except Exception as e:
+                    self._send(500, "ERROR_STARTING_WATCHDOG: %s" % str(e))
+                    return
 
         self._send(404, "UNKNOWN_COMMAND")
 
@@ -64,10 +94,15 @@ def main():
     port = 8765
 
     print("[AUTOSTART] Server PC in ascolto su porta %d" % port)
-    print("[AUTOSTART] Project root:", PROJECT_ROOT)
-    print("[AUTOSTART] Watchdog:", WATCHDOG_PATH)
+    print("[AUTOSTART] Project root: %s" % PROJECT_ROOT)
+    print("[AUTOSTART] Watchdog: %s" % WATCHDOG_PATH)
+    print("[AUTOSTART] Endpoint disponibili:")
+    print("  http://127.0.0.1:8765/ping")
+    print("  http://127.0.0.1:8765/status")
+    print("  http://127.0.0.1:8765/start")
+    print("")
 
-    server = HTTPServer((host, port), AutostartHandler)
+    server = ThreadedHTTPServer((host, port), AutostartHandler)
     server.serve_forever()
 
 
