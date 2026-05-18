@@ -192,6 +192,21 @@ def estrai_eventi(mondo, stato_runtime):
             "sollevamento" in testo or
             "pavimento mancante" in testo
         ),
+
+        "rumore_improvviso": (
+            "rumore improvviso" in testo or
+            "suono improvviso" in testo
+        ),
+
+        "rumore_singolo": (
+            "rumore singolo" in testo or
+            "colpo" in testo
+        ),
+
+        "battiti_mani": (
+            "battiti" in testo or
+            "battito" in testo
+        ),
     }
 
 def _carica_modulo_da_file(nome_modulo, path_file):
@@ -283,6 +298,10 @@ def _slug_testo(testo):
         (ha_urto_piede_sx and ha_urto_piede_dx)
     )
 
+    ha_rumore_improvviso = "rumore improvviso" in testo or "suono improvviso" in testo
+    ha_rumore_singolo = "rumore singolo" in testo or "colpo" in testo
+    ha_battiti = "battiti" in testo or "battito" in testo
+
     if ha_batteria_critica and ha_volto_noto:
         return "batteria_critica_e_volto_riconosciuto"
 
@@ -305,6 +324,15 @@ def _slug_testo(testo):
 
     if camminando and ha_volto_ignoto:
         return "volto_ignoto_durante_cammino"
+    
+    if camminando and ha_rumore_improvviso:
+        return "rumore_improvviso_durante_cammino"
+
+    if camminando and ha_rumore_singolo:
+        return "rumore_singolo_durante_cammino"
+
+    if camminando and ha_battiti:
+        return "battiti_durante_cammino"
 
     if camminando and ha_ostacolo_sx:
         return "ostacolo_sinistra_durante_cammino"
@@ -354,6 +382,15 @@ def _slug_testo(testo):
 
     if ha_mano_sx and ha_mano_dx:
         return "tocco_entrambe_mani"
+    
+    if ha_rumore_improvviso and fermo:
+        return "rumore_improvviso_fermo"
+
+    if ha_rumore_singolo and fermo:
+        return "rumore_singolo_fermo"
+
+    if ha_battiti and fermo:
+        return "battiti_fermo"
 
     # COMBINAZIONI OSTACOLI / SPAZIO
     # Dopo i casi sociali.
@@ -957,7 +994,7 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                     for frase in frasi_sociali_non_coerenti:
                         if frase in testo_azione:
                             return False, "Frase sociale non coerente con condizione spaziale/ostacolo"
-
+        
         if not condizione_sociale:
             if (
                 eventi_originali.get("ostacolo_sinistra", False) and
@@ -1002,6 +1039,31 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                     {"eventi": estrai_eventi(mondo_invertito, {})}
                 ))
 
+                if eventi_originali.get("fermo", False):
+                    mondo_cammino = mondo_originale.replace("SONO FERMO", "STO CAMMINANDO").replace("sono fermo", "sto camminando")
+
+                    casi_negativi.append((
+                        mondo_cammino,
+                        {"eventi": estrai_eventi(mondo_cammino, {})}
+                    ))
+
+                # Se la condizione riguarda un rumore, non deve attivarsi senza rumore.
+            if (
+                eventi_originali.get("rumore_improvviso", False) or
+                eventi_originali.get("rumore_singolo", False) or
+                eventi_originali.get("battiti_mani", False)
+            ):
+                mondo_senza_rumore = (
+                    u"REPORT: SONO FERMO."
+                    if eventi_originali.get("fermo", False)
+                    else u"REPORT: STO CAMMINANDO."
+                )
+
+                casi_negativi.append((
+                    mondo_senza_rumore,
+                    {"eventi": estrai_eventi(mondo_senza_rumore, {})}
+                ))
+
         if eventi_originali.get("camminando", False):
             mondo_fermo = mondo_originale.replace("STO CAMMINANDO", "SONO FERMO").replace("sto camminando", "sono fermo")
 
@@ -1009,6 +1071,7 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
                 mondo_fermo,
                 {"eventi": estrai_eventi(mondo_fermo, {})}
             ))
+
 
         for mondo_negativo, runtime_negativo in casi_negativi:
             risultato = modulo.condizione(mondo_negativo, runtime_negativo)
@@ -1791,6 +1854,22 @@ def costruisci_evento_strutturato(mondo, stato_runtime=None):
     elif eventi.get("volto_ignoto", False):
         tipo = "volto_ignoto"
         categoria = "sociale"
+        gravita = "bassa"
+
+    # Suoni / audio
+    elif eventi.get("rumore_improvviso", False):
+        tipo = "rumore_improvviso"
+        categoria = "audio"
+        gravita = "media"
+
+    elif eventi.get("rumore_singolo", False):
+        tipo = "rumore_singolo"
+        categoria = "audio"
+        gravita = "bassa"
+
+    elif eventi.get("battiti_mani", False):
+        tipo = "battiti_mani"
+        categoria = "audio"
         gravita = "bassa"
 
     # Batteria
