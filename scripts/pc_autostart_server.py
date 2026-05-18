@@ -2,6 +2,7 @@
 
 import os
 import sys
+import socket
 import subprocess
 import threading
 
@@ -16,12 +17,31 @@ except ImportError:
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 WATCHDOG_PATH = os.path.join(PROJECT_ROOT, "scripts", "autonomous_watchdog.py")
 
+ROBOT_IP = os.environ.get("NAO_ROBOT_IP", "172.16.165.86")
+ROBOT_PORT = int(os.environ.get("NAO_ROBOT_PORT", "9559"))
+
 WATCHDOG_PROCESS = None
 LOCK = threading.Lock()
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
+
+
+def robot_raggiungibile(timeout=3):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+
+    try:
+        sock.connect((ROBOT_IP, ROBOT_PORT))
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
 
 
 class AutostartHandler(BaseHTTPRequestHandler):
@@ -51,6 +71,13 @@ class AutostartHandler(BaseHTTPRequestHandler):
             self._send(200, "PC_AUTOSTART_SERVER_OK")
             return
 
+        if self.path == "/robot":
+            if robot_raggiungibile():
+                self._send(200, "ROBOT_REACHABLE")
+            else:
+                self._send(200, "ROBOT_NOT_REACHABLE")
+            return
+
         if self.path == "/status":
             with LOCK:
                 running = WATCHDOG_PROCESS is not None and WATCHDOG_PROCESS.poll() is None
@@ -67,17 +94,21 @@ class AutostartHandler(BaseHTTPRequestHandler):
                     self._send(200, "WATCHDOG_ALREADY_RUNNING")
                     return
 
-                try:
-                    print("[AUTOSTART] Avvio watchdog: %s" % WATCHDOG_PATH)
+                if not robot_raggiungibile():
+                    print("[AUTOSTART] Robot non raggiungibile: %s:%s" % (ROBOT_IP, ROBOT_PORT))
+                    self._send(503, "ROBOT_NOT_REACHABLE")
+                    return
 
+                try:
                     python_exe = os.environ.get("NAO_PYTHON", sys.executable)
 
-                print("[AUTOSTART] Python per watchdog: %s" % python_exe)
+                    print("[AUTOSTART] Avvio watchdog: %s" % WATCHDOG_PATH)
+                    print("[AUTOSTART] Python per watchdog: %s" % python_exe)
 
-                WATCHDOG_PROCESS = subprocess.Popen(
-                    [python_exe, WATCHDOG_PATH],
-                    cwd=PROJECT_ROOT
-                )
+                    WATCHDOG_PROCESS = subprocess.Popen(
+                        [python_exe, WATCHDOG_PATH],
+                        cwd=PROJECT_ROOT
+                    )
 
                     self._send(200, "WATCHDOG_STARTED")
                     return
@@ -96,8 +127,12 @@ def main():
     print("[AUTOSTART] Server PC in ascolto su porta %d" % port)
     print("[AUTOSTART] Project root: %s" % PROJECT_ROOT)
     print("[AUTOSTART] Watchdog: %s" % WATCHDOG_PATH)
+    print("[AUTOSTART] Python server: %s" % sys.executable)
+    print("[AUTOSTART] NAO_PYTHON: %s" % os.environ.get("NAO_PYTHON", "NON DEFINITO"))
+    print("[AUTOSTART] Robot atteso: %s:%s" % (ROBOT_IP, ROBOT_PORT))
     print("[AUTOSTART] Endpoint disponibili:")
     print("  http://127.0.0.1:8765/ping")
+    print("  http://127.0.0.1:8765/robot")
     print("  http://127.0.0.1:8765/status")
     print("  http://127.0.0.1:8765/start")
     print("")
