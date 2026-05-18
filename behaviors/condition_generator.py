@@ -1066,6 +1066,14 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"Devi generare UNA nuova condizione Python autonoma.\n\n"
 
         u"REGOLE OBBLIGATORIE:\n"
+        u"- La funzione condizione() DEVE usare stato_runtime.get(\"eventi\", {}).\n"
+        u"- NON usare parsing fragile del testo come 'parola' in mondo, salvo curiosità visiva.\n"
+        u"- Per condizioni multiple usa AND tra eventi reali.\n"
+        u"- Esempio corretto:\n"
+        u"  eventi = stato_runtime.get(\"eventi\", {})\n"
+        u"  return eventi.get(\"rumore_improvviso\", False) and eventi.get(\"camminando\", False)\n"
+        u"- Esempio sbagliato:\n"
+        u"  return u\"rumore\" in mondo and u\"camminando\" in mondo\n"
         u"- Genera SOLO codice Python.\n"
         u"- Non scrivere spiegazioni.\n"
         u"- Non usare import.\n"
@@ -1079,7 +1087,8 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"FORMATO OBBLIGATORIO:\n"
         u"# -*- coding: utf-8 -*-\n\n"
         u"def condizione(mondo, stato_runtime):\n"
-        u"    return u\"testo trigger\" in mondo\n\n"
+        u"    eventi = stato_runtime.get(\"eventi\", {})\n"
+        u"    return eventi.get(\"nome_evento\", False)\n\n"
         u"def comportamento():\n"
         u"    return {\n"
         u"        \"stato_interno\": \"prudente/sociale/curioso/allerta/neutro\",\n"
@@ -1430,6 +1439,22 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     elif nome_base == "tocco_entrambe_mani":
         righe.append('    eventi = stato_runtime.get("eventi", {})')
         righe.append('    return eventi.get("entrambe_mani", False) or (eventi.get("mano_sinistra", False) and eventi.get("mano_destra", False))')
+    
+    elif nome_base == "rumore_improvviso_durante_cammino":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("rumore_improvviso", False) and eventi.get("camminando", False)')
+
+    elif nome_base == "rumore_improvviso_fermo":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("rumore_improvviso", False) and eventi.get("fermo", False)')
+
+    elif nome_base == "rumore_e_mano_destra":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("rumore_improvviso", False) and eventi.get("mano_destra", False)')
+
+    elif nome_base == "rumore_e_mano_sinistra":
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append('    return eventi.get("rumore_improvviso", False) and eventi.get("mano_sinistra", False)')
 
     # EVENTI SINGOLI
     elif nome_base == "carezza_testa":

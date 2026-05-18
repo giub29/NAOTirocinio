@@ -78,10 +78,18 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
         return None
 
+    eventi_reali = stato_runtime.get("eventi_reali", {})
+
+    numero_eventi_reali = len([
+        k for k, v in eventi_reali.items()
+        if v not in [False, None, "", [], {}]
+    ])
+
     evento_composto = (
         stato_runtime.get("evento_composto", False)
         or firma.get("eventi_multipli", False)
         or firma.get("situazione_composta", False)
+        or numero_eventi_reali >= 2
     )
 
     # CASO SPECIALE:

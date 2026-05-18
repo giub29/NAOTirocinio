@@ -528,7 +528,7 @@ def _mondo_ha_eventi_multipli(mondo):
 
     if u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo:
         segnali += 1
-        
+
     if u"rumore" in testo or u"battiti" in testo or u"colpo" in testo:
         segnali += 1
     
@@ -857,6 +857,16 @@ def main():
 
             # Eventi reali del robot (sensori -> supervisore)
             eventi_robot = sensi.ottieni_eventi_strutturati()
+
+            # Stato movimento come evento reale
+            try:
+                if corpo.sta_camminando() or stato_runtime.get("in_pattugliamento", False):
+                    eventi_robot["camminando"] = True
+                else:
+                    eventi_robot["fermo"] = True
+            except:
+                eventi_robot["fermo"] = True
+
             stato_runtime["eventi_reali"] = eventi_robot
 
             mondo = normalizza_testo_ascii(mondo)
