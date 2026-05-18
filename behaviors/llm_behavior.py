@@ -115,7 +115,9 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
         u"- puoi fare stretching;\n"
         u"- ragiona su ciò che vedi;\n"
         u"- collega ciò che vedi alla memoria;\n"
-        u"- termina SEMPRE con la frase: Cosa faresti tu?\n"
+        u"- NON chiedere all'utente cosa fare.\n"
+        u"- formula una breve osservazione autonoma e scegli tu una micro-azione sicura.\n"
+        u"- se non serve agire, dì solo cosa hai notato in modo naturale.\n"
         u"- NON usare cammina o gira.\n\n"
 
         u"DATI MEMORIA ATTUALE:\n"

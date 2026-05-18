@@ -223,6 +223,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
 
     testo = (mondo or "").strip().lower()
     eventi = stato_runtime.get("eventi", {})
+    eventi_reali = stato_runtime.get("eventi_reali", {})
     evento_strutturato = stato_runtime.get("evento_strutturato", {})
 
     if not isinstance(evento_strutturato, dict):
@@ -230,6 +231,9 @@ def costruisci_firma_situazione(mondo, stato_runtime):
 
     if not isinstance(eventi, dict):
         eventi = {}
+    
+    if not isinstance(eventi_reali, dict):
+        eventi_reali = {}
 
     parole_banali = [
         "la mia batteria",
@@ -272,7 +276,18 @@ def costruisci_firma_situazione(mondo, stato_runtime):
 
     eventi_attivi = {}
 
+    # Eventi estratti dal testo
     for chiave, valore in eventi.items():
+        chiave_norm = str(chiave).lower()
+
+        if chiave_norm in chiavi_runtime_banali:
+            continue
+
+        if valore not in [None, False, "", [], {}]:
+            eventi_attivi[chiave] = valore
+
+    # Eventi reali dei sensori (priorità alta)
+    for chiave, valore in eventi_reali.items():
         chiave_norm = str(chiave).lower()
 
         if chiave_norm in chiavi_runtime_banali:
@@ -302,8 +317,11 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     if not isinstance(eventi_core, list):
         eventi_core = []
 
+    numero_eventi_reali = len(eventi_attivi.keys())
+
     eventi_multipli = (
         len(eventi_core) >= 2
+        or numero_eventi_reali >= 2
         or evento_strutturato.get("evento_composto", False)
     )
 

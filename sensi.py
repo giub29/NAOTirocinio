@@ -13,6 +13,7 @@ class NaoSenses:
 
         # Memoria breve eventi: serve per avere piu' eventi nello stesso REPORT
         self.eventi_recenti = {}
+        self.eventi_strutturati = {}
         self.lock_eventi = threading.RLock()
         self.durata_eventi_recenti = 4.0
 
@@ -72,9 +73,17 @@ class NaoSenses:
         if testo == u"INTERAZIONE_UTENTE." or testo == u"INTERAZIONE_UTENTE":
             return
 
+        tempo = time.time()
+
         self.eventi_recenti[chiave] = {
             "testo": testo,
-            "tempo": time.time()
+            "tempo": tempo
+        }
+
+        # Evento strutturato per supervisore autonomo
+        self.eventi_strutturati[chiave] = {
+            "attivo": True,
+            "tempo": tempo
         }
         
     def _eventi_recenti_validi(self):
@@ -96,6 +105,30 @@ class NaoSenses:
                 for chiave in chiavi_da_eliminare:
                     try:
                         del self.eventi_recenti[chiave]
+                    except:
+                        pass
+        except:
+            pass
+
+        return eventi
+
+    def ottieni_eventi_strutturati(self):
+        """
+        Restituisce eventi recenti come firma semantica:
+        {
+            "ostacolo_destra": True,
+            "camminando": True
+        }
+        """
+        tempo_attuale = time.time()
+        eventi = {}
+
+        try:
+            with self.lock_eventi:
+                for chiave, dati in self.eventi_recenti.items():
+                    try:
+                        if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
+                            eventi[chiave] = True
                     except:
                         pass
         except:
@@ -290,7 +323,7 @@ class NaoSenses:
             eventi.append(evento)
             self._ricorda_evento("volto_ignoto", evento)
 
-        # 2. GESTIONE BATTITI
+        # 2. GESTIONE SUONI / BATTITI
         try:
             dati_audio = self.memory.getData("SoundDetected")
         except:
@@ -304,10 +337,19 @@ class NaoSenses:
                 self.contatore_battiti += 1
                 self.ultimo_battito_rilevato = tempo_attuale
 
+                evento = u"Sento un rumore improvviso vicino a me."
+                eventi.append(evento)
+                self._ricorda_evento("rumore_improvviso", evento)
+
         if self.contatore_battiti > 0 and (tempo_attuale - self.ultimo_battito_rilevato > self.finestra_ascolto):
-            evento = u"Sento {} battiti di mani.".format(self.contatore_battiti)
+            if self.contatore_battiti == 1:
+                evento = u"Sento un colpo o un rumore singolo."
+                self._ricorda_evento("rumore_singolo", evento)
+            else:
+                evento = u"Sento {} battiti o rumori ravvicinati.".format(self.contatore_battiti)
+                self._ricorda_evento("battiti_mani", evento)
+
             eventi.append(evento)
-            self._ricorda_evento("battiti_mani", evento)
             self.contatore_battiti = 0
 
         # 3. SONAR

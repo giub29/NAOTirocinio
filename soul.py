@@ -475,6 +475,9 @@ def _valuta_interazione_reale(mondo):
         u"entrambe le mani" in testo or
         u"urto" in testo or
         u"pericolo" in testo or
+        u"rumore" in testo or
+        u"battiti" in testo or
+        u"colpo" in testo or
         u"qualcosa a destra" in testo or
         u"qualcosa a sinistra" in testo or
         u"ostacolo a destra" in testo or
@@ -525,7 +528,10 @@ def _mondo_ha_eventi_multipli(mondo):
 
     if u"pericolo caduta" in testo or u"sollevamento" in testo or u"pavimento mancante" in testo:
         segnali += 1
-
+        
+    if u"rumore" in testo or u"battiti" in testo or u"colpo" in testo:
+        segnali += 1
+    
     # Cammino + un evento fisico = condizione composta utile
     if u"sto camminando" in testo and segnali >= 1:
         segnali += 1
@@ -554,8 +560,13 @@ def _sincronizza_nome_runtime_da_mondo(mondo):
         stato_runtime["ultimo_nome_riconosciuto"] = ""
         stato_runtime["ultimo_volto_noto_tempo"] = 0
         
-def _gestisci_iniziativa_robot(corpo, voce):
-    logger.info(u"[SOUL] Nessuna condizione rilevata: osservo l'ambiente")
+def _gestisci_iniziativa_robot(corpo, voce, motivo="inerzia"):
+    """
+    Curiosità autonoma centralizzata.
+    Osserva l'ambiente, NON ripete la descrizione a voce,
+    e restituisce un mondo arricchito per il supervisore/LLM.
+    """
+    logger.info(u"[SOUL] Curiosità autonoma attivata: {}".format(motivo))
 
     corpo.imposta_colore_occhi("yellow")
     corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
@@ -576,12 +587,15 @@ def _gestisci_iniziativa_robot(corpo, voce):
     else:
         descrizione = u"non riesco a vedere chiaramente l'ambiente"
 
-    voce.parla(u"Sto osservando l'ambiente.")
-    voce.parla(descrizione[:200])
+    logger.info(u"[SOUL] Osservazione autonoma: {}".format(
+        testo_per_log(descrizione[:180])
+    ))
 
     return (
-        u" OSSERVAZIONE_AUTONOMA. "
+        u"REPORT: PRENDI L'INIZIATIVA. "
+        u"OSSERVAZIONE_AUTONOMA. "
         u"NESSUNA_CONDIZIONE_ATTIVA. "
+        u"SONO FERMO. "
         u"VEDO: {}.".format(descrizione)
     )
 
@@ -599,6 +613,38 @@ def _aggiungi_stato_movimento(mondo, corpo):
 
     return mondo + u" SONO FERMO."
 
+def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, motivo_safety=""):
+    """
+    Centralizza la preparazione dello stato runtime per supervisore,
+    condizioni autogenerate e validazione.
+    """
+    eventi_testuali = estrai_eventi(mondo, stato_runtime)
+
+    eventi_reali = stato_runtime.get("eventi_reali", {})
+    eventi_combinati = {}
+
+    try:
+        eventi_combinati.update(eventi_testuali)
+    except:
+        pass
+
+    try:
+        eventi_combinati.update(eventi_reali)
+    except:
+        pass
+
+    stato_runtime["eventi"] = eventi_combinati
+    stato_runtime["eventi_testuali"] = eventi_testuali
+    stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+        mondo,
+        stato_runtime
+    )
+    stato_runtime["memoria"] = memoria_fisica
+    stato_runtime["stato_robot"] = stato_robot
+    stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+    stato_runtime["evento_composto"] = evento_composto
+    stato_runtime["forza_generazione_safety"] = forza_safety
+    stato_runtime["motivo_safety"] = motivo_safety
 
 def _elabora_decisione(mondo, corpo, voce, vista, sistema):
     decisione = genera_decisione_anima(
@@ -647,16 +693,12 @@ def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
         ULTIMA_GENERAZIONE_SAFETY_TEMPO = adesso
         ULTIMO_MONDO_SAFETY_GENERATO = mondo_norm
 
-        stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-        stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+        _prepara_runtime_autonomo(
             mondo,
-            stato_runtime
+            evento_composto=False,
+            forza_safety=True,
+            motivo_safety=motivo
         )
-        stato_runtime["memoria"] = memoria_fisica
-        stato_runtime["stato_robot"] = stato_robot
-        stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-        stato_runtime["forza_generazione_safety"] = True
-        stato_runtime["motivo_safety"] = motivo
         
         try:
             decisione = autonomy_supervisor.gestisci_autonomia(
@@ -783,28 +825,13 @@ def main():
                 aggiorna_heartbeat()
 
                 try:
-                    corpo.imposta_colore_occhi("yellow")
-                    corpo.guarda(*ANGOLO_SGUARDO_INIZIATIVA)
-                    time.sleep(1)
-
-                    img_b64 = corpo.scatta_foto(camera_id=0, nome_file="curiosita_stop.jpg")
+                    voce.parla(u"Mi fermo. Osservo l'ambiente.")
                     aggiorna_heartbeat()
 
-                    if img_b64:
-                        descrizione = analizza_immagine(
-                            img_b64,
-                            CHIAVE_PRIVATA,
-                            contesto="ambiente dopo stop"
-                        )
-                        aggiorna_heartbeat()
-                    else:
-                        descrizione = u"non riesco a vedere chiaramente l'ambiente"
-
-                    voce.parla(u"Ho osservato l'ambiente. Ti descrivo cosa vedo.")
-                    voce.parla(descrizione[:180])
-
-                    mondo_curioso = u"REPORT: PRENDI L'INIZIATIVA. SONO FERMO. VEDO: {}.".format(
-                        descrizione
+                    mondo_curioso = _gestisci_iniziativa_robot(
+                        corpo,
+                        voce,
+                        motivo="dopo stop"
                     )
 
                     decisione_curiosa = _elabora_decisione(
@@ -827,6 +854,11 @@ def main():
                 continue
 
             mondo = sensi.ottieni_report_semantico()
+
+            # Eventi reali del robot (sensori -> supervisore)
+            eventi_robot = sensi.ottieni_eventi_strutturati()
+            stato_runtime["eventi_reali"] = eventi_robot
+
             mondo = normalizza_testo_ascii(mondo)
             _sincronizza_nome_runtime_da_mondo(mondo)
 
@@ -907,14 +939,7 @@ def main():
 
                 mondo_evento = mondo + u" STO CAMMINANDO."
 
-                stato_runtime["eventi"] = estrai_eventi(mondo_evento, stato_runtime)
-                stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
-                    mondo_evento,
-                    stato_runtime
-                )
-                stato_runtime["memoria"] = memoria_fisica
-                stato_runtime["stato_robot"] = stato_robot
-                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+                _prepara_runtime_autonomo(mondo_evento)
 
                 decisione_condizione = valuta_condizioni_generate(mondo_evento, stato_runtime)
 
@@ -1031,7 +1056,11 @@ def main():
                     if adesso - ultimo_evento < 10:
                         logger.info(u"[SOUL] Iniziativa saltata: evento reale recente.")
                     else:
-                        mondo += _gestisci_iniziativa_robot(corpo, voce)
+                        mondo = _gestisci_iniziativa_robot(
+                            corpo,
+                            voce,
+                            motivo="inerzia"
+                        )
                         ultimo_evento_tempo = time.time()
 
             mondo = _pulisci_mondo_da_volti_salutati(mondo)
@@ -1157,15 +1186,10 @@ def main():
             decisione_condizione = None
 
             if mondo_cambiato and mondo_valido:
-                stato_runtime["eventi"] = estrai_eventi(mondo, stato_runtime)
-                stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
+                _prepara_runtime_autonomo(
                     mondo,
-                    stato_runtime
+                    evento_composto=evento_composto
                 )
-                stato_runtime["memoria"] = memoria_fisica
-                stato_runtime["stato_robot"] = stato_robot
-                stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-                stato_runtime["evento_composto"] = evento_composto
 
                 if stato_runtime.get("missione_laboratorio", False):
                     if gestisci_navigazione_laboratorio(
