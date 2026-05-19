@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-14 10:54:20", 
+  "aggiornata_il": "2026-05-19 11:43:29", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -112,6 +112,34 @@
       }, 
       "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-14 10:54:20"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Come posso aiutarti?", 
+            "tipo": "parla"
+          }, 
+          {
+            "path": "animations/Stand/Gestures/Hey_1", 
+            "tipo": "animazione"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-19 11:43:29"
     }
   ], 
   "creata_il": "2026-05-12 14:18:55", 
@@ -158,10 +186,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 4, 
+    "attivazioni": 5, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 10:54:20", 
+    "ultima_attivazione": "2026-05-19 11:43:29", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

@@ -1812,6 +1812,23 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
     if eventi_originali.get("camminando", False) and pericolo_reale and not ha_fermati:
         return False, "Pericolo/frontale/urto durante cammino: serve fermati"
 
+    for azione in azioni:
+        if not isinstance(azione, dict):
+            continue
+
+        if azione.get("tipo", "") != "parla":
+            continue
+
+        testo = azione.get("testo", "").lower()
+
+        if eventi_originali.get("ostacolo_sinistra", False):
+            if "davanti" in testo or "frontale" in testo or "destra" in testo:
+                return False, "Frase non coerente: ostacolo sinistra descritto come davanti/destra"
+
+        if eventi_originali.get("ostacolo_destra", False):
+            if "davanti" in testo or "frontale" in testo or "sinistra" in testo:
+                return False, "Frase non coerente: ostacolo destra descritto come davanti/sinistra"
+            
     return True, "ok"
 
 def costruisci_evento_strutturato(mondo, stato_runtime=None):

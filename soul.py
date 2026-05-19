@@ -683,7 +683,6 @@ def _elabora_decisione(mondo, corpo, voce, vista, sistema):
                 azioni_filtrate.append(azione)
 
         if len(azioni_filtrate) != len(decisione.get("azioni", [])):
-            logger.info(u"[SOUL] Rimosso movimento non giustificato da evento solo audio")
             decisione["azioni"] = azioni_filtrate
 
         if not decisione.get("azioni", []):
@@ -1029,7 +1028,6 @@ def main():
                 ultimo = stato_runtime.get(chiave_tempo, 0)
 
                 if time.time() - ultimo < 4.0:
-                    logger.info(u"[SOUL] Ostacolo laterale {} ignorato: cooldown anti-loop.".format(lato_tmp))
                     stato_precedente = mondo
                     time.sleep(0.1)
                     continue
@@ -1139,6 +1137,28 @@ def main():
                 continue
 
             interazione_reale = _valuta_interazione_reale(mondo)
+
+            testo_mondo_audio = mondo.lower()
+            solo_audio_fermo = (
+                not stato_runtime.get("in_pattugliamento", False)
+                and not corpo.sta_camminando()
+                and (
+                    "rumore" in testo_mondo_audio or
+                    "colpo" in testo_mondo_audio or
+                    "battiti" in testo_mondo_audio
+                )
+                and "tocco" not in testo_mondo_audio
+                and "carezza" not in testo_mondo_audio
+                and "volto" not in testo_mondo_audio
+                and "ostacolo" not in testo_mondo_audio
+                and "urto" not in testo_mondo_audio
+                and "pericolo" not in testo_mondo_audio
+            )
+
+            if solo_audio_fermo:
+                stato_precedente = mondo
+                time.sleep(0.1)
+                continue
 
             if interazione_reale:
                 ultimo_evento_tempo = time.time()
@@ -1349,7 +1369,6 @@ def main():
                         ultimo = stato_runtime.get(chiave_schivata, 0)
 
                         if time.time() - ultimo < 5.0:
-                            logger.info(u"[SOUL] Schivata {} ignorata: cooldown decisione.".format(lato_schivata))
                             decisione_condizione = None
                         else:
                             stato_runtime[chiave_schivata] = time.time()

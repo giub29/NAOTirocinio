@@ -29,6 +29,8 @@ class NaoSenses:
             print("--- ERRORE FACE DETECTION: {} ---".format(e))
 
         self.ultimo_timestamp_audio = 0
+        self.ultimo_evento_audio_tempo = 0
+        self.cooldown_audio = 8.0
         self.contatore_battiti = 0
         self.ultimo_battito_rilevato = 0
         self.finestra_ascolto = 1.5
@@ -39,7 +41,7 @@ class NaoSenses:
             self.sound_detection = ALProxy("ALSoundDetection", ip, port)
 
             # Sensibilità prudente: non troppo bassa per evitare rumore continuo
-            self.sound_detection.setParameter("Sensitivity", 0.45)
+            self.sound_detection.setParameter("Sensitivity", 0.35)
 
             self.sound_detection.subscribe("SensiSound")
 
@@ -349,13 +351,22 @@ class NaoSenses:
             timestamp_audio = dati_audio[0][0] + dati_audio[0][1] * 1e-6
 
             if timestamp_audio > self.ultimo_timestamp_audio:
-                self.ultimo_timestamp_audio = timestamp_audio
-                self.contatore_battiti += 1
-                self.ultimo_battito_rilevato = tempo_attuale
 
-                evento = u"Sento un rumore improvviso vicino a me."
-                eventi.append(evento)
-                self._ricorda_evento("rumore_improvviso", evento)
+                # Cooldown anti-rumore: evita spam continuo
+                if (
+                    tempo_attuale - self.ultimo_evento_audio_tempo
+                    >= self.cooldown_audio
+                ):
+
+                    self.ultimo_evento_audio_tempo = tempo_attuale
+
+                    self.ultimo_timestamp_audio = timestamp_audio
+                    self.contatore_battiti += 1
+                    self.ultimo_battito_rilevato = tempo_attuale
+
+                    evento = u"Sento un rumore improvviso vicino a me."
+                    eventi.append(evento)
+                    self._ricorda_evento("rumore_improvviso", evento)
 
         if self.contatore_battiti > 0 and (tempo_attuale - self.ultimo_battito_rilevato > self.finestra_ascolto):
             if self.contatore_battiti == 1:

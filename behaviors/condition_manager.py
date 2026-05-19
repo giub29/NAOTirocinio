@@ -555,6 +555,13 @@ def valuta_condizioni_generate(mondo, stato_runtime):
             continue
 
         valutazione = valuta_affidabilita_condizione(nome)
+        logger.info(
+            u"[CONDIZIONI][FIDUCIA] {} -> {} ({})".format(
+                nome,
+                valutazione.get("azione", "mantieni"),
+                valutazione.get("motivo", "")
+            )
+        )
 
         if valutazione.get("azione") == "disattiva":
             logger.warning(u"[CONDIZIONI] Condizione ignorata per bassa affidabilita': {} | {}".format(
