@@ -312,6 +312,33 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         ["interazione", "movimento"]
     ]
 
+    # EVENTI STRUTTURATI PRIORITARI
+    # Se ho eventi reali coerenti, li uso prima del parsing testo.
+    eventi_sociali = [
+        "carezza_testa",
+        "mano_sinistra",
+        "mano_destra",
+        "entrambe_mani",
+        "volto_riconosciuto",
+        "volto_ignoto"
+    ]
+
+    eventi_safety = [
+        "ostacolo_sinistra",
+        "ostacolo_destra",
+        "ostacolo_frontale",
+        "urto_piedi",
+        "piede_sinistro",
+        "piede_destro",
+        "pericolo_caduta"
+    ]
+
+    eventi_audio = [
+        "rumore_improvviso",
+        "rumore_singolo",
+        "battiti_mani"
+    ]
+
     mondo_vuoto = not testo
 
     solo_banale = False
@@ -326,6 +353,17 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         eventi_core = []
 
     numero_eventi_reali = len(eventi_attivi.keys())
+
+    # Se gli eventi strutturati reali esistono,
+    # considero la situazione significativa anche con poco testo.
+    presenza_eventi_reali = any([
+        k in eventi_attivi
+        for k in (
+            eventi_sociali +
+            eventi_safety +
+            eventi_audio
+        )
+    ])
 
     eventi_multipli = (
         len(eventi_core) >= 2
@@ -349,7 +387,8 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                 break
 
     ha_novita_runtime = (
-        len(eventi_attivi.keys()) > 0
+        presenza_eventi_reali
+        or len(eventi_attivi.keys()) > 0
         or evento_strutturato.get("tipo", "generico") != "generico"
     )
 

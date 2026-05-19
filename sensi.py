@@ -34,6 +34,20 @@ class NaoSenses:
         self.finestra_ascolto = 1.5
         self.ultimo_urto = 0
 
+        # AUDIO / RUMORI
+        try:
+            self.sound_detection = ALProxy("ALSoundDetection", ip, port)
+
+            # Sensibilità prudente: non troppo bassa per evitare rumore continuo
+            self.sound_detection.setParameter("Sensitivity", 0.55)
+
+            self.sound_detection.subscribe("SensiSound")
+
+            print("--- SOUND DETECTION ATTIVA ---")
+
+        except Exception as e:
+            print("--- ERRORE SOUND DETECTION: {} ---".format(e))
+
         try:
             self.sonar = ALProxy("ALSonar", ip, port)
             self.sonar.subscribe("SensiAnima")
@@ -330,6 +344,8 @@ class NaoSenses:
             dati_audio = None
 
         if dati_audio and len(dati_audio) > 0:
+            if self.debug_sensori:
+                print("[DEBUG AUDIO] {}".format(dati_audio))
             timestamp_audio = dati_audio[0][0] + dati_audio[0][1] * 1e-6
 
             if timestamp_audio > self.ultimo_timestamp_audio:

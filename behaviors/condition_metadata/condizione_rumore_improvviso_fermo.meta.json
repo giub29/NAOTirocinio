@@ -1,0 +1,72 @@
+{
+  "aggiornata_il": "2026-05-19 10:59:34", 
+  "creata_il": "2026-05-19 10:59:34", 
+  "eventi_attivi_origine": [
+    "rumore_improvviso", 
+    "fermo"
+  ], 
+  "eventi_completi_origine": {
+    "batteria_bassa": false, 
+    "batteria_critica": false, 
+    "batteria_percentuale": null, 
+    "battiti_mani": false, 
+    "camminando": false, 
+    "carezza_testa": false, 
+    "entrambe_mani": false, 
+    "entrambi_piedi": false, 
+    "fermo": true, 
+    "mano_destra": false, 
+    "mano_sinistra": false, 
+    "ostacolo_destra": false, 
+    "ostacolo_frontale": false, 
+    "ostacolo_sinistra": false, 
+    "pericolo": false, 
+    "piede_destro": false, 
+    "piede_sinistro": false, 
+    "rumore_improvviso": true, 
+    "rumore_singolo": false, 
+    "urto": false, 
+    "urto_piedi": false, 
+    "volto_ignoto": false, 
+    "volto_riconosciuto": false
+  }, 
+  "file_python": "condizione_rumore_improvviso_fermo.py", 
+  "mondo_origine": "REPORT: Evento recente: Sento un rumore improvviso vicino a me. SONO FERMO.", 
+  "nome": "condizione_rumore_improvviso_fermo", 
+  "note": [
+    "Condizione generata autonomamente da NAO.", 
+    "Il file Python contiene la logica eseguibile.", 
+    "Questo JSON contiene la memoria e la tracciabilità della condizione."
+  ], 
+  "origine": "autogenerata_llm", 
+  "riparazione": {
+    "fallimenti": 0, 
+    "successi": 0, 
+    "tentativi": 0, 
+    "ultimo_esito": "", 
+    "ultimo_motivo": ""
+  }, 
+  "statistiche": {
+    "attivazioni": 0, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "", 
+    "ultimo_errore": ""
+  }, 
+  "stato": "promossa", 
+  "stato_robot_origine": {
+    "energia": 100, 
+    "livello_allerta": 0, 
+    "modalita": "osservazione", 
+    "obiettivo_corrente": "esplorare", 
+    "persona_attuale": null, 
+    "sta_camminando": false, 
+    "ultimo_evento": "", 
+    "umore": "neutro"
+  }, 
+  "validazione": {
+    "modulo": "ok", 
+    "semantica": "ok", 
+    "struttura": "ok"
+  }
+}

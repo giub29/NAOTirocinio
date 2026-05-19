@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-19 10:44:41", 
+  "aggiornata_il": "2026-05-19 10:59:46", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -29,6 +29,35 @@
       }, 
       "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 100%. STO CAMMINANDO.", 
       "tempo": "2026-05-19 10:44:41"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "g": -0.12, 
+            "tipo": "cammina", 
+            "x": 0.16
+          }, 
+          {
+            "testo": "Attenzione, ostacolo a sinistra!", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Sento un rumore improvviso vicino a me. Ostacolo a sinistra. La mia batteria e' al 100%. Evento recente: Sento 2 battiti o rumori ravvicinati. STO CAMMINANDO.", 
+      "tempo": "2026-05-19 10:59:46"
     }
   ], 
   "creata_il": "2026-05-19 10:44:41", 
@@ -78,10 +107,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 1, 
+    "attivazioni": 2, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-19 10:44:41", 
+    "ultima_attivazione": "2026-05-19 10:59:46", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 
