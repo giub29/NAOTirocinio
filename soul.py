@@ -63,6 +63,16 @@ try:
         }
     ))
 
+except ImportError:
+
+    handler = logging.StreamHandler()
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    handler.setFormatter(formatter)
+
 except Exception:
 
     handler = logging.StreamHandler()
@@ -792,15 +802,35 @@ def main():
     try:
         logger.info(u"Connessione al robot: {}".format(IP_ROBOT))
 
+        logger.info(u"[BOOT] Creo NaoBody")
         corpo = NaoBody(IP_ROBOT)
+
+        logger.info(u"[BOOT] Creo NaoSenses")
         sensi = NaoSenses(IP_ROBOT)
+
+        logger.info(u"[BOOT] Creo NaoVoice")
         voce = NaoVoice(IP_ROBOT)
-        voce.avvia_ascolto_comandi()
+
+        if os.environ.get("ABILITA_VOCE_COMANDI", "") == "1":
+            voce.avvia_ascolto_comandi()
+        else:
+            logger.info(u"[VOCE] Comandi vocali disattivati in questa modalità")
+
+        logger.info(u"[BOOT] Creo NaoVision")
         vista = NaoVision(IP_ROBOT)
-        sistema = NaoSystem(IP_ROBOT)
+
+        logger.info(u"[BOOT] Salto NaoSystem temporaneamente")
+        sistema = None
+        sistema_globale = None
+
         sistema_globale = sistema
 
-        sistema.configura_autonomous_life_da_env()
+        logger.info(u"[BOOT] Moduli robot creati")
+
+        if os.environ.get("SKIP_AUTONOMOUS_LIFE_CONFIG", "") == "1":
+            logger.info(u"[SYSTEM] Configurazione AutonomousLife saltata su robot")
+        else:
+            sistema.configura_autonomous_life_da_env()
 
         try:
             sistema.pubblica_stato_autonomo("BOOT_COMPLETED")
@@ -834,12 +864,24 @@ def main():
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
 
-            comando_vocale = voce.leggi_comando_vocale()
+            if os.environ.get("ABILITA_VOCE_COMANDI", "") == "1":
+                comando_vocale = voce.leggi_comando_vocale()
+            else:
+                comando_vocale = ""
             if comando_vocale:
                 logger.info(u"[VOCE] Comando vocale riconosciuto: {}".format(comando_vocale))
                 messaggio_utente = comando_vocale
                 input_ricevuto = True
             
+            if input_ricevuto and messaggio_utente == "test_voce_vai":
+                messaggio_utente = "vai"
+
+            if input_ricevuto and messaggio_utente == "test_voce_stop":
+                messaggio_utente = "stop"
+
+            if input_ricevuto and messaggio_utente == "test_voce_status":
+                messaggio_utente = "status"
+
 
             if time.time() - ultimo_input_tempo < 2.0 and not input_ricevuto:
                 time.sleep(0.1)

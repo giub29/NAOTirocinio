@@ -13,6 +13,7 @@ os.environ.setdefault("CHOREGRAPHE_BOOT", "1")
 if os.name != "nt":
     os.environ.setdefault("NAO_IP", "127.0.0.1")
 
+
 WATCHDOG = os.path.join(BASE_DIR, "scripts", "autonomous_watchdog.py")
 
 if not os.path.exists(WATCHDOG):

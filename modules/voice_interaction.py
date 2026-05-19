@@ -63,7 +63,11 @@ class NaoVoice:
         try:
             self.tts.say(testo)
         except Exception as e:
-            print("[ERRORE VOCE]: {}".format(e))
+            testo_errore = str(e)
+            if "Future canceled" in testo_errore:
+                print("[VOCE] Parlato interrotto, continuo.")
+            else:
+                print("[ERRORE VOCE]: {}".format(e))
 
     def imposta_volume(self, livello):
         self.audio_device.setOutputVolume(livello)
@@ -123,15 +127,18 @@ class NaoVoice:
         if not dato or len(dato) < 2:
             return ""
 
-        parola = dato[0]
-        confidenza = dato[1]
+        parola = str(dato[0]).lower().strip()
+        confidenza = float(dato[1])
 
-        try:
-            parola = parola.lower().strip()
-        except:
-            return ""
+        # Debug pulito
+        if confidenza > 0.15:
+            print("[VOCE DEBUG] {} ({:.2f})".format(
+                parola,
+                confidenza
+            ))
 
-        if confidenza < soglia:
+        # ignora rumore debole
+        if confidenza < 0.55:
             return ""
 
         if parola in ["vai", "cammina"]:

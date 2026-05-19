@@ -88,8 +88,10 @@ def heartbeat_scaduto():
 
 def avvia_soul():
 
-    # FORZO Python 2.7 compatibile con NAOqi
-    python_cmd = r"C:\Python27\python.exe"
+    if os.name == "nt":
+        python_cmd = r"C:\Python27\python.exe"
+    else:
+        python_cmd = sys.executable
 
     logger.warning(
         "Avvio soul.py da {}".format(SOUL_PATH)
@@ -111,10 +113,19 @@ def avvia_soul():
         )
     )
 
+    log_path = os.path.join(
+        RUNTIME_DIR,
+        "soul_onboard.log"
+    )
+
+    log_file = open(log_path, "a")
+
     return subprocess.Popen(
         [python_cmd, SOUL_PATH],
         cwd=SOUL_DIR,
-        env=env
+        env=env,
+        stdout=log_file,
+        stderr=log_file
     )
 
 def termina_processo(p):
