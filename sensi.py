@@ -39,7 +39,7 @@ class NaoSenses:
             self.sound_detection = ALProxy("ALSoundDetection", ip, port)
 
             # Sensibilità prudente: non troppo bassa per evitare rumore continuo
-            self.sound_detection.setParameter("Sensitivity", 0.55)
+            self.sound_detection.setParameter("Sensitivity", 0.45)
 
             self.sound_detection.subscribe("SensiSound")
 

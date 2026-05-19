@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-19 11:08:40", 
+  "aggiornata_il": "2026-05-19 11:21:08", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -87,6 +87,64 @@
       }, 
       "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 98%. STO CAMMINANDO.", 
       "tempo": "2026-05-19 11:08:40"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "g": -0.12, 
+            "tipo": "cammina", 
+            "x": 0.16
+          }, 
+          {
+            "testo": "Attenzione, ostacolo a sinistra!", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Sento un rumore improvviso vicino a me. Ostacolo a sinistra. La mia batteria e' al 93%. Evento recente: Sento un colpo o un rumore singolo. STO CAMMINANDO.", 
+      "tempo": "2026-05-19 11:16:14"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "g": -0.12, 
+            "tipo": "cammina", 
+            "x": 0.16
+          }, 
+          {
+            "testo": "Attenzione, ostacolo a sinistra!", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 87%. Evento recente: Sento un colpo o un rumore singolo. STO CAMMINANDO.", 
+      "tempo": "2026-05-19 11:20:35"
     }
   ], 
   "creata_il": "2026-05-19 10:44:41", 
@@ -121,6 +179,7 @@
   }, 
   "file_python": "condizione_ostacolo_sinistra_durante_cammino.py", 
   "mondo_origine": "REPORT: Ostacolo a sinistra. La mia batteria e' al 100%. STO CAMMINANDO.", 
+  "motivo_rifiuto": "movimento non coerente quando il robot e' fermo", 
   "nome": "condizione_ostacolo_sinistra_durante_cammino", 
   "note": [
     "Condizione generata autonomamente da NAO.", 
@@ -129,20 +188,20 @@
   ], 
   "origine": "autogenerata_llm", 
   "riparazione": {
-    "fallimenti": 0, 
+    "fallimenti": 1, 
     "successi": 0, 
-    "tentativi": 0, 
-    "ultimo_esito": "", 
-    "ultimo_motivo": ""
+    "tentativi": 1, 
+    "ultimo_esito": "repair_validation_failed", 
+    "ultimo_motivo": "nessuna condizione valida generata dal generatore"
   }, 
   "statistiche": {
-    "attivazioni": 3, 
+    "attivazioni": 5, 
     "errori_runtime": 0, 
-    "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-19 11:08:40", 
+    "rifiuti": 1, 
+    "ultima_attivazione": "2026-05-19 11:20:35", 
     "ultimo_errore": ""
   }, 
-  "stato": "promossa", 
+  "stato": "rifiutata", 
   "stato_robot_origine": {
     "energia": 100, 
     "livello_allerta": 1, 

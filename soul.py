@@ -656,6 +656,43 @@ def _elabora_decisione(mondo, corpo, voce, vista, sistema):
 
     decisione = valida_decisione(decisione, mondo)
 
+    testo_mondo = mondo.lower()
+    eventi = stato_runtime.get("eventi", {})
+    solo_audio = (
+        (
+            "rumore" in testo_mondo or
+            "battiti" in testo_mondo or
+            "colpo" in testo_mondo or
+            eventi.get("rumore_improvviso", False) or
+            eventi.get("rumore_singolo", False) or
+            eventi.get("battiti_mani", False)
+        )
+        and "ostacolo" not in testo_mondo
+        and "urto" not in testo_mondo
+        and "pericolo" not in testo_mondo
+        and not eventi.get("ostacolo_sinistra", False)
+        and not eventi.get("ostacolo_destra", False)
+        and not eventi.get("ostacolo_frontale", False)
+    )
+
+    if solo_audio:
+        azioni_filtrate = []
+
+        for azione in decisione.get("azioni", []):
+            if azione.get("tipo", "") not in ["cammina", "gira"]:
+                azioni_filtrate.append(azione)
+
+        if len(azioni_filtrate) != len(decisione.get("azioni", [])):
+            logger.info(u"[SOUL] Rimosso movimento non giustificato da evento solo audio")
+            decisione["azioni"] = azioni_filtrate
+
+        if not decisione.get("azioni", []):
+            decisione["azioni"] = [
+                {"tipo": "occhi", "colore": "yellow"},
+                {"tipo": "guarda", "x": 0.0, "y": -0.2},
+                {"tipo": "parla", "testo": "Ho sentito un rumore. Resto attento."}
+            ]
+
     logger.info(u"Stato: {}".format(testo_per_log(decisione.get("stato_interno", "neutro"))))
     logger.info(u"Obiettivo: {}".format(testo_per_log(decisione.get("obiettivo", ""))))
     logger.info(u"Azioni: {}".format(
@@ -724,6 +761,17 @@ def _riprendi_cammino_automatico(corpo, ultima_decisione):
 
     if time.time() - stato_runtime.get("ultimo_evento_fisico_gestito_tempo", 0) < 3.0:
         return
+
+    # Dopo una schivata laterale, riprendo cammino dritto
+    # evitando accumulo di rotazioni.
+    ultimo_ostacolo = stato_runtime.get("ultimo_ostacolo_laterale_tempo", 0)
+
+    if ultimo_ostacolo and time.time() - ultimo_ostacolo > 2.0:
+        stato_runtime["ultimo_ostacolo_laterale_tempo"] = 0
+
+        if stato_runtime.get("in_pattugliamento", False):
+            corpo.cammina(VELOCITA_CAMMINO, 0.0)
+            logger.info(u"[SOUL] Riprendo cammino dritto dopo schivata laterale")
 
     corpo.cammina(VELOCITA_CAMMINO, 0.0)
     logger.debug(u"Cammino automatico ripreso")
@@ -987,6 +1035,8 @@ def main():
                     continue
 
                 stato_runtime[chiave_tempo] = time.time()
+                stato_runtime["ultimo_lato_ostacolo"] = lato_tmp
+                stato_runtime["ultimo_ostacolo_laterale_tempo"] = time.time()
 
 
             if gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
@@ -1274,9 +1324,43 @@ def main():
                         mondo,
                         stato_runtime
                     )
+
+                # Anti-loop decisione: evita di ripetere continuamente
+                # la stessa schivata laterale.
+                try:
+                    testo_decisione = json.dumps(
+                        decisione_condizione,
+                        ensure_ascii=False
+                    ).lower()
+
+                    schivata_sinistra = (
+                        "schivo" in testo_decisione and
+                        "ostacolo a sinistra" in testo_decisione
+                    )
+
+                    schivata_destra = (
+                        "schivo" in testo_decisione and
+                        "ostacolo a destra" in testo_decisione
+                    )
+
+                    if schivata_sinistra or schivata_destra:
+                        lato_schivata = "sinistra" if schivata_sinistra else "destra"
+                        chiave_schivata = "ultima_schivata_{}_tempo".format(lato_schivata)
+                        ultimo = stato_runtime.get(chiave_schivata, 0)
+
+                        if time.time() - ultimo < 5.0:
+                            logger.info(u"[SOUL] Schivata {} ignorata: cooldown decisione.".format(lato_schivata))
+                            decisione_condizione = None
+                        else:
+                            stato_runtime[chiave_schivata] = time.time()
+
+                except Exception:
+                    pass
+
             if decisione_condizione:
                 logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
 
+                
                 decisione_condizione = valida_decisione(decisione_condizione, mondo)
 
                 esegui_decisione(
