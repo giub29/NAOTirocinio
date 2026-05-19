@@ -1,5 +1,34 @@
 {
-  "aggiornata_il": "2026-05-19 10:59:34", 
+  "aggiornata_il": "2026-05-19 11:08:23", 
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "red", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "C'è qualcuno qui?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "verificare la fonte del rumore", 
+        "stato_interno": "allerta"
+      }, 
+      "mondo": "REPORT: Sento un rumore improvviso vicino a me. SONO FERMO.", 
+      "tempo": "2026-05-19 11:08:23"
+    }
+  ], 
   "creata_il": "2026-05-19 10:59:34", 
   "eventi_attivi_origine": [
     "rumore_improvviso", 
@@ -47,10 +76,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 0, 
+    "attivazioni": 1, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "", 
+    "ultima_attivazione": "2026-05-19 11:08:23", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

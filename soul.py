@@ -773,7 +773,7 @@ def main():
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
 
-        voce.parla(u"Sistemi pronti. Ciao {}, io sono NAO.".format(
+        voce.parla(u"Ciao {}, io sono NAO.".format(
             memoria_fisica.get("nome_utente", "amico")
         ))
 
@@ -967,6 +967,27 @@ def main():
                 stato_precedente = mondo
                 time.sleep(0.2)
                 continue
+            
+            # Anti-loop ostacolo: evita reazioni ripetute allo stesso lato
+            testo_mondo_tmp = mondo.lower()
+            ostacolo_laterale_tmp = (
+                u"ostacolo a sinistra" in testo_mondo_tmp or
+                u"ostacolo a destra" in testo_mondo_tmp
+            )
+
+            if ostacolo_laterale_tmp:
+                lato_tmp = "sinistra" if u"sinistra" in testo_mondo_tmp else "destra"
+                chiave_tempo = "ultimo_ostacolo_{}_tempo".format(lato_tmp)
+                ultimo = stato_runtime.get(chiave_tempo, 0)
+
+                if time.time() - ultimo < 4.0:
+                    logger.info(u"[SOUL] Ostacolo laterale {} ignorato: cooldown anti-loop.".format(lato_tmp))
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
+
+                stato_runtime[chiave_tempo] = time.time()
+
 
             if gestisci_ostacoli_durante_cammino(mondo, corpo, stato_runtime):
                 stato_runtime["ultimo_evento_fisico_gestito_tempo"] = time.time()

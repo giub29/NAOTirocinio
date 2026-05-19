@@ -157,7 +157,7 @@ class NaoSenses:
         da voce.parla(), LLM o altre operazioni lente.
         """
         ultimo_evento = {}
-        cooldown = 1.0
+        cooldown = 2.5
 
         while not self._stop_monitor_tocco:
             tempo_attuale = time.time()

@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-19 10:59:46", 
+  "aggiornata_il": "2026-05-19 11:08:40", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -58,6 +58,35 @@
       }, 
       "mondo": "REPORT: Sento un rumore improvviso vicino a me. Ostacolo a sinistra. La mia batteria e' al 100%. Evento recente: Sento 2 battiti o rumori ravvicinati. STO CAMMINANDO.", 
       "tempo": "2026-05-19 10:59:46"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.0, 
+            "y": -0.2
+          }, 
+          {
+            "g": -0.12, 
+            "tipo": "cammina", 
+            "x": 0.16
+          }, 
+          {
+            "testo": "Attenzione, ostacolo a sinistra!", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo a sinistra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 98%. STO CAMMINANDO.", 
+      "tempo": "2026-05-19 11:08:40"
     }
   ], 
   "creata_il": "2026-05-19 10:44:41", 
@@ -107,10 +136,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 2, 
+    "attivazioni": 3, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-19 10:59:46", 
+    "ultima_attivazione": "2026-05-19 11:08:40", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 
