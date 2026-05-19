@@ -87,7 +87,8 @@ def heartbeat_scaduto():
 
 
 def avvia_soul():
-    python_cmd = os.environ.get("NAO_PYTHON", sys.executable)
+    # FORZO Python 2.7 compatibile con NAOqi
+    python_cmd = r"C:\Python27\python.exe"
 
     logger.warning(
         "Avvio soul.py da {}".format(SOUL_PATH)

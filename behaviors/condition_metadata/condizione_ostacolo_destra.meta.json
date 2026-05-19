@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-14 13:09:37", 
+  "aggiornata_il": "2026-05-19 10:32:21", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Cosa c'è a destra?", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "osservare l'oggetto a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
-      "tempo": "2026-05-12 15:49:34"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +108,33 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. SONO FERMO.", 
       "tempo": "2026-05-14 13:09:37"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa c'è a destra?", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'oggetto a destra", 
+        "stato_interno": "prudente"
+      }, 
+      "mondo": "REPORT: C'è qualcosa a destra. SONO FERMO.", 
+      "tempo": "2026-05-19 10:32:21"
     }
   ], 
   "creata_il": "2026-05-12 12:30:33", 
@@ -181,10 +181,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 30, 
+    "attivazioni": 31, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 13:09:37", 
+    "ultima_attivazione": "2026-05-19 10:32:21", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

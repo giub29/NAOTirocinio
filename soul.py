@@ -821,6 +821,13 @@ def main():
 
                 stato_runtime["ultima_curiosita_stop_tempo"] = adesso
 
+                # TEST ROBOT REALE:
+                # durante i test di eventi/safety non avvio curiosità dopo stop,
+                # altrimenti blocca il ciclo e il watchdog termina soul.py.
+                voce.parla(u"Mi fermo.")
+                stato_precedente = ""
+                time.sleep(0.1)
+                continue
                 voce.parla(u"Mi fermo. Ora osservo l'ambiente.")
                 aggiorna_heartbeat()
 
@@ -868,6 +875,23 @@ def main():
                 eventi_robot["fermo"] = True
 
             stato_runtime["eventi_reali"] = eventi_robot
+
+            # Porto gli eventi strutturati reali anche nel mondo testuale,
+            # così il ciclo decisionale e le condizioni autogenerate li vedono.
+            try:
+                if eventi_robot.get("carezza_testa", False) and u"Sento una carezza sulla testa" not in mondo:
+                    mondo += u" Evento recente: Sento una carezza sulla testa."
+
+                if eventi_robot.get("mano_sinistra", False) and u"Sento un tocco sulla mano sinistra" not in mondo:
+                    mondo += u" Evento recente: Sento un tocco sulla mano sinistra."
+
+                if eventi_robot.get("mano_destra", False) and u"Sento un tocco sulla mano destra" not in mondo:
+                    mondo += u" Evento recente: Sento un tocco sulla mano destra."
+
+                if eventi_robot.get("entrambe_mani", False) and u"Sento un tocco su entrambe le mani" not in mondo:
+                    mondo += u" Evento recente: Sento un tocco su entrambe le mani."
+            except Exception:
+                pass
 
             mondo = normalizza_testo_ascii(mondo)
             _sincronizza_nome_runtime_da_mondo(mondo)
@@ -1012,7 +1036,10 @@ def main():
             solo_percezione_spaziale_fermo = (
                 not stato_runtime["in_pattugliamento"] and
                 not corpo.sta_camminando() and
-                "sono fermo" in testo_mondo and
+                (
+                    "sono fermo" in testo_mondo or
+                    not stato_runtime["in_pattugliamento"]
+                ) and
                 (
                     "c'e' qualcosa a destra" in testo_mondo or
                     "c'è qualcosa a destra" in testo_mondo or
@@ -1081,10 +1108,11 @@ def main():
             _sincronizza_nome_runtime_da_mondo(mondo)
 
             evento_fisico_sensibile = (
-                u"Sento una carezza sulla testa" in mondo or
-                u"Sento un tocco sulla mano" in mondo or
                 u"URTO" in mondo or
                 u"PERICOLO" in mondo or
+                u"piede sinistro premuto" in mondo.lower() or
+                u"piede destro premuto" in mondo.lower() or
+                u"ostacolo frontale ai piedi" in mondo.lower() or
                 u"rischio di cadere" in mondo.lower() or
                 u"cadere" in mondo.lower()
             )

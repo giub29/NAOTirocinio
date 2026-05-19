@@ -1,45 +1,16 @@
 {
-  "aggiornata_il": "2026-05-14 10:55:06", 
+  "aggiornata_il": "2026-05-19 10:44:41", 
   "attivazioni_recenti": [
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "red", 
+            "colore": "yellow", 
             "tipo": "occhi"
           }, 
           {
             "tipo": "guarda", 
-            "x": -0.5, 
-            "y": -0.2
-          }, 
-          {
-            "g": -0.12, 
-            "tipo": "cammina", 
-            "x": 0.16
-          }, 
-          {
-            "testo": "Attenzione, ostacolo a sinistra!", 
-            "tipo": "parla"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "evitare ostacolo a sinistra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 78%. STO CAMMINANDO.", 
-      "tempo": "2026-05-12 15:50:03"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "red", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": -0.5, 
+            "x": 0.0, 
             "y": -0.2
           }, 
           {
@@ -57,18 +28,19 @@
         "stato_interno": "prudente"
       }, 
       "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 100%. STO CAMMINANDO.", 
-      "tempo": "2026-05-14 10:55:06"
+      "tempo": "2026-05-19 10:44:41"
     }
   ], 
-  "creata_il": "2026-05-12 14:59:36", 
+  "creata_il": "2026-05-19 10:44:41", 
   "eventi_attivi_origine": [
-    "camminando", 
-    "ostacolo_sinistra"
+    "ostacolo_sinistra", 
+    "camminando"
   ], 
   "eventi_completi_origine": {
     "batteria_bassa": false, 
     "batteria_critica": false, 
-    "batteria_percentuale": 55, 
+    "batteria_percentuale": 100, 
+    "battiti_mani": false, 
     "camminando": true, 
     "carezza_testa": false, 
     "entrambe_mani": false, 
@@ -82,13 +54,15 @@
     "pericolo": false, 
     "piede_destro": false, 
     "piede_sinistro": false, 
+    "rumore_improvviso": false, 
+    "rumore_singolo": false, 
     "urto": false, 
     "urto_piedi": false, 
     "volto_ignoto": false, 
     "volto_riconosciuto": false
   }, 
   "file_python": "condizione_ostacolo_sinistra_durante_cammino.py", 
-  "mondo_origine": "REPORT: Ostacolo a sinistra. La mia batteria e' al 55%. STO CAMMINANDO.", 
+  "mondo_origine": "REPORT: Ostacolo a sinistra. La mia batteria e' al 100%. STO CAMMINANDO.", 
   "nome": "condizione_ostacolo_sinistra_durante_cammino", 
   "note": [
     "Condizione generata autonomamente da NAO.", 
@@ -104,15 +78,15 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 2, 
+    "attivazioni": 1, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 10:55:06", 
+    "ultima_attivazione": "2026-05-19 10:44:41", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 
   "stato_robot_origine": {
-    "energia": 55, 
+    "energia": 100, 
     "livello_allerta": 1, 
     "modalita": "esplorazione", 
     "obiettivo_corrente": "evitare ostacolo", 
