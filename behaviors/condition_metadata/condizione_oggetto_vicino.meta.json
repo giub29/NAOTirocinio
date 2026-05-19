@@ -1,33 +1,6 @@
 {
-  "aggiornata_il": "2026-05-14 10:54:48", 
+  "aggiornata_il": "2026-05-19 12:16:10", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "yellow", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Attenzione, c'è qualcosa qui.", 
-            "tipo": "parla"
-          }, 
-          {
-            "tipo": "fermati"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "evitare ostacolo", 
-        "stato_interno": "allerta"
-      }, 
-      "mondo": "REPORT: Vedo qualcosa vicino. SONO FERMO.", 
-      "tempo": "2026-05-12 11:50:09"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -135,6 +108,33 @@
       }, 
       "mondo": "REPORT: Vedo qualcosa vicino. SONO FERMO.", 
       "tempo": "2026-05-14 10:54:48"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "yellow", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Attenzione, c'è qualcosa qui.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "evitare ostacolo", 
+        "stato_interno": "allerta"
+      }, 
+      "mondo": "REPORT: Evento recente: Vedo qualcosa vicino. SONO FERMO.", 
+      "tempo": "2026-05-19 12:16:10"
     }
   ], 
   "creata_il": "2026-05-12 11:09:56", 
@@ -142,10 +142,10 @@
   "nome": "condizione_oggetto_vicino", 
   "origine": "sconosciuta", 
   "statistiche": {
-    "attivazioni": 7, 
+    "attivazioni": 8, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-14 10:54:48", 
+    "ultima_attivazione": "2026-05-19 12:16:10", 
     "ultimo_errore": ""
   }, 
   "stato": "attiva"

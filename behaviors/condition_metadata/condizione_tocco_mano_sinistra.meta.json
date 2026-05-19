@@ -1,34 +1,6 @@
 {
-  "aggiornata_il": "2026-05-19 11:43:29", 
+  "aggiornata_il": "2026-05-19 12:23:12", 
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "testo": "Ciao! Come posso aiutarti?", 
-            "tipo": "parla"
-          }, 
-          {
-            "path": "animations/Stand/Gestures/Hey_1", 
-            "tipo": "animazione"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "esplorare l'interazione", 
-        "stato_interno": "curioso"
-      }, 
-      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: La foto mostra una serie di armadietti grigi, con un monitor bianco appeso sopra di essi e alcune scatole di cartone accatastate a lato.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
-      "tempo": "2026-05-12 15:30:47"
-    }, 
     {
       "decisione": {
         "azioni": [
@@ -140,6 +112,34 @@
       }, 
       "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-19 11:43:29"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ciao! Come posso aiutarti?", 
+            "tipo": "parla"
+          }, 
+          {
+            "path": "animations/Stand/Gestures/Hey_1", 
+            "tipo": "animazione"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Sento un rumore improvviso vicino a me. Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-19 12:23:12"
     }
   ], 
   "creata_il": "2026-05-12 14:18:55", 
@@ -186,10 +186,10 @@
     "ultimo_motivo": ""
   }, 
   "statistiche": {
-    "attivazioni": 5, 
+    "attivazioni": 6, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-19 11:43:29", 
+    "ultima_attivazione": "2026-05-19 12:23:12", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

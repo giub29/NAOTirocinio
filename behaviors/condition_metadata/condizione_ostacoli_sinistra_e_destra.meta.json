@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 11:00:37", 
+  "aggiornata_il": "2026-05-19 12:20:18", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -24,6 +24,30 @@
       }, 
       "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: C'è qualcosa a destra. INTERAZIONE_UTENTE. PRENDI L'INIZIATIVA. Vedi: L'immagine mostra una parte del corpo di una persona, indossando una maglietta grigia e jeans, con i capelli lunghi visibili ai lati. Sullo sfondo si intravede un ambiente interno, probabilmente un ufficio o una scuola.. Usa la memoria e chiedi 'Cosa faresti tu?'. SONO FERMO.", 
       "tempo": "2026-05-12 11:00:37"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "cyan", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Cosa faresti tu?", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "osservare l'ambiente", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Vedo qualcosa vicino. Evento recente: C'è qualcosa a destra. Evento recente: Sento un tocco sulla mano destra. Evento recente: C'è qualcosa a sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-05-19 12:20:18"
     }
   ], 
   "creata_il": "2026-05-12 11:00:37", 
@@ -61,10 +85,10 @@
   ], 
   "origine": "autogenerata_llm", 
   "statistiche": {
-    "attivazioni": 1, 
+    "attivazioni": 2, 
     "errori_runtime": 0, 
     "rifiuti": 0, 
-    "ultima_attivazione": "2026-05-12 11:00:37", 
+    "ultima_attivazione": "2026-05-19 12:20:18", 
     "ultimo_errore": ""
   }, 
   "stato": "promossa", 

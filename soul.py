@@ -91,7 +91,7 @@ logging.getLogger("behaviors.condition_manager").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-IP_ROBOT = "172.16.165.86"
+IP_ROBOT = os.environ.get("NAO_IP", "172.16.165.86")
 CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY")
 
 TEMPO_INERZIA_INIZIATIVA = 20
@@ -795,6 +795,7 @@ def main():
         corpo = NaoBody(IP_ROBOT)
         sensi = NaoSenses(IP_ROBOT)
         voce = NaoVoice(IP_ROBOT)
+        voce.avvia_ascolto_comandi()
         vista = NaoVision(IP_ROBOT)
         sistema = NaoSystem(IP_ROBOT)
         sistema_globale = sistema
@@ -815,7 +816,10 @@ def main():
         if MODALITA_TEST:
             logger.info(u"Modalita test attiva: input da tastiera abilitato")
         else:
-            logger.info(u"Modalita autonoma laboratorio: input nome abilitato")
+            if os.environ.get("CHOREGRAPHE_BOOT", "") == "1":
+                logger.info(u"Modalita autonoma laboratorio: input tastiera disabilitato")
+            else:
+                logger.info(u"Modalita autonoma laboratorio: input tastiera abilitato")
 
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
@@ -829,6 +833,12 @@ def main():
 
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
+
+            comando_vocale = voce.leggi_comando_vocale()
+            if comando_vocale:
+                logger.info(u"[VOCE] Comando vocale riconosciuto: {}".format(comando_vocale))
+                messaggio_utente = comando_vocale
+                input_ricevuto = True
             
 
             if time.time() - ultimo_input_tempo < 2.0 and not input_ricevuto:
@@ -943,7 +953,7 @@ def main():
             mondo = normalizza_testo_ascii(mondo)
             _sincronizza_nome_runtime_da_mondo(mondo)
 
-            # Filtro anti-falso-positivo: mano sinistra ripetuta da ferma
+            # Filtro anti-ripetizione: accetta il primo tocco, ignora solo ripetizioni troppo ravvicinate
             if (
                 u"Sento un tocco sulla mano sinistra" in mondo and
                 not corpo.sta_camminando() and
@@ -952,14 +962,14 @@ def main():
                 adesso = time.time()
                 ultimo = stato_runtime.get("ultimo_tocco_mano_sinistra_tempo", 0)
 
-                if adesso - ultimo < 5:
-                    logger.info(u"[SOUL] Tocco mano sinistra ignorato: possibile falso positivo.")
+                if ultimo > 0 and adesso - ultimo < 3:
+                    logger.info(u"[SOUL] Tocco mano sinistra ripetuto ignorato.")
                     stato_precedente = mondo
                     time.sleep(0.1)
                     continue
 
                 stato_runtime["ultimo_tocco_mano_sinistra_tempo"] = adesso
-
+            
             if stato_runtime.get("attesa_nome", False) and input_ricevuto and messaggio_utente:
                 gestisci_input_nome(
                     corpo,

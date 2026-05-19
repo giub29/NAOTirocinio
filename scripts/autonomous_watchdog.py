@@ -87,6 +87,7 @@ def heartbeat_scaduto():
 
 
 def avvia_soul():
+
     # FORZO Python 2.7 compatibile con NAOqi
     python_cmd = r"C:\Python27\python.exe"
 
@@ -102,9 +103,18 @@ def avvia_soul():
         "Working directory: {}".format(SOUL_DIR)
     )
 
+    env = os.environ.copy()
+
+    logger.warning(
+        "NAO_IP: {}".format(
+            env.get("NAO_IP", "default")
+        )
+    )
+
     return subprocess.Popen(
         [python_cmd, SOUL_PATH],
-        cwd=SOUL_DIR
+        cwd=SOUL_DIR,
+        env=env
     )
 
 def termina_processo(p):
