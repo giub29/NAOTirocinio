@@ -147,7 +147,7 @@ def estrai_eventi(mondo, stato_runtime):
         )
     )
 
-    return {
+    eventi = {
         "batteria_percentuale": batteria_valore,
         "batteria_bassa": batteria_valore is not None and batteria_valore <= 25,
         "batteria_critica": batteria_valore is not None and batteria_valore <= 15,
@@ -208,6 +208,30 @@ def estrai_eventi(mondo, stato_runtime):
             "battito" in testo
         ),
     }
+
+    # PRIORITÀ AGLI EVENTI STRUTTURATI REALI
+    try:
+        eventi_runtime = stato_runtime.get("eventi", {})
+        if isinstance(eventi_runtime, dict):
+            eventi.update(eventi_runtime)
+    except Exception:
+        pass
+
+    try:
+        eventi_reali = stato_runtime.get("eventi_reali", {})
+        if isinstance(eventi_reali, dict):
+            eventi.update(eventi_reali)
+    except Exception:
+        pass
+
+    # Coerenza movimento: gli eventi strutturati prevalgono sul testo
+    if eventi.get("camminando", False):
+        eventi["fermo"] = False
+
+    if eventi.get("fermo", False):
+        eventi["camminando"] = False
+
+    return eventi
 
 def _carica_modulo_da_file(nome_modulo, path_file):
     """
@@ -901,8 +925,25 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         nome_base = _slug_testo(mondo_originale)
         
         runtime_positivo = {
-            "eventi": eventi_originali
+            "eventi": eventi_originali,
+            "eventi_reali": eventi_originali
         }
+
+        def _runtime_test(mondo_test, eventi_forzati=None):
+            eventi_test = estrai_eventi(mondo_test, {})
+            if eventi_forzati:
+                eventi_test.update(eventi_forzati)
+
+            if eventi_test.get("camminando", False):
+                eventi_test["fermo"] = False
+
+            if eventi_test.get("fermo", False):
+                eventi_test["camminando"] = False
+
+            return {
+                "eventi": eventi_test,
+                "eventi_reali": eventi_test
+            }
 
         positivo = modulo.condizione(mondo_originale, runtime_positivo)
 
@@ -912,11 +953,11 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
         casi_negativi = [
             (
                 u"REPORT: SONO FERMO.",
-                {"eventi": estrai_eventi(u"REPORT: SONO FERMO.", {})}
+                _runtime_test(u"REPORT: SONO FERMO.")
             ),
             (
                 u"REPORT: La mia batteria e' al 90%. SONO FERMO.",
-                {"eventi": estrai_eventi(u"REPORT: La mia batteria e' al 90%. SONO FERMO.", {})}
+                _runtime_test(u"REPORT: La mia batteria e' al 90%. SONO FERMO.")
             )
         ]
 
