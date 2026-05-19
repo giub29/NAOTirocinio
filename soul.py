@@ -113,6 +113,29 @@ ANGOLO_SGUARDO_INIZIATIVA = (0.0, -0.2)
 HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
 HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
 
+LOCK_FILE = os.path.join(HEARTBEAT_DIR, "soul.lock")
+
+
+def acquisisci_lock_soul():
+    if not os.path.exists(HEARTBEAT_DIR):
+        os.makedirs(HEARTBEAT_DIR)
+
+    if os.path.exists(LOCK_FILE):
+        print("[SOUL] Blocco avvio: soul.py risulta gia' attivo.")
+        return False
+
+    with open(LOCK_FILE, "w") as f:
+        f.write(str(os.getpid()))
+
+    return True
+
+
+def rilascia_lock_soul():
+    try:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+    except:
+        pass
 
 def aggiorna_heartbeat():
     try:
@@ -795,6 +818,9 @@ def main():
     global messaggio_utente, input_ricevuto, STOP_PROGRAMMA
     global memoria_fisica, stato_robot, sistema_globale
 
+    if not acquisisci_lock_soul():
+        return
+
     ultimo_evento_tempo = time.time()
     memoria_fisica = carica_memoria()
     corpo = None
@@ -819,15 +845,20 @@ def main():
         logger.info(u"[BOOT] Creo NaoVision")
         vista = NaoVision(IP_ROBOT)
 
-        logger.info(u"[BOOT] Salto NaoSystem temporaneamente")
-        sistema = None
-        sistema_globale = None
+        logger.info(u"[BOOT] Creo NaoSystem")
+        try:
+            sistema = NaoSystem(IP_ROBOT)
+        except Exception as e:
+            logger.warning(u"[BOOT] NaoSystem non disponibile: {}".format(e))
+            sistema = None
 
         sistema_globale = sistema
 
         logger.info(u"[BOOT] Moduli robot creati")
 
-        if os.environ.get("SKIP_AUTONOMOUS_LIFE_CONFIG", "") == "1":
+        if sistema is None:
+            logger.info(u"[SYSTEM] NaoSystem assente: salto configurazione sistema")
+        elif os.environ.get("SKIP_AUTONOMOUS_LIFE_CONFIG", "") == "1":
             logger.info(u"[SYSTEM] Configurazione AutonomousLife saltata su robot")
         else:
             sistema.configura_autonomous_life_da_env()
@@ -1479,6 +1510,7 @@ def main():
             corpo.fermati()
             corpo.disabilita_motori()
 
+        rilascia_lock_soul()
         logger.info(u"Sistema spento correttamente")
 
 

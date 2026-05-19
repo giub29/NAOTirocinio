@@ -6,13 +6,29 @@ import time
 
 class NaoSystem:
     def __init__(self, ip, port=9559):
-        # Proxy di gestione sistema
-        self.system = ALProxy("ALSystem", ip, port)
-        self.conn_manager = ALProxy("ALConnectionManager", ip, port)
-        self.life = ALProxy("ALAutonomousLife", ip, port)
-        self.battery = ALProxy("ALBattery", ip, port)
+
         self.percorso_memoria = "memoria.json"
-        self.memory = ALProxy("ALMemory", ip, port)
+
+        def _proxy_safe(nome_proxy):
+            try:
+                proxy = ALProxy(nome_proxy, ip, port)
+                print("[SYSTEM] Proxy {} OK".format(nome_proxy))
+                return proxy
+            except Exception as errore:
+                print(
+                    "[SYSTEM] Proxy {} NON disponibile: {}".format(
+                        nome_proxy,
+                        errore
+                    )
+                )
+                return None
+
+        # Proxy di gestione sistema
+        self.system = _proxy_safe("ALSystem")
+        self.conn_manager = _proxy_safe("ALConnectionManager")
+        self.life = _proxy_safe("ALAutonomousLife")
+        self.battery = _proxy_safe("ALBattery")
+        self.memory = _proxy_safe("ALMemory")
 
     def configura_autonomous_life_da_env(self):
         """
@@ -27,6 +43,12 @@ class NaoSystem:
         """
 
         try:
+            if self.life is None:
+                print(
+                    "[SYSTEM] ALAutonomousLife non disponibile."
+                )
+                return False
+            
             valore = os.environ.get(
                 "NAO_AUTONOMOUS_LIFE",
                 ""
@@ -96,8 +118,13 @@ class NaoSystem:
 
     def set_vita_autonoma(self, stato):
         """Attiva o disattiva la vita autonoma (solitary o disabled)"""
+        if self.life is None:
+            print("[SYSTEM] ALAutonomousLife non disponibile.")
+            return False
+
         nuovo_stato = "solitary" if stato else "disabled"
         self.life.setState(nuovo_stato)
+        return True
 
     def controlla_batteria(self):
         """

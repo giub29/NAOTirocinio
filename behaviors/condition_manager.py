@@ -41,10 +41,11 @@ REJECTED_DIR = os.path.join(BASE_DIR, "rejected_conditions")
 
 _condizioni_cache = None
 _ultima_attivazione_condizione = {}
+_ultima_firma_condizione = {}
 _errori_condizione = {}
 
-# Una condizione vera non viene rieseguita continuamente.
-COOLDOWN_CONDIZIONE = 30
+# Evita loop: una stessa condizione sullo stesso evento non viene rieseguita subito.
+COOLDOWN_CONDIZIONE = 8
 
 # Dopo questo numero di errori runtime, la condizione viene disattivata.
 MAX_ERRORI_CONDIZIONE = 3
@@ -62,6 +63,36 @@ def _assicura_cartelle():
     if not os.path.exists(REJECTED_DIR):
         os.makedirs(REJECTED_DIR)
 
+def _firma_evento_corrente(mondo, stato_runtime):
+    """
+    Crea una firma stabile dell'evento corrente.
+    Serve per evitare che la stessa condizione venga eseguita in loop
+    mentre l'evento resta ancora nei recenti.
+    """
+    parti = []
+
+    try:
+        evento_strutturato = stato_runtime.get("evento_strutturato", {})
+        if isinstance(evento_strutturato, dict):
+            for chiave in sorted(evento_strutturato.keys()):
+                parti.append("{}={}".format(chiave, evento_strutturato.get(chiave)))
+    except:
+        pass
+
+    try:
+        eventi = stato_runtime.get("eventi", {})
+        if isinstance(eventi, dict):
+            for chiave in sorted(eventi.keys()):
+                if eventi.get(chiave):
+                    parti.append("evento:{}".format(chiave))
+    except:
+        pass
+
+    if not parti:
+        testo = (mondo or "").lower().strip()
+        parti.append(testo[:180])
+
+    return "|".join(parti)
 
 def _path_condizione(nome_modulo):
     if nome_modulo.endswith(".py"):
@@ -571,9 +602,12 @@ def valuta_condizioni_generate(mondo, stato_runtime):
             continue
 
         try:
+            firma_corrente = _firma_evento_corrente(mondo, stato_runtime)
+            ultima_firma = _ultima_firma_condizione.get(nome)
             ultimo_tempo = _ultima_attivazione_condizione.get(nome, 0)
 
-            if adesso - ultimo_tempo < COOLDOWN_CONDIZIONE:
+            if ultima_firma == firma_corrente and adesso - ultimo_tempo < COOLDOWN_CONDIZIONE:
+                logger.info(u"[CONDIZIONI] Skip anti-loop: {} ancora in cooldown".format(nome))
                 continue
 
             condizione_vera = modulo.condizione(mondo, stato_runtime)
@@ -626,7 +660,7 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                     continue
 
                 _ultima_attivazione_condizione[nome] = adesso
-
+                _ultima_firma_condizione[nome] = firma_corrente
                 try:
                     registra_attivazione(
                         nome.replace(".py", ""),

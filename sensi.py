@@ -160,7 +160,7 @@ class NaoSenses:
         """
         ultimo_evento = {}
         cooldown = 2.5
-
+        
         while not self._stop_monitor_tocco:
             tempo_attuale = time.time()
 

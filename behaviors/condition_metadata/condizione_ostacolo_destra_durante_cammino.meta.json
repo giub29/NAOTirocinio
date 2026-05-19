@@ -1,130 +1,63 @@
 {
-  "aggiornata_il": "2026-05-19 11:51:40", 
-  "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "red", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "g": 0.12, 
-            "tipo": "cammina", 
-            "x": 0.16
-          }, 
-          {
-            "testo": "Attenzione, ostacolo a destra!", 
-            "tipo": "parla"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "evitare ostacolo a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: Ostacolo a sinistra. La mia batteria e' al 100%. STO CAMMINANDO.", 
-      "tempo": "2026-05-19 10:32:27"
-    }, 
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "red", 
-            "tipo": "occhi"
-          }, 
-          {
-            "tipo": "guarda", 
-            "x": 0.5, 
-            "y": -0.2
-          }, 
-          {
-            "g": 0.12, 
-            "tipo": "cammina", 
-            "x": 0.16
-          }, 
-          {
-            "testo": "Attenzione, ostacolo a destra!", 
-            "tipo": "parla"
-          }
-        ], 
-        "memoria": [], 
-        "obiettivo": "evitare ostacolo a destra", 
-        "stato_interno": "prudente"
-      }, 
-      "mondo": "REPORT: La mia batteria e' al 65%. Evento recente: Ostacolo a destra. Evento recente: Ostacolo a sinistra. STO CAMMINANDO.", 
-      "tempo": "2026-05-19 11:50:45"
-    }
-  ], 
-  "creata_il": "2026-05-12 14:59:48", 
+  "aggiornata_il": "2026-05-19 21:44:59",
+  "creata_il": "2026-05-19 21:44:59",
   "eventi_attivi_origine": [
-    "ostacolo_destra", 
+    "ostacolo_destra",
     "camminando"
-  ], 
+  ],
   "eventi_completi_origine": {
-    "batteria_bassa": false, 
-    "batteria_critica": false, 
-    "batteria_percentuale": 50, 
-    "camminando": true, 
-    "carezza_testa": false, 
-    "entrambe_mani": false, 
-    "entrambi_piedi": false, 
-    "fermo": false, 
-    "mano_destra": false, 
-    "mano_sinistra": false, 
-    "ostacolo_destra": true, 
-    "ostacolo_frontale": false, 
-    "ostacolo_sinistra": false, 
-    "pericolo": false, 
-    "piede_destro": false, 
-    "piede_sinistro": false, 
-    "urto": false, 
-    "urto_piedi": false, 
-    "volto_ignoto": false, 
+    "batteria_bassa": false,
+    "batteria_critica": false,
+    "batteria_percentuale": null,
+    "battiti_mani": false,
+    "camminando": true,
+    "carezza_testa": false,
+    "entrambe_mani": false,
+    "entrambi_piedi": false,
+    "fermo": false,
+    "mano_destra": false,
+    "mano_sinistra": false,
+    "ostacolo_destra": true,
+    "ostacolo_frontale": false,
+    "ostacolo_sinistra": false,
+    "pericolo": false,
+    "piede_destro": false,
+    "piede_sinistro": false,
+    "rumore_improvviso": false,
+    "rumore_singolo": false,
+    "urto": false,
+    "urto_piedi": false,
+    "volto_ignoto": false,
     "volto_riconosciuto": false
-  }, 
-  "file_python": "condizione_ostacolo_destra_durante_cammino.py", 
-  "mondo_origine": "REPORT: Ostacolo a destra. La mia batteria e' al 50%. STO CAMMINANDO.", 
-  "motivo_rifiuto": "movimento non coerente quando il robot e' fermo", 
-  "nome": "condizione_ostacolo_destra_durante_cammino", 
+  },
+  "file_python": "condizione_ostacolo_destra_durante_cammino.py",
+  "mondo_origine": "REPORT: Ostacolo a destra. STO CAMMINANDO.",
+  "nome": "condizione_ostacolo_destra_durante_cammino",
   "note": [
-    "Condizione generata autonomamente da NAO.", 
-    "Il file Python contiene la logica eseguibile.", 
+    "Condizione generata autonomamente da NAO.",
+    "Il file Python contiene la logica eseguibile.",
     "Questo JSON contiene la memoria e la tracciabilità della condizione."
-  ], 
-  "origine": "autogenerata_llm", 
+  ],
+  "origine": "autogenerata_llm",
   "riparazione": {
-    "fallimenti": 1, 
-    "successi": 0, 
-    "tentativi": 1, 
-    "ultimo_esito": "repair_validation_failed", 
-    "ultimo_motivo": "nessuna condizione valida generata dal generatore"
-  }, 
+    "fallimenti": 0,
+    "successi": 0,
+    "tentativi": 0,
+    "ultimo_esito": "",
+    "ultimo_motivo": ""
+  },
   "statistiche": {
-    "attivazioni": 2, 
-    "errori_runtime": 0, 
-    "rifiuti": 1, 
-    "ultima_attivazione": "2026-05-19 11:50:45", 
+    "attivazioni": 0,
+    "errori_runtime": 0,
+    "rifiuti": 0,
+    "ultima_attivazione": "",
     "ultimo_errore": ""
-  }, 
-  "stato": "rifiutata", 
-  "stato_robot_origine": {
-    "energia": 50, 
-    "livello_allerta": 1, 
-    "modalita": "esplorazione", 
-    "obiettivo_corrente": "evitare ostacolo", 
-    "persona_attuale": null, 
-    "sta_camminando": true, 
-    "ultimo_evento": "ostacolo rilevato", 
-    "umore": "prudente"
-  }, 
+  },
+  "stato": "promossa",
+  "stato_robot_origine": {},
   "validazione": {
-    "modulo": "ok", 
-    "semantica": "ok", 
+    "modulo": "ok",
+    "semantica": "ok",
     "struttura": "ok"
   }
 }
