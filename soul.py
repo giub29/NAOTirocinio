@@ -895,6 +895,43 @@ def main():
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
 
+            # STOP DI EMERGENZA TESTA
+            try:
+                from naoqi import ALProxy
+                memory = ALProxy("ALMemory", IP_ROBOT, 9559)
+
+                testa_front = memory.getData(
+                    "Device/SubDeviceList/Head/Touch/Front/Sensor/Value"
+                )
+
+                testa_middle = memory.getData(
+                    "Device/SubDeviceList/Head/Touch/Middle/Sensor/Value"
+                )
+
+                if testa_front and testa_middle:
+                    logger.warning(
+                        u"[EMERGENCY] STOP MANUALE ATTIVATO"
+                    )
+
+                    try:
+                        corpo.fermati()
+                    except:
+                        pass
+
+                    try:
+                        voce.parla(
+                            u"Modalita sicurezza attivata."
+                        )
+                    except:
+                        pass
+
+                    os._exit(0)
+
+            except Exception as e:
+                logger.error(
+                    u"Errore emergency stop: {}".format(e)
+                )
+
             if os.environ.get("ABILITA_VOCE_COMANDI", "") == "1":
                 comando_vocale = voce.leggi_comando_vocale()
             else:
