@@ -1115,10 +1115,15 @@ def main():
                 ultimo = stato_runtime.get("ultimo_tocco_mano_sinistra_tempo", 0)
 
                 if ultimo > 0 and adesso - ultimo < 3:
-                    logger.info(u"[SOUL] Tocco mano sinistra ripetuto ignorato.")
+                    if not stato_runtime.get("skip_tocco_mano_sinistra_loggato", False):
+                        logger.info(u"[SOUL] Tocco mano sinistra ripetuto ignorato.")
+                        stato_runtime["skip_tocco_mano_sinistra_loggato"] = True
+
                     stato_precedente = mondo
                     time.sleep(0.1)
                     continue
+
+                stato_runtime["skip_tocco_mano_sinistra_loggato"] = False
 
                 stato_runtime["ultimo_tocco_mano_sinistra_tempo"] = adesso
             
@@ -1361,17 +1366,52 @@ def main():
             # troppe volte in pochi secondi.
             mondo_dedup = re.sub(r"\s+", " ", mondo).strip().lower()
 
-            # Ignoro la parte "Evento recente:" per evitare auto-loop
             # Rimuovo marker rumorosi che generano pseudo-eventi
             mondo_dedup = mondo_dedup.replace("evento recente:", "")
             mondo_dedup = mondo_dedup.replace("report:", "")
+            mondo_dedup = mondo_dedup.replace("interazione_utente.", "")
+            mondo_dedup = mondo_dedup.replace("sono fermo.", "")
+            mondo_dedup = mondo_dedup.replace("sto camminando.", "camminando")
+            mondo_dedup = re.sub(r"\s+", " ", mondo_dedup).strip()
 
-            # Normalizzo il volto ignoto:
-            # "Evento recente: Vedo un volto ignoto"
-            # e "Vedo un volto ignoto"
-            # devono essere lo stesso evento.
+            # Firma evento stabile: evita che lo stesso fatto cambi forma nel testo
+            firma_evento = []
+
             if "vedo un volto ignoto" in mondo_dedup:
-                mondo_dedup = "volto_ignoto"
+                firma_evento.append("volto_ignoto")
+
+            if "riconosco" in mondo_dedup:
+                firma_evento.append("volto_noto")
+
+            if "mano sinistra" in mondo_dedup:
+                firma_evento.append("mano_sinistra")
+
+            if "mano destra" in mondo_dedup:
+                firma_evento.append("mano_destra")
+
+            if "entrambe le mani" in mondo_dedup:
+                firma_evento.append("entrambe_mani")
+
+            if "carezza" in mondo_dedup and "testa" in mondo_dedup:
+                firma_evento.append("carezza_testa")
+
+            if "rumore" in mondo_dedup:
+                firma_evento.append("rumore")
+
+            if "colpo" in mondo_dedup:
+                firma_evento.append("colpo")
+
+            if "qualcosa a sinistra" in mondo_dedup or "ostacolo a sinistra" in mondo_dedup:
+                firma_evento.append("ostacolo_sinistra")
+
+            if "qualcosa a destra" in mondo_dedup or "ostacolo a destra" in mondo_dedup:
+                firma_evento.append("ostacolo_destra")
+
+            if "camminando" in mondo_dedup:
+                firma_evento.append("camminando")
+
+            if firma_evento:
+                mondo_dedup = "|".join(sorted(set(firma_evento)))
 
             ultimo_mondo = stato_runtime.get("ultimo_mondo_gestito", "")
             ultimo_mondo_tempo = stato_runtime.get("ultimo_mondo_gestito_tempo", 0)
