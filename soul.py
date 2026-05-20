@@ -1357,6 +1357,69 @@ def main():
             mondo = re.sub(r"\s+", " ", mondo).strip()
             mondo = _aggiungi_stato_movimento(mondo, corpo)
 
+            # Deduplica conservativa: evita che lo stesso evento venga gestito
+            # troppe volte in pochi secondi.
+            mondo_dedup = re.sub(r"\s+", " ", mondo).strip().lower()
+
+            # Ignoro la parte "Evento recente:" per evitare auto-loop
+            # Rimuovo marker rumorosi che generano pseudo-eventi
+            mondo_dedup = mondo_dedup.replace("evento recente:", "")
+            mondo_dedup = mondo_dedup.replace("report:", "")
+
+            # Normalizzo il volto ignoto:
+            # "Evento recente: Vedo un volto ignoto"
+            # e "Vedo un volto ignoto"
+            # devono essere lo stesso evento.
+            if "vedo un volto ignoto" in mondo_dedup:
+                mondo_dedup = "volto_ignoto"
+
+            ultimo_mondo = stato_runtime.get("ultimo_mondo_gestito", "")
+            ultimo_mondo_tempo = stato_runtime.get("ultimo_mondo_gestito_tempo", 0)
+
+            tempo_cooldown = 4.0
+
+            # Volto ignoto da fermo: evento molto rumoroso, lo tratto con cooldown più lungo
+            if (
+                "vedo un volto ignoto" in mondo_dedup and
+                "sono fermo" in mondo_dedup and
+                "tocco" not in mondo_dedup and
+                "carezza" not in mondo_dedup and
+                "rumore" not in mondo_dedup and
+                "colpo" not in mondo_dedup and
+                "ostacolo" not in mondo_dedup and
+                "qualcosa a destra" not in mondo_dedup and
+                "qualcosa a sinistra" not in mondo_dedup
+            ):
+                tempo_cooldown = 20.0
+
+            # mondo neutro: cooldown più lungo
+            if mondo_dedup in [
+                "report: sono fermo.",
+                "sono fermo.",
+                "report:"
+            ]:
+                tempo_cooldown = 8.0
+
+            if (
+                mondo_dedup == ultimo_mondo and
+                time.time() - ultimo_mondo_tempo < tempo_cooldown
+            ):
+                # Loggo una sola volta
+                if not stato_runtime.get("ultimo_skip_loggato", False):
+                    logger.info(
+                        u"[SOUL] Evento duplicato ignorato: {}".format(
+                            testo_per_log(mondo)
+                        )
+                    )
+                    stato_runtime["ultimo_skip_loggato"] = True
+
+                time.sleep(0.1)
+                continue
+
+            stato_runtime["ultimo_skip_loggato"] = False
+            stato_runtime["ultimo_mondo_gestito"] = mondo_dedup
+            stato_runtime["ultimo_mondo_gestito_tempo"] = time.time()
+
             # Se vedo solo un volto ignoto, non devo continuare a ragionare come se fosse Giulia.
             _sincronizza_nome_runtime_da_mondo(mondo)
 
