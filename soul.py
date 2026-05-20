@@ -185,6 +185,7 @@ stato_runtime = {
     "controllo_manuale_fino_a": 0,
     "ultima_curiosita_stop_tempo": 0,
     "ultimo_volto_ignoto_rilevato": False,
+    "ultimo_volto_ignoto_tempo": 0,
     "ultimo_evento_reale_tempo": 0
 }
 
@@ -381,6 +382,7 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
 
     if input_ricevuto and messaggio_utente:
         testo_user = messaggio_utente.lower().strip()
+        logger.warning(u"[TEST INPUT] Ho ricevuto: {}".format(testo_user))
 
         if "spegni" in testo_user or "chiudi" in testo_user or "esci" in testo_user:
             stato_runtime["in_pattugliamento"] = False
@@ -389,7 +391,46 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
             STOP_PROGRAMMA = True
             logger.info(u"Spegnimento richiesto dall'utente")
 
+        elif "test evento sconosciuto" in testo_user:
+            mondo_test = u"REPORT: Sento una vibrazione improvvisa vicino al piede destro. STO CAMMINANDO."
+
+            stato_runtime["in_pattugliamento"] = True
+            stato_runtime["eventi_reali"] = {
+                "camminando": True,
+                "vibrazione_improvvisa": True,
+                "piede_destro": True
+            }
+
+            _prepara_runtime_autonomo(
+                mondo_test,
+                evento_composto=True,
+                forza_safety=True,
+                motivo_safety=u"test controllato condizione sconosciuta"
+            )
+
+            decisione = autonomy_supervisor.gestisci_autonomia(
+                mondo_test,
+                stato_runtime
+            )
+
+            if decisione:
+                decisione = valida_decisione(decisione, mondo_test)
+                esegui_decisione(
+                    decisione,
+                    corpo,
+                    voce,
+                    vista,
+                    sistema,
+                    stato_runtime,
+                    aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                )
+
+            messaggio_utente = ""
+            input_ricevuto = False
+            return mondo_test
+
         elif "status" in testo_user:
+            
             voce.parla(u"Sono attivo e sto funzionando correttamente.")
             try:
                 sistema.pubblica_stato_autonomo("RUNNING")
@@ -925,7 +966,8 @@ def main():
                     except:
                         pass
 
-                    os._exit(0)
+                    STOP_PROGRAMMA = True
+                    break
 
             except Exception as e:
                 logger.error(

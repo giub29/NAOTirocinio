@@ -95,6 +95,14 @@ def _attendi_stabilita_volto(stato_runtime):
 
 
 def _segnala_volto_ignoto(corpo, voce, stato_runtime):
+    adesso = time.time()
+    ultimo = stato_runtime.get("ultimo_volto_ignoto_tempo", 0)
+
+    if adesso - ultimo < 60:
+        logger.info(u"Cooldown volto ignoto attivo: evito loop")
+        return
+
+    stato_runtime["ultimo_volto_ignoto_tempo"] = adesso
     corpo.imposta_colore_occhi("red")
 
     stava_camminando = corpo.sta_camminando() or stato_runtime["in_pattugliamento"]
@@ -106,7 +114,22 @@ def _segnala_volto_ignoto(corpo, voce, stato_runtime):
     corpo.guarda(*ANGOLO_SGUARDO_VOLTO)
     time.sleep(TEMPO_SLEEP_FOTO)
 
-    corpo.scatta_foto(camera_id=0, nome_file="sconosciuto.jpg")
+    nome_foto = "sconosciuto_{}.jpg".format(
+        int(time.time())
+    )
+
+    try:
+        corpo.scatta_foto(
+            camera_id=0,
+            nome_file=nome_foto
+        )
+        logger.info(
+            u"Foto sconosciuto salvata: {}".format(nome_foto)
+        )
+    except Exception as e:
+        logger.warning(
+            u"Errore scatto foto sconosciuto: {}".format(e)
+        )
     voce.parla(MSG_NO_RICONOSCIMENTO)
 
     stato_runtime["attesa_nome"] = False
