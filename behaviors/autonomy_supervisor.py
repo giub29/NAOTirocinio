@@ -25,6 +25,11 @@ try:
 except Exception:
     arricchisci_eventi_con_sconosciuti = None
 
+try:
+    from behaviors.event_registry import arricchisci_eventi_registro
+except Exception:
+    arricchisci_eventi_registro = None
+
 logger = logging.getLogger(__name__)
 ULTIMA_GENERAZIONE = 0
 INTERVALLO_MINIMO_GENERAZIONE = 20
@@ -228,6 +233,34 @@ def situazione_merita_generazione(mondo, stato_runtime):
 
     return False, "situazione non abbastanza significativa"
 
+def _estrai_eventi_noti_minimi(mondo):
+    testo = (mondo or "").lower()
+
+    eventi = {
+        "carezza_testa": "testa" in testo and ("tocc" in testo or "carezza" in testo),
+        "mano_destra": "mano destra" in testo,
+        "mano_sinistra": "mano sinistra" in testo,
+        "entrambe_mani": "entrambe le mani" in testo,
+        "volto_riconosciuto": "riconosco" in testo,
+        "volto_ignoto": "volto ignoto" in testo or "non riconosco" in testo,
+        "ostacolo_destra": "ostacolo a destra" in testo,
+        "ostacolo_sinistra": "ostacolo a sinistra" in testo,
+        "ostacolo_frontale": "ostacolo frontale" in testo,
+        "rumore_improvviso": "rumore improvviso" in testo or "suono improvviso" in testo,
+        "rumore_singolo": "rumore singolo" in testo or "colpo" in testo,
+        "battiti_mani": "battiti" in testo or "battito" in testo,
+        "fermo": "sono fermo" in testo,
+        "camminando": "sto camminando" in testo
+    }
+
+    if eventi.get("camminando", False):
+        eventi["fermo"] = False
+
+    if eventi.get("fermo", False):
+        eventi["camminando"] = False
+
+    return eventi
+
 def costruisci_firma_situazione(mondo, stato_runtime):
     """
     Trasforma il mondo attuale in una descrizione piu' astratta.
@@ -252,6 +285,12 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     
     if not isinstance(eventi_reali, dict):
         eventi_reali = {}
+
+    eventi_noti_testo = _estrai_eventi_noti_minimi(mondo)
+
+    for chiave, valore in eventi_noti_testo.items():
+        if chiave not in eventi:
+            eventi[chiave] = valore
     
     # Eventi sconosciuti:
     # se il mondo contiene concetti nuovi, li trasformo in eventi candidati.
@@ -422,10 +461,19 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     mondo_normalizzato = testo
     gia_tentata = mondo_normalizzato == ULTIMO_MONDO_GENERATO
 
+    eventi_descritti = {}
+
+    try:
+        if arricchisci_eventi_registro is not None:
+            eventi_descritti = arricchisci_eventi_registro(eventi_attivi)
+    except Exception:
+        eventi_descritti = {}
+
     return {
         "testo": testo,
         "eventi": eventi,
         "eventi_attivi": eventi_attivi,
+        "eventi_descritti": eventi_descritti,
         "mondo_vuoto": mondo_vuoto,
         "banale": solo_banale,
         "eventi_multipli": eventi_multipli,

@@ -187,7 +187,10 @@ def estrai_eventi_sconosciuti(mondo, eventi_noti=None):
 
         candidati.append(parola)
 
-        nome_evento = _slug(candidati)
+    if not candidati:
+        return {}
+    
+    nome_evento = _slug(candidati)
 
     if not nome_evento:
         return {}

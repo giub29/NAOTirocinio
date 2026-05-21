@@ -47,6 +47,11 @@ try:
 except Exception:
     arricchisci_eventi_con_sconosciuti = None
 
+try:
+    from behaviors.event_registry import arricchisci_eventi_registro
+except Exception:
+    arricchisci_eventi_registro = None
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
@@ -1984,6 +1989,14 @@ def costruisci_evento_strutturato(mondo, stato_runtime=None):
     if eventi.get("camminando", False) and len(eventi_core) >= 1:
         evento_composto = True
 
+        eventi_descritti = {}
+
+    try:
+        if arricchisci_eventi_registro is not None:
+            eventi_descritti = arricchisci_eventi_registro(eventi)
+    except Exception:
+        eventi_descritti = {}
+
     firma = {
         "tipo": tipo,
         "direzione": direzione,
@@ -1993,6 +2006,7 @@ def costruisci_evento_strutturato(mondo, stato_runtime=None):
         "fermo": fermo,
         "durante_cammino": camminando,
         "eventi": eventi,
+        "eventi_descritti": eventi_descritti,
         "eventi_attivi": eventi_attivi,
         "eventi_core": eventi_core,
         "evento_composto": evento_composto
