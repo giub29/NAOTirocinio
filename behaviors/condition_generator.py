@@ -42,6 +42,11 @@ except NameError:
 from behaviors.condition_manager import reset_cache_condizioni
 from behaviors.condition_memory import salva_metadati_condizione
 
+try:
+    from behaviors.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+except Exception:
+    arricchisci_eventi_con_sconosciuti = None
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
@@ -230,6 +235,14 @@ def estrai_eventi(mondo, stato_runtime):
 
     if eventi.get("fermo", False):
         eventi["camminando"] = False
+
+    # Eventi sconosciuti:
+    # aggiunge concetti nuovi senza sovrascrivere eventi noti.
+    try:
+        if arricchisci_eventi_con_sconosciuti is not None:
+            eventi = arricchisci_eventi_con_sconosciuti(mondo, eventi)
+    except Exception as e:
+        logger.warning(u"[GENERATOR] Errore estrazione eventi sconosciuti: {}".format(e))
 
     return eventi
 

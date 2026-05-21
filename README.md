@@ -27,6 +27,7 @@ Funzioni principali:
 - riconoscimento di volti noti e apprendimento di volti ignoti;
 - gestione di ostacoli, urti e pericolo caduta;
 - costruzione di eventi strutturati come `ostacolo_destra`, `carezza_testa`, `volto_ignoto`, `camminando`;
+- estrazione prudente di eventi sconosciuti dal testo sensoriale, con memoria di ricorrenza prima della generazione;
 - generazione autonoma di condizioni Python in `behaviors/generated_conditions`;
 - quarantena, validazione, rifiuto e riparazione delle condizioni generate;
 - memoria persistente in `data/memoria.json`;
@@ -63,10 +64,13 @@ NAOTirocinio/
 |   |-- condition_manager.py        # caricamento ed esecuzione condizioni
 |   |-- condition_memory.py         # metadati e affidabilita condizioni
 |   |-- condition_repair.py         # rigenerazione condizioni rifiutate
+|   |-- event_novelty_memory.py     # memoria ricorrenza eventi sconosciuti
 |   |-- face_behavior.py            # gestione volti noti/ignoti
 |   |-- lab_patrol_behavior.py      # navigazione laboratorio
 |   |-- llm_behavior.py             # chiamate OpenAI per decisioni/visione
 |   |-- safety_behavior.py          # emergenze e ostacoli durante cammino
+|   |-- unknown_event_extractor.py  # estrazione eventi candidati da testo sensoriale
+|   |-- event_novelty_memory.json   # stato persistente delle novita osservate
 |   |-- generated_conditions/       # condizioni attive
 |   |-- quarantine_conditions/      # condizioni in validazione
 |   |-- rejected_conditions/        # condizioni scartate
@@ -125,6 +129,22 @@ E' il punto di ingresso dell'autonomia appresa. Riceve `mondo` e `stato_runtime`
 
 Usa cooldown e memoria dell'ultimo mondo generato per evitare duplicati e chiamate LLM troppo ravvicinate.
 
+Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `unknown_event_extractor.py`. La prima osservazione resta solo in memoria; l'evento diventa candidato alla generazione solo quando supera la soglia di ricorrenza registrata in `event_novelty_memory.json`.
+
+### Eventi sconosciuti e novita
+
+`unknown_event_extractor.py` trasforma concetti nuovi presenti nel report in eventi candidati, per esempio `porta_aperta_laboratorio`, senza chiamare LLM, senza modificare condizioni e senza eseguire azioni sul robot.
+
+Il filtro e' volutamente conservativo:
+
+- ignora parole banali gia' usate nei report, come `report`, `vedo`, `fermo`, `camminando`;
+- non ricrea eventi gia' noti come `carezza_testa`, `volto_ignoto` o `ostacolo_destra`;
+- scarta descrizioni troppo neutre se isolate, ad esempio solo `tavolo` o `sedia`;
+- privilegia parole interessanti come `porta`, `bottiglia`, `telefono`, `fumo`, `acqua`, `grido`;
+- mantiene al massimo tre esempi recenti per ogni novita.
+
+`event_novelty_memory.py` registra quante volte un evento sconosciuto e' stato visto. Con la soglia attuale (`SOGLIA_OCCORRENZE_GENERAZIONE = 2`), una novita osservata una sola volta viene ricordata ma non genera condizioni; dalla seconda osservazione puo' diventare generabile, se non e' gia' stata marcata come generata.
+
 ### Condizioni autonome
 
 Una condizione generata e' un file Python con due funzioni:
@@ -153,6 +173,8 @@ Il generatore:
 7. valida la coerenza semantica fra evento e azioni;
 8. promuove in `generated_conditions` oppure sposta in `rejected_conditions`;
 9. salva metadati in `condition_metadata`.
+
+Durante l'estrazione eventi, `condition_generator.py` usa lo stesso arricchimento degli eventi sconosciuti del supervisore. Gli eventi noti non vengono sovrascritti; le novita servono solo a produrre trigger piu specifici quando sono diventate abbastanza ricorrenti.
 
 Il manager carica le condizioni attive con priorita alle condizioni piu specifiche, composte e `durante_cammino`. Una condizione troppo generica viene ignorata quando il runtime richiede una condizione specifica.
 
@@ -340,6 +362,6 @@ Per debug piu dettagliato:
 
 ## Stato del progetto
 
-Versione documentata: sistema con supervisore autonomo, eventi strutturati, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
+Versione documentata: sistema con supervisore autonomo, eventi strutturati, memoria delle novita sensoriali, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
 
-Ultimo aggiornamento README: 2026-05-19.
+Ultimo aggiornamento README: 2026-05-21.

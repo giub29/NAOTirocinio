@@ -19,7 +19,11 @@ percezione → firma evento → condizione esistente/generazione → decisione.
 import logging
 import traceback
 import time
-import os
+
+try:
+    from behaviors.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+except Exception:
+    arricchisci_eventi_con_sconosciuti = None
 
 logger = logging.getLogger(__name__)
 ULTIMA_GENERAZIONE = 0
@@ -214,6 +218,12 @@ def situazione_merita_generazione(mondo, stato_runtime):
         return True, "novita' runtime non ancora coperta"
 
     if firma["ha_testo_sensoriale_non_banale"]:
+        # Se il testo e' sensoriale ma non ha ancora prodotto eventi attivi,
+        # osservo soltanto. La memoria novita' lo rendera' generabile
+        # solo dopo ricorrenza.
+        if len(firma.get("eventi_attivi", {}).keys()) == 0:
+            return False, "situazione sensoriale osservata ma non ancora ricorrente"
+
         return True, "situazione sensoriale non banale"
 
     return False, "situazione non abbastanza significativa"
@@ -242,7 +252,15 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     
     if not isinstance(eventi_reali, dict):
         eventi_reali = {}
-
+    
+    # Eventi sconosciuti:
+    # se il mondo contiene concetti nuovi, li trasformo in eventi candidati.
+    try:
+        if arricchisci_eventi_con_sconosciuti is not None:
+            eventi = arricchisci_eventi_con_sconosciuti(mondo, eventi)
+    except Exception as e:
+        logger.warning("[AUTONOMIA] Errore estrazione eventi sconosciuti: {}".format(e))
+    
     parole_banali = [
         "la mia batteria",
         "batteria",
