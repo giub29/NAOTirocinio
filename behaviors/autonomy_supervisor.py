@@ -460,8 +460,6 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 or os.environ.get("OPENAI_API_KEY")
             )
 
-            ULTIMO_MONDO_GENERATO = mondo_normalizzato
-
             path_nuova_condizione = condition_generator.genera_condizione_autonoma(
                 mondo,
                 dati_memoria,
@@ -470,6 +468,8 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
             )
 
             if path_nuova_condizione:
+                ULTIMO_MONDO_GENERATO = mondo_normalizzato
+
                 logger.info("[AUTONOMIA] Nuova condizione generata: {}".format(
                     path_nuova_condizione
                 ))

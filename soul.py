@@ -1444,14 +1444,23 @@ def main():
                 mondo_dedup == ultimo_mondo and
                 time.time() - ultimo_mondo_tempo < tempo_cooldown
             ):
-                # Loggo una sola volta
-                if not stato_runtime.get("ultimo_skip_loggato", False):
+                # Loggo una sola volta, ma ignoro mondi neutri
+                if (
+                    not stato_runtime.get("ultimo_skip_loggato", False)
+                    and mondo_dedup not in [
+                        "",
+                        "report:",
+                        "sono fermo.",
+                        "report: sono fermo."
+                    ]
+                ):
                     logger.info(
                         u"[SOUL] Evento duplicato ignorato: {}".format(
                             testo_per_log(mondo)
                         )
                     )
-                    stato_runtime["ultimo_skip_loggato"] = True
+
+                stato_runtime["ultimo_skip_loggato"] = True
 
                 time.sleep(0.1)
                 continue
@@ -1642,6 +1651,34 @@ def main():
                     pass
 
             if decisione_condizione:
+                firma_supervisore = mondo_dedup
+                adesso = time.time()
+
+                ultima_firma = stato_runtime.get(
+                    "ultima_firma_supervisore",
+                    ""
+                )
+
+                ultimo_tempo = stato_runtime.get(
+                    "ultimo_tempo_supervisore",
+                    0
+                )
+
+                if (
+                    firma_supervisore == ultima_firma and
+                    adesso - ultimo_tempo < 15
+                ):
+                    logger.info(
+                        u"[SOUL] Supervisore in cooldown: {}".format(
+                            firma_supervisore
+                        )
+                    )
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
+
+                stato_runtime["ultima_firma_supervisore"] = firma_supervisore
+                stato_runtime["ultimo_tempo_supervisore"] = adesso
                 logger.info(u"[SOUL] Uso decisione del supervisore autonomo")
 
                 

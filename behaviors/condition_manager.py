@@ -22,6 +22,7 @@ except ImportError:
     imp = None
 import time
 import shutil
+import sys
 
 from behaviors.condition_memory import (
     registra_attivazione,
@@ -40,6 +41,7 @@ CONDIZIONI_DIR = os.path.join(BASE_DIR, "generated_conditions")
 REJECTED_DIR = os.path.join(BASE_DIR, "rejected_conditions")
 
 _condizioni_cache = None
+_firma_cache_condizioni = None
 _ultima_attivazione_condizione = {}
 _ultima_firma_condizione = {}
 _errori_condizione = {}
@@ -53,7 +55,83 @@ MAX_ERRORI_CONDIZIONE = 3
 
 def reset_cache_condizioni():
     global _condizioni_cache
+    global _firma_cache_condizioni
     _condizioni_cache = None
+    _firma_cache_condizioni = None
+
+
+def _firma_cartella_condizioni():
+    """
+    Restituisce una firma dello stato reale di generated_conditions.
+    Serve per capire se una condizione e' stata spostata, eliminata o rigenerata
+    mentre soul.py e' ancora acceso.
+    """
+
+    _assicura_cartelle()
+
+    firma = []
+
+    try:
+        nomi_file = os.listdir(CONDIZIONI_DIR)
+    except Exception:
+        nomi_file = []
+
+    for nome_file in nomi_file:
+        if not nome_file.endswith(".py"):
+            continue
+
+        if nome_file.startswith("__"):
+            continue
+
+        path_file = os.path.join(CONDIZIONI_DIR, nome_file)
+
+        try:
+            stat = os.stat(path_file)
+            firma.append((nome_file, stat.st_mtime, stat.st_size))
+        except OSError:
+            continue
+
+    return tuple(sorted(firma))
+
+
+def _rimuovi_modulo_da_memoria(nome_modulo):
+    """
+    Rimuove dalla memoria Python una condizione gia' caricata.
+    Questo risolve il bug: se il file .py viene spostato in rejected_conditions,
+    NAO non deve continuare a usare la vecchia condizione rimasta in cache.
+    """
+
+    if nome_modulo.endswith(".py"):
+        nome_modulo = nome_modulo[:-3]
+
+    try:
+        if nome_modulo in sys.modules:
+            del sys.modules[nome_modulo]
+    except Exception:
+        pass
+
+
+def _pulisci_bytecode_condizione(nome_modulo):
+    """
+    Elimina eventuali .pyc/.pyo rimasti.
+    Utile soprattutto con Python 2 sul robot NAO.
+    """
+
+    if nome_modulo.endswith(".py"):
+        nome_modulo = nome_modulo[:-3]
+
+    possibili = [
+        os.path.join(CONDIZIONI_DIR, nome_modulo + ".pyc"),
+        os.path.join(CONDIZIONI_DIR, nome_modulo + ".pyo"),
+    ]
+
+    for path in possibili:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.info(u"[CONDIZIONI] Bytecode rimosso: {}".format(path))
+        except Exception as e:
+            logger.warning(u"[CONDIZIONI] Impossibile rimuovere bytecode {}: {}".format(path, e))
 
 
 def _assicura_cartelle():
@@ -145,6 +223,9 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
 
         if os.path.exists(origine_meta):
             shutil.move(origine_meta, destinazione_meta)
+
+        _rimuovi_modulo_da_memoria(nome_modulo)
+        _pulisci_bytecode_condizione(nome_modulo)
 
         logger.warning(u"[CONDIZIONI] Condizione spostata in rejected_conditions: {} | motivo: {}".format(
             nome_modulo,
@@ -267,6 +348,7 @@ def _carica_modulo_da_file(nome_modulo, path_file):
     Carica un modulo Python da file.
     Compatibile sia con Python 3 sia con Python 2.7/NAO.
     """
+    _rimuovi_modulo_da_memoria(nome_modulo)
 
     if importlib is not None:
         try:
@@ -284,11 +366,17 @@ def _carica_modulo_da_file(nome_modulo, path_file):
 
 def carica_condizioni_generate():
     global _condizioni_cache
+    global _firma_cache_condizioni
 
     _assicura_cartelle()
 
-    if _condizioni_cache is not None:
+    firma_attuale = _firma_cartella_condizioni()
+
+    if _condizioni_cache is not None and _firma_cache_condizioni == firma_attuale:
         return _condizioni_cache
+
+    if _condizioni_cache is not None and _firma_cache_condizioni != firma_attuale:
+        logger.info(u"[CONDIZIONI] Cartella condizioni cambiata: ricarico cache")
 
     condizioni = []
 
@@ -333,6 +421,7 @@ def carica_condizioni_generate():
     )
 
     _condizioni_cache = condizioni
+    _firma_cache_condizioni = firma_attuale
     return condizioni
 
 def punteggio_specificita_condizione(nome_file):
@@ -492,30 +581,104 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     Filtra condizioni troppo generiche usando la firma evento strutturata.
 
     Obiettivo:
-    - se NAO sta camminando e rileva un ostacolo specifico,
-      deve preferire la condizione specifica durante_cammino;
-    - evitare che una condizione semplice tipo ostacolo_destra
-      intercetti un evento composto come ostacolo_destra_durante_cammino.
+    - evitare che una condizione semplice intercetti un evento composto;
+    - se l'evento e' composto, deve passare solo una condizione composta;
+    - se NAO sta camminando, devono passare solo condizioni specifiche durante_cammino.
     """
 
     nome = (nome_condizione or "").lower()
 
     eventi = stato_runtime.get("eventi", {})
+    eventi_reali = stato_runtime.get("eventi_reali", {})
     evento_strutturato = stato_runtime.get("evento_strutturato", {})
 
     if not isinstance(eventi, dict):
         eventi = {}
+
+    if not isinstance(eventi_reali, dict):
+        eventi_reali = {}
 
     if not isinstance(evento_strutturato, dict):
         evento_strutturato = {}
 
     camminando = (
         evento_strutturato.get("camminando", False) or
-        eventi.get("camminando", False)
+        eventi.get("camminando", False) or
+        eventi_reali.get("camminando", False)
     )
 
     tipo = evento_strutturato.get("tipo", "")
     direzione = evento_strutturato.get("direzione", "")
+    eventi_core = evento_strutturato.get("eventi_core", [])
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_attivi = []
+
+    for chiave, valore in eventi.items():
+        if valore not in [False, None, "", [], {}]:
+            eventi_attivi.append(str(chiave).lower())
+
+    for chiave, valore in eventi_reali.items():
+        if valore not in [False, None, "", [], {}]:
+            chiave_norm = str(chiave).lower()
+            if chiave_norm not in eventi_attivi:
+                eventi_attivi.append(chiave_norm)
+
+    for chiave in eventi_core:
+        chiave_norm = str(chiave).lower()
+        if chiave_norm not in eventi_attivi:
+            eventi_attivi.append(chiave_norm)
+
+    evento_composto = (
+        evento_strutturato.get("evento_composto", False)
+        or len(eventi_attivi) >= 2
+    )
+
+    # Caso fondamentale:
+    # se l'evento e' composto, una condizione semplice NON deve intercettarlo.
+    # Esempio: mano_destra + volto_ignoto non deve attivare solo mano_destra.
+    if evento_composto:
+        parole_rilevanti = []
+
+        for evento in eventi_attivi:
+            for pezzo in evento.replace("-", "_").split("_"):
+                pezzo = pezzo.strip()
+                if pezzo and pezzo not in parole_rilevanti:
+                    parole_rilevanti.append(pezzo)
+
+                eventi_coperti = 0
+
+        for evento in eventi_attivi:
+            evento_norm = evento.replace("-", "_").lower()
+            pezzi_evento = [
+                pezzo.strip()
+                for pezzo in evento_norm.split("_")
+                if pezzo.strip()
+            ]
+
+            if not pezzi_evento:
+                continue
+
+            pezzi_presenti = [
+                pezzo for pezzo in pezzi_evento
+                if pezzo in nome
+            ]
+
+            # Un evento e' coperto se almeno una sua parte significativa
+            # compare nel nome della condizione.
+            if len(pezzi_presenti) > 0:
+                eventi_coperti += 1
+
+        condizione_composta = (
+            "_e_" in nome
+            or "entrambe" in nome
+            or eventi_coperti >= 2
+        )
+
+        if not condizione_composta:
+            return False
 
     # Ostacolo durante cammino: serve condizione specifica.
     if camminando and tipo == "ostacolo":
@@ -533,7 +696,7 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     if camminando and tipo == "urto_piedi":
         return "urto_piedi_durante_cammino" in nome
 
-    # Eventi sociali durante cammino: preferisco condizioni specifiche se esistono.
+    # Eventi sociali durante cammino: serve condizione specifica.
     if camminando and tipo == "carezza":
         return "carezza_durante_cammino" in nome
 
@@ -549,21 +712,11 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     if camminando and tipo == "volto_ignoto":
         return "volto_ignoto_durante_cammino" in nome
 
-    # Se l'evento e' un ostacolo frontale durante cammino,
-    # deve passare solo la condizione frontale specifica.
-    if camminando and tipo == "ostacolo" and direzione == "frontale":
-        return "ostacolo_frontale_durante_cammino" in nome
-
-    # Se l'evento e' una carezza durante cammino,
-    # deve passare solo la condizione specifica durante cammino.
-    if camminando and tipo == "carezza":
-        return "carezza_durante_cammino" in nome
-
     # Se l'evento e' una carezza da fermo,
     # non deve passare carezza_durante_cammino.
     if not camminando and tipo == "carezza":
         return "carezza_testa" in nome and "durante_cammino" not in nome
-    
+
     return True
 
 def valuta_condizioni_generate(mondo, stato_runtime):
