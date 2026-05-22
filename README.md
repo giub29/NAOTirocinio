@@ -28,7 +28,7 @@ Funzioni principali:
 - gestione di ostacoli, urti e pericolo caduta;
 - costruzione di eventi strutturati come `ostacolo_destra`, `carezza_testa`, `volto_ignoto`, `camminando`;
 - estrazione prudente di eventi sconosciuti dal testo sensoriale, con memoria di ricorrenza prima della generazione;
-- generazione autonoma di condizioni Python in `behaviors/generated_conditions`;
+- generazione autonoma di condizioni Python gestita da `behaviors/condition_system`;
 - quarantena, validazione, rifiuto e riparazione delle condizioni generate;
 - memoria persistente in `data/memoria.json`;
 - heartbeat e integrazione con Choregraphe/NAOqi tramite ALMemory;
@@ -60,21 +60,30 @@ NAOTirocinio/
 |-- behaviors/
 |   |-- action_behavior.py          # validazione ed esecuzione azioni
 |   |-- autonomy_supervisor.py      # regia dell'autonomia
-|   |-- condition_generator.py      # generazione e validazione condizioni
-|   |-- condition_manager.py        # caricamento ed esecuzione condizioni
-|   |-- condition_memory.py         # metadati e affidabilita condizioni
-|   |-- condition_repair.py         # rigenerazione condizioni rifiutate
-|   |-- event_novelty_memory.py     # memoria ricorrenza eventi sconosciuti
 |   |-- face_behavior.py            # gestione volti noti/ignoti
 |   |-- lab_patrol_behavior.py      # navigazione laboratorio
 |   |-- llm_behavior.py             # chiamate OpenAI per decisioni/visione
 |   |-- safety_behavior.py          # emergenze e ostacoli durante cammino
-|   |-- unknown_event_extractor.py  # estrazione eventi candidati da testo sensoriale
-|   |-- event_novelty_memory.json   # stato persistente delle novita osservate
-|   |-- generated_conditions/       # condizioni attive
-|   |-- quarantine_conditions/      # condizioni in validazione
-|   |-- rejected_conditions/        # condizioni scartate
-|   `-- condition_metadata/         # metadati delle condizioni
+|   |-- README_AUTONOMIA.md         # riepilogo del sistema autonomo
+|   |
+|   |-- condition_system/
+|   |   |-- condition_generator.py  # generazione e validazione condizioni
+|   |   |-- condition_manager.py    # caricamento ed esecuzione condizioni
+|   |   |-- condition_memory.py     # metadati e affidabilita condizioni
+|   |   |-- condition_repair.py     # rigenerazione condizioni rifiutate
+|   |   |-- generated_conditions/   # condizioni attive, create a runtime
+|   |   |-- quarantine_conditions/  # condizioni in validazione, create a runtime
+|   |   |-- rejected_conditions/    # condizioni scartate, create a runtime
+|   |   |-- condition_metadata/     # metadati delle condizioni, creati a runtime
+|   |   `-- rejected_metadata/      # metadati delle condizioni rifiutate
+|   |
+|   `-- event_system/
+|       |-- event_registry.py               # registro eventi noti/scoperti
+|       |-- event_novelty_memory.py         # memoria ricorrenza eventi sconosciuti
+|       |-- event_novelty_memory.json       # stato persistente delle novita osservate
+|       |-- unknown_condition_validator.py  # validazione trigger sconosciuti
+|       |-- unknown_event_extractor.py      # estrazione eventi candidati
+|       `-- unknown_generation_simulator.py # simulazione prima della generazione reale
 |
 |-- scripts/
 |   |-- nao_autonomous_bootstrap.py # script da eseguire sul NAO
@@ -129,11 +138,11 @@ E' il punto di ingresso dell'autonomia appresa. Riceve `mondo` e `stato_runtime`
 
 Usa cooldown e memoria dell'ultimo mondo generato per evitare duplicati e chiamate LLM troppo ravvicinate.
 
-Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `unknown_event_extractor.py`. La prima osservazione resta solo in memoria; l'evento diventa candidato alla generazione solo quando supera la soglia di ricorrenza registrata in `event_novelty_memory.json`.
+Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `event_system/unknown_event_extractor.py`. La prima osservazione resta solo in memoria; l'evento diventa candidato alla generazione solo quando supera la soglia di ricorrenza registrata in `event_system/event_novelty_memory.json`.
 
 ### Eventi sconosciuti e novita
 
-`unknown_event_extractor.py` trasforma concetti nuovi presenti nel report in eventi candidati, per esempio `porta_aperta_laboratorio`, senza chiamare LLM, senza modificare condizioni e senza eseguire azioni sul robot.
+`event_system/unknown_event_extractor.py` trasforma concetti nuovi presenti nel report in eventi candidati, per esempio `porta_aperta_laboratorio`, senza chiamare LLM, senza modificare condizioni e senza eseguire azioni sul robot.
 
 Il filtro e' volutamente conservativo:
 
@@ -143,7 +152,9 @@ Il filtro e' volutamente conservativo:
 - privilegia parole interessanti come `porta`, `bottiglia`, `telefono`, `fumo`, `acqua`, `grido`;
 - mantiene al massimo tre esempi recenti per ogni novita.
 
-`event_novelty_memory.py` registra quante volte un evento sconosciuto e' stato visto. Con la soglia attuale (`SOGLIA_OCCORRENZE_GENERAZIONE = 2`), una novita osservata una sola volta viene ricordata ma non genera condizioni; dalla seconda osservazione puo' diventare generabile, se non e' gia' stata marcata come generata.
+`event_system/event_novelty_memory.py` registra quante volte un evento sconosciuto e' stato visto. Con la soglia attuale (`SOGLIA_OCCORRENZE_GENERAZIONE = 2`), una novita osservata una sola volta viene ricordata ma non genera condizioni; dalla seconda osservazione puo' diventare generabile, se non e' gia' stata marcata come generata.
+
+Prima della generazione reale, `event_system/unknown_generation_simulator.py` costruisce una condizione minima simulata e la passa a `event_system/unknown_condition_validator.py`. Solo eventi abbastanza specifici, come `porta_aperta_laboratorio`, vengono ammessi alla fase successiva; eventi generici come `porta` o `rumore` vengono tenuti fuori.
 
 ### Condizioni autonome
 
@@ -162,19 +173,26 @@ def comportamento():
     }
 ```
 
+Il sottosistema `condition_system` contiene il ciclo completo delle condizioni:
+
+- `condition_generator.py`: genera codice tramite LLM, lo mette in quarantena e lo valida;
+- `condition_manager.py`: carica le condizioni promosse, le valuta e isola quelle difettose;
+- `condition_memory.py`: salva metadati, statistiche, rifiuti e tentativi di riparazione;
+- `condition_repair.py`: prova a rigenerare una condizione rifiutata quando possibile.
+
 Il generatore:
 
 1. chiede codice Python al LLM;
-2. salva il file in `quarantine_conditions`;
+2. salva il file in `condition_system/quarantine_conditions`;
 3. blocca import, I/O, `exec`, `eval`, cicli e codice fuori funzione;
 4. aggiunge una `condizione()` automatica se il LLM produce solo `comportamento()`;
 5. sostituisce trigger troppo generici con trigger specifici quando possibile;
 6. valida il modulo;
 7. valida la coerenza semantica fra evento e azioni;
-8. promuove in `generated_conditions` oppure sposta in `rejected_conditions`;
-9. salva metadati in `condition_metadata`.
+8. promuove in `condition_system/generated_conditions` oppure sposta in `condition_system/rejected_conditions`;
+9. salva metadati in `condition_system/condition_metadata`.
 
-Durante l'estrazione eventi, `condition_generator.py` usa lo stesso arricchimento degli eventi sconosciuti del supervisore. Gli eventi noti non vengono sovrascritti; le novita servono solo a produrre trigger piu specifici quando sono diventate abbastanza ricorrenti.
+Durante l'estrazione eventi, `condition_system/condition_generator.py` usa lo stesso arricchimento degli eventi sconosciuti del supervisore. Gli eventi noti non vengono sovrascritti; le novita servono solo a produrre trigger piu specifici quando sono diventate abbastanza ricorrenti.
 
 Il manager carica le condizioni attive con priorita alle condizioni piu specifiche, composte e `durante_cammino`. Una condizione troppo generica viene ignorata quando il runtime richiede una condizione specifica.
 
@@ -190,7 +208,7 @@ Il manager carica le condizioni attive con priorita alle condizioni piu specific
 - rifiuti;
 - esiti di riparazione.
 
-Se una condizione genera errori o produce decisioni incoerenti, `condition_manager.py` la sposta in `rejected_conditions` e prova a rigenerarla tramite `condition_repair.py`, se e' disponibile `OPENAI_API_KEY` e se il cooldown lo permette.
+Se una condizione genera errori o produce decisioni incoerenti, `condition_system/condition_manager.py` la sposta in `condition_system/rejected_conditions` e prova a rigenerarla tramite `condition_system/condition_repair.py`, se e' disponibile `OPENAI_API_KEY` e se il cooldown lo permette.
 
 ### Navigazione laboratorio
 
@@ -216,7 +234,7 @@ Regole importanti:
 
 ## LLM e API
 
-Il progetto usa chiamate HTTP verso OpenAI in `behaviors/llm_behavior.py` e `behaviors/condition_generator.py`.
+Il progetto usa chiamate HTTP verso OpenAI in `behaviors/llm_behavior.py` e `behaviors/condition_system/condition_generator.py`.
 
 Variabile richiesta:
 
@@ -355,13 +373,13 @@ Per debug piu dettagliato:
 ## Note operative
 
 - Le condizioni generate sono codice eseguibile: devono passare sempre da quarantena e validazione.
-- Non modificare a mano `generated_conditions` senza controllare anche i relativi metadati.
-- I file in `rejected_conditions` sono utili per capire cosa e' stato scartato.
+- Non modificare a mano `behaviors/condition_system/generated_conditions` senza controllare anche i relativi metadati.
+- I file in `behaviors/condition_system/rejected_conditions` sono utili per capire cosa e' stato scartato.
 - Le cartelle runtime/quarantena/rejected possono essere create automaticamente.
 - L'avvio autonomo dipende dagli IP configurati tramite `NAO_IP`, `NAO_ROBOT_IP` e `PC_IP` in `scripts/nao_autonomous_bootstrap.py`.
 
 ## Stato del progetto
 
-Versione documentata: sistema con supervisore autonomo, eventi strutturati, memoria delle novita sensoriali, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
+Versione documentata: sistema con supervisore autonomo, registro eventi, simulazione degli eventi sconosciuti, memoria delle novita sensoriali, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
 
-Ultimo aggiornamento README: 2026-05-21.
+Ultimo aggiornamento README: 2026-05-22.
