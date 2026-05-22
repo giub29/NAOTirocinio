@@ -39,8 +39,8 @@ from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
-from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
-from behaviors.condition_generator import (
+from NAOTirocinio.behaviors.condition_system.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
+from NAOTirocinio.behaviors.condition_system.condition_generator import (
     estrai_eventi,
     costruisci_evento_strutturato
 )

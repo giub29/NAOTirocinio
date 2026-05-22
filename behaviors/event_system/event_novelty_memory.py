@@ -103,3 +103,23 @@ def marca_evento_generato(nome_evento):
 def stato_evento(nome_evento):
     memoria = _leggi_memoria()
     return memoria.get(nome_evento, {})
+
+def evento_ricorrente(nome_evento):
+    try:
+        info = stato_evento(nome_evento)
+        visto = int(info.get("visto", 0))
+        generato = info.get("generato", False)
+
+        return visto >= SOGLIA_OCCORRENZE_GENERAZIONE and not generato
+
+    except Exception:
+        return False
+
+
+def registra_evento(nome_evento, mondo=None):
+    try:
+        risultato = registra_evento_sconosciuto(nome_evento, mondo)
+        return risultato.get("visto", 0)
+
+    except Exception:
+        return 0

@@ -114,7 +114,7 @@ def tenta_riparazione_condizione(nome_condizione, motivo, mondo=None, stato_runt
             nome_condizione
         ))
 
-        from behaviors.condition_generator import genera_condizione_autonoma
+        from NAOTirocinio.behaviors.condition_system.condition_generator import genera_condizione_autonoma
 
         nuova_condizione = genera_condizione_autonoma(
             mondo_riparazione,

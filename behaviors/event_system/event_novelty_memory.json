@@ -1,0 +1,29 @@
+{
+  "bottiglia_rossa_tavolo": {
+    "esempi": [
+      "REPORT: Vedo una bottiglia rossa sul tavolo. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1779461256,
+    "ultima_volta": 1779461256,
+    "visto": 3
+  },
+  "fischio": {
+    "esempi": [
+      "REPORT: Sento un fischio. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1779458896,
+    "ultima_volta": 1779461251,
+    "visto": 4
+  },
+  "porta_aperta_laboratorio": {
+    "esempi": [
+      "REPORT: Vedo una porta aperta nel laboratorio. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1779399980,
+    "ultima_volta": 1779461165,
+    "visto": 49
+  }
+}

@@ -24,7 +24,7 @@ import time
 import shutil
 import sys
 
-from behaviors.condition_memory import (
+from NAOTirocinio.behaviors.condition_system.condition_memory import (
     registra_attivazione,
     registra_errore_condizione,
     marca_condizione_rifiutata,
@@ -32,7 +32,7 @@ from behaviors.condition_memory import (
     registra_esito_riparazione
 )
 
-from behaviors.condition_repair import tenta_riparazione_condizione
+from NAOTirocinio.behaviors.condition_system.condition_repair import tenta_riparazione_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -587,6 +587,20 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     """
 
     nome = (nome_condizione or "").lower()
+    nome_evento = nome.replace("condizione_", "").replace(".py", "")
+
+    try:
+        eventi = stato_runtime.get("eventi", {})
+        eventi_reali = stato_runtime.get("eventi_reali", {})
+
+        if isinstance(eventi, dict) and eventi.get(nome_evento, False):
+            return True
+
+        if isinstance(eventi_reali, dict) and eventi_reali.get(nome_evento, False):
+            return True
+
+    except Exception:
+        pass
 
     eventi = stato_runtime.get("eventi", {})
     eventi_reali = stato_runtime.get("eventi_reali", {})

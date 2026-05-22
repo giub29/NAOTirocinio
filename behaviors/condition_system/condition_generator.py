@@ -39,16 +39,16 @@ try:
 except NameError:
     basestring = str
 
-from behaviors.condition_manager import reset_cache_condizioni
-from behaviors.condition_memory import salva_metadati_condizione
+from NAOTirocinio.behaviors.condition_system.condition_manager import reset_cache_condizioni
+from NAOTirocinio.behaviors.condition_system.condition_memory import salva_metadati_condizione
 
 try:
-    from behaviors.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+    from NAOTirocinio.behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
 except Exception:
     arricchisci_eventi_con_sconosciuti = None
 
 try:
-    from behaviors.event_registry import arricchisci_eventi_registro
+    from NAOTirocinio.behaviors.event_system.event_registry import arricchisci_eventi_registro
 except Exception:
     arricchisci_eventi_registro = None
 
@@ -1617,6 +1617,16 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
 
     elif nome_base == "curiosita_dinamica":
         righe.append('    return False')
+
+        # EVENTI SCONOSCIUTI AUTONOMI
+    elif "_" in nome_base and nome_base not in [
+        "generica",
+        "curiosita_dinamica"
+    ]:
+        righe.append('    eventi = stato_runtime.get("eventi", {})')
+        righe.append(
+            '    return eventi.get("{}", False)'.format(nome_base)
+        )
 
     else:
         return None
