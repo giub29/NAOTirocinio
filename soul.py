@@ -408,6 +408,11 @@ def _processa_input_utente(mondo, corpo, voce, vista, sistema):
                 motivo_safety=u"test controllato condizione sconosciuta"
             )
 
+            # HARD RESET eventi runtime ad ogni ciclo
+            stato_runtime["eventi"] = dict(
+                stato_runtime.get("eventi_reali", {})
+            )
+
             decisione = autonomy_supervisor.gestisci_autonomia(
                 mondo_test,
                 stato_runtime
@@ -692,9 +697,15 @@ def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, 
     Centralizza la preparazione dello stato runtime per supervisore,
     condizioni autogenerate e validazione.
     """
-    eventi_testuali = estrai_eventi(mondo, stato_runtime)
 
-    eventi_reali = stato_runtime.get("eventi_reali", {})
+    eventi_reali = dict(stato_runtime.get("eventi_reali", {}))
+
+    # Pulizia: non permettere a eventi vecchi di influenzare estrai_eventi
+    runtime_pulito = dict(stato_runtime)
+    runtime_pulito["eventi"] = eventi_reali
+
+    eventi_testuali = estrai_eventi(mondo, runtime_pulito)
+
     eventi_combinati = {}
 
     try:
@@ -711,16 +722,13 @@ def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, 
     stato_runtime["eventi_testuali"] = eventi_testuali
     stato_runtime["evento_strutturato"] = costruisci_evento_strutturato(
         mondo,
-        stato_runtime
+        runtime_pulito
     )
+
     stato_runtime["memoria"] = memoria_fisica
     stato_runtime["stato_robot"] = stato_robot
     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-
-    # Abilita davvero la generazione autonoma di condizioni sconosciute.
-    # Senza questo flag il supervisore simula soltanto.
-    stato_runtime["abilita_generazione_eventi_sconosciuti"] = True  
-
+    stato_runtime["abilita_generazione_eventi_sconosciuti"] = True
     stato_runtime["evento_composto"] = evento_composto
     stato_runtime["forza_generazione_safety"] = forza_safety
     stato_runtime["motivo_safety"] = motivo_safety
@@ -816,6 +824,11 @@ def _tenta_generare_condizione_da_evento_safety(mondo, motivo):
         )
         
         try:
+            # HARD RESET eventi runtime ad ogni ciclo
+            stato_runtime["eventi"] = dict(
+                stato_runtime.get("eventi_reali", {})
+            )
+
             decisione = autonomy_supervisor.gestisci_autonomia(
                 mondo,
                 stato_runtime
@@ -1079,33 +1092,79 @@ def main():
             mondo = sensi.ottieni_report_semantico()
 
             # Eventi reali del robot (sensori -> supervisore)
-            eventi_robot = sensi.ottieni_eventi_strutturati()
+            eventi_robot_freschi = sensi.ottieni_eventi_strutturati()
+
+            # Ricostruisco SEMPRE da zero lo stato eventi
+            eventi_robot = {
+                "carezza_testa": False,
+                "mano_destra": False,
+                "mano_sinistra": False,
+                "entrambe_mani": False,
+                "rumore_improvviso": False,
+                "rumore_singolo": False,
+                "battiti_mani": False,
+                "piede_sinistro": False,
+                "piede_destro": False,
+                "urto_piedi": False,
+                "ostacolo_destra": False,
+                "ostacolo_sinistra": False,
+                "ostacolo_frontale": False,
+                "volto_ignoto": False,
+                "volto_riconosciuto": False,
+                "camminando": False,
+                "fermo": False
+            }
+
+            # Aggiorno solo gli eventi davvero attivi ORA
+            eventi_robot.update(eventi_robot_freschi)
 
             # Stato movimento come evento reale
             try:
                 if corpo.sta_camminando() or stato_runtime.get("in_pattugliamento", False):
                     eventi_robot["camminando"] = True
+                    eventi_robot["fermo"] = False
                 else:
                     eventi_robot["fermo"] = True
+                    eventi_robot["camminando"] = False
             except:
                 eventi_robot["fermo"] = True
+                eventi_robot["camminando"] = False
 
-            stato_runtime["eventi_reali"] = eventi_robot
-
-            # Porto gli eventi strutturati reali anche nel mondo testuale,
-            # così il ciclo decisionale e le condizioni autogenerate li vedono.
+            stato_runtime["eventi_reali"] = dict(eventi_robot)
+            
             try:
-                if eventi_robot.get("carezza_testa", False) and u"Sento una carezza sulla testa" not in mondo:
-                    mondo += u" Evento recente: Sento una carezza sulla testa."
+                # Eventi temporanei: aggiungo SOLO quelli vivi ORA
+                eventi_testuali = []
 
-                if eventi_robot.get("mano_sinistra", False) and u"Sento un tocco sulla mano sinistra" not in mondo:
-                    mondo += u" Evento recente: Sento un tocco sulla mano sinistra."
+                if eventi_robot.get("carezza_testa", False):
+                    eventi_testuali.append(
+                        u"Evento recente: Sento una carezza sulla testa."
+                    )
 
-                if eventi_robot.get("mano_destra", False) and u"Sento un tocco sulla mano destra" not in mondo:
-                    mondo += u" Evento recente: Sento un tocco sulla mano destra."
+                if eventi_robot.get("mano_sinistra", False):
+                    eventi_testuali.append(
+                        u"Evento recente: Sento un tocco sulla mano sinistra."
+                    )
 
-                if eventi_robot.get("entrambe_mani", False) and u"Sento un tocco su entrambe le mani" not in mondo:
-                    mondo += u" Evento recente: Sento un tocco su entrambe le mani."
+                if eventi_robot.get("mano_destra", False):
+                    eventi_testuali.append(
+                        u"Evento recente: Sento un tocco sulla mano destra."
+                    )
+
+                if eventi_robot.get("entrambe_mani", False):
+                    eventi_testuali.append(
+                        u"Evento recente: Sento un tocco su entrambe le mani."
+                    )
+
+                if eventi_testuali:
+                    mondo = re.sub(
+                        u"Evento recente:.*?(?=SONO FERMO|STO CAMMINANDO|$)",
+                        u"",
+                        mondo
+                    ).strip()
+
+                    mondo += u" " + u" ".join(eventi_testuali)
+
             except Exception:
                 pass
 
@@ -1621,6 +1680,11 @@ def main():
                 if salta_autonomia_per_vai:
                     logger.info(u"[SOUL] Salto autonomia per avvio pattugliamento appena richiesto")
                 else:
+                    # HARD RESET eventi runtime ad ogni ciclo
+                    stato_runtime["eventi"] = dict(
+                        stato_runtime.get("eventi_reali", {})
+                    )
+
                     decisione_condizione = autonomy_supervisor.gestisci_autonomia(
                         mondo,
                         stato_runtime

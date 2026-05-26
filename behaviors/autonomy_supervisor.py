@@ -74,10 +74,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         if not isinstance(eventi_core, list):
             eventi_core = []
 
+        eventi_reali_correnti = stato_runtime.get("eventi_reali", {})
         for nome_evento in eventi_core:
             nome_evento = str(nome_evento).lower().strip()
 
-            if nome_evento:
+            if nome_evento and eventi_reali_correnti.get(nome_evento, False):
                 stato_runtime.setdefault("eventi", {})
                 stato_runtime["eventi"][nome_evento] = True
 
@@ -338,8 +339,8 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         stato_runtime = {}
 
     testo = (mondo or "").strip().lower()
-    eventi = stato_runtime.get("eventi", {})
-    eventi_reali = stato_runtime.get("eventi_reali", {})
+    eventi = dict(stato_runtime.get("eventi", {}))
+    eventi_reali = dict(stato_runtime.get("eventi_reali", {}))
     evento_strutturato = stato_runtime.get("evento_strutturato", {})
 
     if not isinstance(evento_strutturato, dict):

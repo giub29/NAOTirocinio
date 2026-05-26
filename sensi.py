@@ -62,9 +62,7 @@ class NaoSenses:
         self.thread_tocco = threading.Thread(target=self._monitor_tocchi)
         self.thread_tocco.daemon = True
         self.thread_tocco.start()
-
         
-
     def _safe_print(self, testo):
         try:
             if isinstance(testo, unicode):
@@ -115,7 +113,21 @@ class NaoSenses:
                 for chiave, dati in self.eventi_recenti.items():
                     try:
                         if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
-                            eventi.append(dati["testo"])
+
+                            # per eventi umani/tattili verifica che siano ancora vivi
+                            if chiave in [
+                                "mano_destra",
+                                "mano_sinistra",
+                                "carezza_testa",
+                                "entrambe_mani",
+                                "rumore_improvviso",
+                                "rumore_singolo",
+                                "battiti_mani"
+                            ]:
+                                if self.evento_recente(chiave):
+                                    eventi.append(dati["testo"])
+                            else:
+                                eventi.append(dati["testo"])
                         else:
                             chiavi_da_eliminare.append(chiave)
                     except:
@@ -130,26 +142,64 @@ class NaoSenses:
             pass
 
         return eventi
+    
+    def evento_recente(self, nome_evento, finestra=3.0):
+        """
+        Ritorna True solo se l'evento è recente.
+        Evita che vecchi tocchi/rumori restino attivi per sempre.
+        """
+        ultimo = self.ultimo_evento.get(nome_evento, 0)
+
+        if not ultimo:
+            return False
+
+        return (time.time() - ultimo) <= finestra
 
     def ottieni_eventi_strutturati(self):
         """
-        Restituisce eventi recenti come firma semantica:
-        {
-            "ostacolo_destra": True,
-            "camminando": True
-        }
+        Restituisce SOLO eventi realmente attivi ora.
+        Gli eventi tattili/audio non devono restare appiccicati.
         """
-        tempo_attuale = time.time()
         eventi = {}
 
         try:
+            # Eventi che devono vivere solo pochi secondi
+            eventi_temporanei = [
+                "mano_destra",
+                "mano_sinistra",
+                "carezza_testa",
+                "entrambe_mani",
+                "rumore_improvviso",
+                "rumore_singolo",
+                "battiti_mani",
+                "piede_sinistro",
+                "piede_destro",
+                "urto_piedi"
+            ]
+
+            # Verifica diretta da timestamp
+            for nome in eventi_temporanei:
+                eventi[nome] = self.evento_recente(nome)
+
+            # Eventi ambientali (sonar, volti, ecc.)
+            tempo_attuale = time.time()
+
             with self.lock_eventi:
                 for chiave, dati in self.eventi_recenti.items():
+
+                    # già gestiti sopra
+                    if chiave in eventi_temporanei:
+                        continue
+
                     try:
-                        if tempo_attuale - dati["tempo"] <= self.durata_eventi_recenti:
+                        if (
+                            tempo_attuale - dati["tempo"]
+                            <= self.durata_eventi_recenti
+                        ):
                             eventi[chiave] = True
                     except:
                         pass
+
         except:
             pass
 
@@ -236,11 +286,15 @@ class NaoSenses:
                     era_attivo["mano_sinistra"] = mano_sx_toccata
 
                     if mano_dx_toccata and not era_attivo["mano_destra"]:
-                        if tempo_attuale - self.ultimo_evento.get("mano_destra", 0) > cooldown:
+                        ultimo_raw = self.ultimo_evento.get("_raw_touch_mano_destra", 0)
+
+                        if tempo_attuale - ultimo_raw > cooldown:
                             evento = u"Sento un tocco sulla mano destra."
                             self._ricorda_evento("mano_destra", evento)
+                            self.ultimo_evento["_raw_touch_mano_destra"] = tempo_attuale
                             self.ultimo_evento["mano_destra"] = tempo_attuale
                             self._safe_print(u"[TOCCO] " + evento)
+
                     era_attivo["mano_destra"] = mano_dx_toccata
 
             except Exception as e:
@@ -468,10 +522,32 @@ class NaoSenses:
         eventi_memoria = self._eventi_recenti_validi()
 
         for evento in eventi_memoria:
-            if not evento:
+            evento_pulito = evento.strip()
+            
+            # Non riportare eventi tattili/audio scaduti nel testo:
+            eventi_con_scadenza = [
+                "mano_destra",
+                "mano_sinistra",
+                "carezza_testa",
+                "entrambe_mani",
+                "rumore_improvviso",
+                "rumore_singolo",
+                "battiti_mani"
+            ]
+
+            salta = False
+
+            for nome in eventi_con_scadenza:
+                if nome in evento_pulito.lower():
+                    if not self.evento_recente(nome):
+                        salta = True
+                    break
+
+            if salta:
                 continue
 
-            evento_pulito = evento.strip()
+            if not evento:
+                continue
 
             # Evita "Evento recente: Evento recente: ..."
             while evento_pulito.lower().startswith("evento recente:"):
