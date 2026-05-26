@@ -926,9 +926,11 @@ def main():
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
 
-        voce.parla(u"Ciao {}, io sono NAO.".format(
-            memoria_fisica.get("nome_utente", "amico")
-        ))
+        nome = memoria_fisica.get("nome_utente", "")
+        if not nome or nome.lower() in ["sconosciuto", "ignoto", ""]:
+            voce.parla(u"Ciao, io sono NAO.")
+        else:
+            voce.parla(u"Ciao {}, io sono NAO.".format(nome))
 
         stato_precedente = ""
         ultima_decisione = {"azioni": []}
