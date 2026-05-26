@@ -101,7 +101,24 @@ PAROLE_INTERESSANTI = [
     "gatto",
     "persona",
     "sconosciuto",
-    "laboratorio"
+    "laboratorio",
+    "aperta",
+    "chiusa",
+    "aperto",
+    "chiuso",
+    "rosso",
+    "verde",
+    "blu",
+    "grande",
+    "piccolo",
+    "libro",
+    "sedia",     # solo se combinata con altro
+    "tavolo",
+    "schermo",
+    "computer",
+    "robot",
+    "cibo",
+    "tazza"
 ]
 
 PAROLE_NEUTRE_DA_SOLE = [

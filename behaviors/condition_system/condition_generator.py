@@ -1182,7 +1182,21 @@ def _promuovi_in_generated(path_file):
     return path_finale
 
 
-def _costruisci_prompt(mondo, dati_memoria, stato_robot):
+def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None):
+
+    sezione_sconosciuti = u""
+    if eventi_sconosciuti:
+        nome_ev = list(eventi_sconosciuti.keys())[0]
+        parole_ev = nome_ev.replace("_", " e ")
+        sezione_sconosciuti = (
+            u"\nEVENTI SCONOSCIUTI RILEVATI:\n"
+            u"Il testo del MONDO contiene concetti nuovi non presenti tra gli eventi noti del robot.\n"
+            u"Devi generare una condizione specifica per questo evento: {nome_ev}\n"
+            u"La funzione condizione() DEVE usare eventi.get(\"{nome_ev}\", False) oppure cercare "
+            u"le parole {parole_ev} nel testo con mondo.lower().\n"
+            u"Non generare una condizione generica: deve riconoscere esattamente questo concetto.\n\n"
+        ).format(nome_ev=nome_ev, parole_ev=parole_ev)
+
     return (
         u"Sei un generatore di codice Python per un robot NAO.\n"
         u"Devi generare UNA nuova condizione Python autonoma.\n\n"
@@ -1267,17 +1281,19 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot):
         u"  return u\"PRENDI L'INIZIATIVA\" in mondo\n"
         u"- Il comportamento deve essere curioso ma semplice, non complesso.\n\n"
 
-        u"MONDO ATTUALE:\n"
-        + mondo +
-        u"\n\nMEMORIA:\n"
-        + json.dumps(dati_memoria, ensure_ascii=False) +
-        u"\n\nSTATO ROBOT:\n"
+        + sezione_sconosciuti
+
+        + u"MONDO ATTUALE:\n"
+        + mondo
+        + u"\n\nMEMORIA:\n"
+        + json.dumps(dati_memoria, ensure_ascii=False)
+        + u"\n\nSTATO ROBOT:\n"
         + json.dumps(stato_robot, ensure_ascii=False)
     )
 
 
-def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata):
-    prompt = _costruisci_prompt(mondo, dati_memoria, stato_robot)
+def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata, eventi_sconosciuti=None):
+    prompt = _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti)
 
     payload = {
         "model": "gpt-4o-mini",
@@ -1384,6 +1400,36 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
             nome_file
         ))
         return True
+    
+    # EVENTI SCONOSCIUTI: se non c'è evento noto, controlla concetti nuovi
+    if evento_rilevato is None and arricchisci_eventi_con_sconosciuti is not None:
+        try:
+            eventi_tutti = estrai_eventi(mondo, {"memoria": dati_memoria, "stato_robot": stato_robot})
+            sconosciuti = {
+                k: v for k, v in eventi_tutti.items()
+                if v and k not in [
+                    "batteria_percentuale", "batteria_bassa", "batteria_critica",
+                    "fermo", "camminando"
+                ] and k not in [
+                    "carezza_testa", "mano_sinistra", "mano_destra", "entrambe_mani",
+                    "ostacolo_sinistra", "ostacolo_destra", "ostacolo_frontale",
+                    "urto", "urto_piedi", "entrambi_piedi", "pericolo",
+                    "rumore_improvviso", "rumore_singolo", "battiti_mani",
+                    "volto_riconosciuto", "volto_ignoto",
+                    "piede_sinistro", "piede_destro"
+                ]
+            }
+            
+            if sconosciuti:
+                nome_evento_sconosciuto = list(sconosciuti.keys())[0]
+                nome_file = "condizione_{}.py".format(nome_evento_sconosciuto)
+                path_generato = os.path.join(GENERATED_DIR, nome_file)
+                path_quarantena = os.path.join(QUARANTINE_DIR, nome_file)
+                if not os.path.exists(path_generato) and not os.path.exists(path_quarantena):
+                    logger.info(u"[GENERATOR] Evento sconosciuto rilevato: {} -> genero condizione".format(nome_evento_sconosciuto))
+                    return True
+        except Exception as e:
+            logger.warning(u"[GENERATOR] Errore valutazione eventi sconosciuti: {}".format(e))
 
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
@@ -1683,15 +1729,41 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
 
         codice = _estrai_codice_python(risposta)
 
-        # AUTORIPARAZIONE:
-        # Se l'LLM genera solo comportamento(), il sistema aggiunge da solo
-        # la funzione condizione(mondo, stato_runtime).
         codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
-
-        # SICUREZZA SEMANTICA:
-        # Il comportamento resta generato dall'LLM,
-        # ma il trigger viene reso specifico automaticamente.
         codice = _forza_condizione_specifica(codice, mondo)
+
+        # Valida la condizione se è legata a un evento sconosciuto
+        try:
+            from NAOTirocinio.behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
+            from NAOTirocinio.behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
+
+            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo, {})
+
+            if eventi_sconosciuti:
+                nome_ev = list(eventi_sconosciuti.keys())[0]
+                valido_sconosciuto, motivo_sconosciuto = valida_condizione_sconosciuta(nome_ev, codice)
+
+                if not valido_sconosciuto:
+                    logger.warning(u"[GENERATOR] Condizione per evento sconosciuto '{}' troppo generica: {}. Ri-chiedo al LLM.".format(
+                        nome_ev, motivo_sconosciuto))
+
+                    risposta = _chiama_llm_codice(
+                        mondo, dati_memoria, stato_robot, chiave_privata,
+                        eventi_sconosciuti=eventi_sconosciuti
+                    )
+                    codice = _estrai_codice_python(risposta)
+                    codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
+                    codice = _forza_condizione_specifica(codice, mondo)
+
+                    # Ri-valida dopo il retry: se ancora generica, abbandona
+                    valido_retry, motivo_retry = valida_condizione_sconosciuta(nome_ev, codice)
+                    if not valido_retry:
+                        logger.warning(u"[GENERATOR] Anche dopo retry la condizione e' generica: {}. Abbandono.".format(
+                            motivo_retry))
+                        return None
+
+        except Exception as e:
+            logger.warning(u"[GENERATOR] Errore validazione sconosciuto: {}".format(e))
 
         nome_base = _slug_testo(mondo)
         nome_file = "condizione_{}.py".format(nome_base)
@@ -1714,13 +1786,11 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         _scrivi_file(path_quarantine, codice)
 
         valido, motivo = _valida_struttura_codice(codice)
-
         if not valido:
             _sposta_in_rejected(path_quarantine, motivo)
             return None
 
         valido, motivo = _valida_modulo_python(path_quarantine)
-
         if not valido:
             _sposta_in_rejected(path_quarantine, motivo)
             return None
@@ -1733,7 +1803,6 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
                 "stato_robot": stato_robot
             }
         )
-
         if not valido:
             _sposta_in_rejected(path_quarantine, motivo)
             return None
