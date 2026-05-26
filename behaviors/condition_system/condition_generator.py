@@ -39,8 +39,8 @@ try:
 except NameError:
     basestring = str
 
-from behaviors.condition_system.condition_manager import reset_cache_condizioni
-from behaviors.condition_system.condition_memory import salva_metadati_condizione
+from behaviors.condition_manager import reset_cache_condizioni
+from behaviors.condition_memory import salva_metadati_condizione
 
 try:
     from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti

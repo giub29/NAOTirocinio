@@ -30,7 +30,7 @@ class NaoSenses:
 
         self.ultimo_timestamp_audio = 0
         self.ultimo_evento_audio_tempo = 0
-        self.cooldown_audio = 8.0
+        self.cooldown_audio = 15.0
         self.contatore_battiti = 0
         self.ultimo_battito_rilevato = 0
         self.finestra_ascolto = 1.5
@@ -42,7 +42,7 @@ class NaoSenses:
             self.sound_detection = ALProxy("ALSoundDetection", ip, port)
 
             # Sensibilità prudente: non troppo bassa per evitare rumore continuo
-            self.sound_detection.setParameter("Sensitivity", 0.35)
+            self.sound_detection.setParameter("Sensitivity", 0.55)
 
             self.sound_detection.subscribe("SensiSound")
 
@@ -197,8 +197,7 @@ class NaoSenses:
                 era_attivo["carezza_testa"] = testa_toccata
 
             except Exception as e:
-                if self.debug_sensori:
-                    print("[DEBUG MONITOR TESTA ERROR] {}".format(e))
+                print("[DEBUG MONITOR TESTA ERROR] {}".format(e))
 
             # MANI
             try:
@@ -245,7 +244,6 @@ class NaoSenses:
                     era_attivo["mano_destra"] = mano_dx_toccata
 
             except Exception as e:
-                if self.debug_sensori:
                     print("[DEBUG MONITOR MANI ERROR] {}".format(e))
 
             # PIEDI / BUMPER
@@ -289,8 +287,7 @@ class NaoSenses:
                     era_attivo["piede_destro"] = piede_dx_toccato
 
             except Exception as e:
-                if self.debug_sensori:
-                    print("[DEBUG MONITOR PIEDI ERROR] {}".format(e))
+                print("[DEBUG MONITOR PIEDI ERROR] {}".format(e))
 
             time.sleep(0.05)
 
@@ -382,9 +379,30 @@ class NaoSenses:
                     self.contatore_battiti += 1
                     self.ultimo_battito_rilevato = tempo_attuale
 
-                    evento = u"Sento un rumore improvviso vicino a me."
-                    eventi.append(evento)
-                    self._ricorda_evento("rumore_improvviso", evento)
+                    # Se c'e' stato un tocco umano recente,
+                    # ignoro il rumore per evitare falsi positivi
+                    touch_recenti = [
+                        "mano_destra",
+                        "mano_sinistra",
+                        "entrambe_mani",
+                        "carezza_testa"
+                    ]
+
+                    ignora_audio = False
+
+                    for ev in touch_recenti:
+                        ultimo = self.ultimo_evento.get(ev, 0)
+
+                        if tempo_attuale - ultimo < 3.0:
+                            ignora_audio = True
+                            break
+
+                    if ignora_audio:
+                        pass
+                    else:
+                        evento = u"Sento un rumore improvviso vicino a me."
+                        eventi.append(evento)
+                        self._ricorda_evento("rumore_improvviso", evento)
 
         if self.contatore_battiti > 0 and (tempo_attuale - self.ultimo_battito_rilevato > self.finestra_ascolto):
             if self.contatore_battiti == 1:

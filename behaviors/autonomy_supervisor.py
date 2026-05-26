@@ -22,12 +22,12 @@ import time
 import os
 
 try:
-    from NAOTirocinio.behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+    from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
 except Exception:
     arricchisci_eventi_con_sconosciuti = None
 
 try:
-    from NAOTirocinio.behaviors.event_system.event_registry import arricchisci_eventi_registro
+    from behaviors.event_system.event_registry import arricchisci_eventi_registro
 except Exception:
     arricchisci_eventi_registro = None
 
@@ -203,7 +203,7 @@ def valuta_condizioni_generate_sicure(mondo, stato_runtime):
     """
 
     try:
-        from NAOTirocinio.behaviors.condition_system import condition_manager
+        import behaviors.condition_manager as condition_manager
 
         # Caso piu' probabile nel tuo progetto:
         if hasattr(condition_manager, "valuta_condizioni_generate"):
@@ -225,11 +225,10 @@ def situazione_merita_generazione(mondo, stato_runtime):
     """
     Decide se la situazione osservata merita una nuova condizione autonoma.
 
-    FASE A:
-    - non si basa solo su parole chiave scritte dalla programmatrice
-    - costruisce una firma della situazione
-    - evita situazioni vuote, banali o gia' tentate
-    - riconosce situazioni composte
+    Versione finale:
+    - gli eventi unknown/scoperta devono poter generare davvero;
+    - non dipende piu' dal flag abilita_generazione_eventi_sconosciuti;
+    - mantiene i filtri contro mondo vuoto, banale e gia' tentato.
     """
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
@@ -244,6 +243,31 @@ def situazione_merita_generazione(mondo, stato_runtime):
     if firma["banale"]:
         return False, "situazione banale"
 
+    evento_strutturato = firma.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    tipo = str(evento_strutturato.get("tipo", "")).lower()
+    categoria = str(evento_strutturato.get("categoria", "")).lower()
+    origine = str(evento_strutturato.get("origine", "")).lower()
+
+    eventi_core = firma.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    # CASO CENTRALE DEL PROGETTO:
+    # se l'evento e' sconosciuto/scoperto e contiene almeno un evento core,
+    # deve poter generare una nuova condizione autonoma.
+    if (
+        tipo in ["unknown", "sconosciuto", "scoperta"]
+        or categoria in ["unknown", "sconosciuta", "scoperta"]
+        or origine in ["unknown", "scoperta"]
+    ):
+        if len(eventi_core) > 0:
+            return True, "evento sconosciuto/scoperta valido"
+
+        return False, "evento sconosciuto senza eventi_core"
+
     if firma["eventi_multipli"]:
         return True, "eventi multipli rilevati"
 
@@ -251,7 +275,6 @@ def situazione_merita_generazione(mondo, stato_runtime):
         return True, "situazione composta non banale"
 
     if firma["ha_novita_runtime"]:
-
         eventi_descritti = firma.get("eventi_descritti", {})
 
         eventi_sconosciuti = [
@@ -260,77 +283,16 @@ def situazione_merita_generazione(mondo, stato_runtime):
             if not dati.get("conosciuto", True)
         ]
 
-        # Se ho eventi sconosciuti, NON genero ancora davvero.
-        # Prima simulo e valido la specificita'.
         if eventi_sconosciuti:
-
-            for nome_evento in eventi_sconosciuti:
-
-                try:
-                    from NAOTirocinio.behaviors.event_system.event_novelty_memory import registra_evento
-                    registra_evento(nome_evento)
-
-                except Exception as e:
-                    logger.warning(
-                        "[UNKNOWN_SIMULATION] Errore memoria ricorrenza: %s",
-                        e
-                    )
-
-                simulazione = simula_condizione_sconosciuta(nome_evento)
-
-                ricorrente = False
-                try:
-                    from NAOTirocinio.behaviors.event_system.event_novelty_memory import evento_ricorrente
-                    ricorrente = evento_ricorrente(nome_evento)
-                except Exception as e:
-                    logger.warning(
-                        "[UNKNOWN_SIMULATION] Memoria ricorrenza non disponibile: %s",
-                        e
-                    )
-
-                simulazione["ricorrente"] = ricorrente
-                simulazione["generazione_reale_permessa"] = (
-                    simulazione.get("valido", False)
-                    and ricorrente
-                )
-
-                logger.info(
-                    "[UNKNOWN_SIMULATION] %s",
-                    simulazione
-                )
-
-            abilita_generazione_reale = stato_runtime.get(
-                "abilita_generazione_eventi_sconosciuti",
-                False
+            return True, "eventi sconosciuti rilevati: {}".format(
+                ", ".join(eventi_sconosciuti)
             )
-
-            if simulazione.get("generazione_reale_permessa", False):
-
-                if abilita_generazione_reale:
-                    return True, (
-                        "evento sconosciuto valido, ricorrente "
-                        "e autorizzato alla generazione reale"
-                    )
-
-                logger.info(
-                    "[UNKNOWN_SIMULATION] Evento pronto "
-                    "ma generazione reale disattivata"
-                )
-
-                return False, (
-                    "evento valido ma generazione reale disattivata"
-                )
-
-            return False, "evento sconosciuto simulato con ricorrenza"
 
         return True, "novita' runtime non ancora coperta"
 
     if firma["ha_testo_sensoriale_non_banale"]:
-        # Se il testo e' sensoriale ma non ha ancora prodotto eventi attivi,
-        # osservo soltanto. La memoria novita' lo rendera' generabile
-        # solo dopo ricorrenza.
         if len(firma.get("eventi_attivi", {}).keys()) == 0:
-            return False, "situazione sensoriale osservata ma non ancora ricorrente"
+            return False, "situazione sensoriale osservata ma senza eventi attivi"
 
         return True, "situazione sensoriale non banale"
 
@@ -617,7 +579,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     ULTIMA_GENERAZIONE = adesso
 
     try:
-        from NAOTirocinio.behaviors.condition_system import condition_generator
+        import behaviors.condition_generator as condition_generator
 
         logger.info("[AUTONOMIA] Provo generazione autonoma. Motivo: {}".format(motivo))
 
@@ -650,7 +612,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                     pass
 
                 try:
-                    from NAOTirocinio.behaviors.condition_system.condition_manager import reset_cache_condizioni
+                    from behaviors.condition_system.condition_manager import reset_cache_condizioni
                     reset_cache_condizioni()
                 except Exception:
                     pass

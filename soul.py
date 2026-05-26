@@ -93,10 +93,10 @@ root_logger.handlers = []
 root_logger.addHandler(handler)
 root_logger.setLevel(logging.INFO)
 logging.getLogger("WATCHDOG").setLevel(logging.WARNING)
-logging.getLogger("behaviors.autonomy_supervisor").setLevel(logging.WARNING)
-logging.getLogger("behaviors.condition_generator").setLevel(logging.WARNING)
+logging.getLogger("behaviors.autonomy_supervisor").setLevel(logging.INFO)
+logging.getLogger("behaviors.condition_generator").setLevel(logging.INFO)
 logging.getLogger("behaviors.safety_behavior").setLevel(logging.WARNING)
-logging.getLogger("behaviors.condition_manager").setLevel(logging.WARNING)
+logging.getLogger("behaviors.condition_manager").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 

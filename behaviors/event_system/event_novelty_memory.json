@@ -2,28 +2,37 @@
   "bottiglia_rossa_tavolo": {
     "esempi": [
       "REPORT: Vedo una bottiglia rossa sul tavolo. SONO FERMO."
-    ],
-    "generato": false,
-    "prima_volta": 1779461256,
-    "ultima_volta": 1779461256,
+    ], 
+    "generato": false, 
+    "prima_volta": 1779461256, 
+    "ultima_volta": 1779461256, 
     "visto": 3
-  },
+  }, 
   "fischio": {
     "esempi": [
       "REPORT: Sento un fischio. SONO FERMO."
-    ],
-    "generato": false,
-    "prima_volta": 1779458896,
-    "ultima_volta": 1779461251,
+    ], 
+    "generato": false, 
+    "prima_volta": 1779458896, 
+    "ultima_volta": 1779461251, 
     "visto": 4
-  },
+  }, 
+  "interazione_utente": {
+    "esempi": [
+      "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO."
+    ], 
+    "generato": false, 
+    "prima_volta": 1779796477, 
+    "ultima_volta": 1779796477, 
+    "visto": 2
+  }, 
   "porta_aperta_laboratorio": {
     "esempi": [
       "REPORT: Vedo una porta aperta nel laboratorio. SONO FERMO."
-    ],
-    "generato": false,
-    "prima_volta": 1779399980,
-    "ultima_volta": 1779792608,
+    ], 
+    "generato": false, 
+    "prima_volta": 1779399980, 
+    "ultima_volta": 1779792608, 
     "visto": 61
   }
 }
