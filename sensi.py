@@ -15,7 +15,7 @@ class NaoSenses:
         self.eventi_recenti = {}
         self.eventi_strutturati = {}
         self.lock_eventi = threading.RLock()
-        self.durata_eventi_recenti = 4.0
+        self.durata_eventi_recenti = 1.2
 
         self.ultimo_volto_nome = None
         self.ultimo_volto_tempo = 0
@@ -35,6 +35,7 @@ class NaoSenses:
         self.ultimo_battito_rilevato = 0
         self.finestra_ascolto = 1.5
         self.ultimo_urto = 0
+        self.ultimo_evento = {}
 
         # AUDIO / RUMORI
         try:
@@ -158,7 +159,6 @@ class NaoSenses:
         Serve per non perdere tocchi brevi mentre il ciclo principale e' bloccato
         da voce.parla(), LLM o altre operazioni lente.
         """
-        ultimo_evento = {}
         cooldown = 2.5
         
         while not self._stop_monitor_tocco:
@@ -178,10 +178,10 @@ class NaoSenses:
                 testa_toccata = head_front > 0.2 or head_middle > 0.2 or head_rear > 0.2
 
                 if testa_toccata:
-                    if tempo_attuale - ultimo_evento.get("carezza_testa", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("carezza_testa", 0) > cooldown:
                         evento = u"Sento una carezza sulla testa."
                         self._ricorda_evento("carezza_testa", evento)
-                        ultimo_evento["carezza_testa"] = tempo_attuale
+                        self.ultimo_evento["carezza_testa"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
             except Exception as e:
@@ -210,24 +210,24 @@ class NaoSenses:
                 mano_dx_toccata = mano_dx_back > 0.2 or mano_dx_left > 0.2 or mano_dx_right > 0.2
 
                 if mano_sx_toccata and mano_dx_toccata:
-                    if tempo_attuale - ultimo_evento.get("entrambe_mani", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("entrambe_mani", 0) > cooldown:
                         evento = u"Sento un tocco su entrambe le mani."
                         self._ricorda_evento("entrambe_mani", evento)
-                        ultimo_evento["entrambe_mani"] = tempo_attuale
+                        self.ultimo_evento["entrambe_mani"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
                 elif mano_sx_toccata:
-                    if tempo_attuale - ultimo_evento.get("mano_sinistra", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("mano_sinistra", 0) > cooldown:
                         evento = u"Sento un tocco sulla mano sinistra."
                         self._ricorda_evento("mano_sinistra", evento)
-                        ultimo_evento["mano_sinistra"] = tempo_attuale
+                        self.ultimo_evento["mano_sinistra"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
                 elif mano_dx_toccata:
-                    if tempo_attuale - ultimo_evento.get("mano_destra", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("mano_destra", 0) > cooldown:
                         evento = u"Sento un tocco sulla mano destra."
                         self._ricorda_evento("mano_destra", evento)
-                        ultimo_evento["mano_destra"] = tempo_attuale
+                        self.ultimo_evento["mano_destra"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
             except Exception as e:
@@ -250,24 +250,24 @@ class NaoSenses:
                 piede_dx_toccato = rb_left > 0.2 or rb_right > 0.2
 
                 if piede_sx_toccato and piede_dx_toccato:
-                    if tempo_attuale - ultimo_evento.get("urto_piedi", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("urto_piedi", 0) > cooldown:
                         evento = u"URTO TATTILE! Ostacolo frontale ai piedi."
                         self._ricorda_evento("urto_piedi", evento)
-                        ultimo_evento["urto_piedi"] = tempo_attuale
+                        self.ultimo_evento["urto_piedi"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
                 elif piede_sx_toccato:
-                    if tempo_attuale - ultimo_evento.get("piede_sinistro", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("piede_sinistro", 0) > cooldown:
                         evento = u"URTO TATTILE! Ostacolo a sinistra. Piede sinistro premuto."
                         self._ricorda_evento("piede_sinistro", evento)
-                        ultimo_evento["piede_sinistro"] = tempo_attuale
+                        self.ultimo_evento["piede_sinistro"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
                 elif piede_dx_toccato:
-                    if tempo_attuale - ultimo_evento.get("piede_destro", 0) > cooldown:
+                    if tempo_attuale - self.ultimo_evento.get("piede_destro", 0) > cooldown:
                         evento = u"URTO TATTILE! Ostacolo a destra. Piede destro premuto."
                         self._ricorda_evento("piede_destro", evento)
-                        ultimo_evento["piede_destro"] = tempo_attuale
+                        self.ultimo_evento["piede_destro"] = tempo_attuale
                         self._safe_print(u"[TOCCO] " + evento)
 
             except Exception as e:
