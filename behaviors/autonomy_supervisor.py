@@ -31,7 +31,7 @@ try:
 except Exception:
     arricchisci_eventi_registro = None
 
-from NAOTirocinio.behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
+from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
 logger = logging.getLogger(__name__)
 ULTIMA_GENERAZIONE = 0
@@ -63,6 +63,28 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     if "eventi_reali" not in stato_runtime:
         stato_runtime["eventi_reali"] = firma.get("eventi_attivi", {})
+
+    # EVENTI UNKNOWN:
+    # gli eventi scoperti autonomamente devono entrare anche
+    # in stato_runtime["eventi"], altrimenti le condizioni
+    # autogenerate non possono attivarsi davvero.
+    try:
+        eventi_core = firma.get("eventi_core", [])
+
+        if not isinstance(eventi_core, list):
+            eventi_core = []
+
+        for nome_evento in eventi_core:
+            nome_evento = str(nome_evento).lower().strip()
+
+            if nome_evento:
+                stato_runtime.setdefault("eventi", {})
+                stato_runtime["eventi"][nome_evento] = True
+
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore propagando eventi_core nel runtime: {}".format(e)
+        )
 
     if stato_runtime.get("forza_generazione_safety", False):
         motivo_safety = stato_runtime.get(

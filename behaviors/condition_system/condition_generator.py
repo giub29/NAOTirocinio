@@ -39,16 +39,16 @@ try:
 except NameError:
     basestring = str
 
-from NAOTirocinio.behaviors.condition_system.condition_manager import reset_cache_condizioni
-from NAOTirocinio.behaviors.condition_system.condition_memory import salva_metadati_condizione
+from behaviors.condition_system.condition_manager import reset_cache_condizioni
+from behaviors.condition_system.condition_memory import salva_metadati_condizione
 
 try:
-    from NAOTirocinio.behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+    from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
 except Exception:
     arricchisci_eventi_con_sconosciuti = None
 
 try:
-    from NAOTirocinio.behaviors.event_system.event_registry import arricchisci_eventi_registro
+    from behaviors.event_system.event_registry import arricchisci_eventi_registro
 except Exception:
     arricchisci_eventi_registro = None
 
@@ -1734,8 +1734,8 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
 
         # Valida la condizione se è legata a un evento sconosciuto
         try:
-            from NAOTirocinio.behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
-            from NAOTirocinio.behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
+            from behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
+            from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
 
             eventi_sconosciuti = estrai_eventi_sconosciuti(mondo, {})
 

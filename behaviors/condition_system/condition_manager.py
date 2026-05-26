@@ -24,7 +24,7 @@ import time
 import shutil
 import sys
 
-from NAOTirocinio.behaviors.condition_system.condition_memory import (
+from behaviors.condition_memory import (
     registra_attivazione,
     registra_errore_condizione,
     marca_condizione_rifiutata,
@@ -32,7 +32,7 @@ from NAOTirocinio.behaviors.condition_system.condition_memory import (
     registra_esito_riparazione
 )
 
-from NAOTirocinio.behaviors.condition_system.condition_repair import tenta_riparazione_condizione
+from behaviors.condition_repair import tenta_riparazione_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -580,27 +580,15 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     """
     Filtra condizioni troppo generiche usando la firma evento strutturata.
 
-    Obiettivo:
-    - evitare che una condizione semplice intercetti un evento composto;
-    - se l'evento e' composto, deve passare solo una condizione composta;
-    - se NAO sta camminando, devono passare solo condizioni specifiche durante_cammino.
+    Regola centrale:
+    - le condizioni esistenti possono attivarsi solo se coerenti con evento_strutturato;
+    - gli eventi unknown/scoperta NON devono essere intercettati da condizioni vecchie;
+    - eventi composti richiedono condizioni composte;
+    - durante cammino servono condizioni specifiche durante_cammino.
     """
 
     nome = (nome_condizione or "").lower()
     nome_evento = nome.replace("condizione_", "").replace(".py", "")
-
-    try:
-        eventi = stato_runtime.get("eventi", {})
-        eventi_reali = stato_runtime.get("eventi_reali", {})
-
-        if isinstance(eventi, dict) and eventi.get(nome_evento, False):
-            return True
-
-        if isinstance(eventi_reali, dict) and eventi_reali.get(nome_evento, False):
-            return True
-
-    except Exception:
-        pass
 
     eventi = stato_runtime.get("eventi", {})
     eventi_reali = stato_runtime.get("eventi_reali", {})
@@ -615,18 +603,39 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     if not isinstance(evento_strutturato, dict):
         evento_strutturato = {}
 
+    tipo = str(evento_strutturato.get("tipo", "")).lower()
+    categoria = str(evento_strutturato.get("categoria", "")).lower()
+    origine = str(evento_strutturato.get("origine", "")).lower()
+    direzione = str(evento_strutturato.get("direzione", "")).lower()
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
     camminando = (
         evento_strutturato.get("camminando", False) or
         eventi.get("camminando", False) or
         eventi_reali.get("camminando", False)
     )
 
-    tipo = evento_strutturato.get("tipo", "")
-    direzione = evento_strutturato.get("direzione", "")
-    eventi_core = evento_strutturato.get("eventi_core", [])
+    # Un evento sconosciuto/scoperto non deve essere catturato da condizioni vecchie.
+    # Deve tornare al supervisore, che genera nuova condizione autonoma.
+    if (
+        tipo in ["unknown", "sconosciuto", "scoperta"]
+        or categoria in ["unknown", "sconosciuta", "scoperta"]
+        or origine in ["scoperta", "unknown"]
+    ):
+        eventi_core_norm = [
+            str(e).lower().replace("-", "_")
+            for e in eventi_core
+        ]
 
-    if not isinstance(eventi_core, list):
-        eventi_core = []
+        # Se esiste già una condizione generata esattamente per questo evento unknown,
+        # allora può attivarsi. Altrimenti l'unknown deve tornare al supervisore.
+        if nome_evento in eventi_core_norm:
+            return True
+
+        return False
 
     eventi_attivi = []
 
@@ -650,19 +659,9 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
         or len(eventi_attivi) >= 2
     )
 
-    # Caso fondamentale:
-    # se l'evento e' composto, una condizione semplice NON deve intercettarlo.
-    # Esempio: mano_destra + volto_ignoto non deve attivare solo mano_destra.
+    # Se evento composto, una condizione semplice NON deve passare.
     if evento_composto:
-        parole_rilevanti = []
-
-        for evento in eventi_attivi:
-            for pezzo in evento.replace("-", "_").split("_"):
-                pezzo = pezzo.strip()
-                if pezzo and pezzo not in parole_rilevanti:
-                    parole_rilevanti.append(pezzo)
-
-                eventi_coperti = 0
+        eventi_coperti = 0
 
         for evento in eventi_attivi:
             evento_norm = evento.replace("-", "_").lower()
@@ -675,14 +674,7 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
             if not pezzi_evento:
                 continue
 
-            pezzi_presenti = [
-                pezzo for pezzo in pezzi_evento
-                if pezzo in nome
-            ]
-
-            # Un evento e' coperto se almeno una sua parte significativa
-            # compare nel nome della condizione.
-            if len(pezzi_presenti) > 0:
+            if any(pezzo in nome for pezzo in pezzi_evento):
                 eventi_coperti += 1
 
         condizione_composta = (
@@ -694,23 +686,21 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
         if not condizione_composta:
             return False
 
-    # Ostacolo durante cammino: serve condizione specifica.
-    if camminando and tipo == "ostacolo":
+    # Durante cammino servono condizioni specifiche.
+    if camminando and "durante_cammino" not in nome:
+        return False
 
+    if camminando and tipo == "ostacolo":
         if direzione == "destra":
             return "ostacolo_destra_durante_cammino" in nome
-
         if direzione == "sinistra":
             return "ostacolo_sinistra_durante_cammino" in nome
-
         if direzione == "frontale":
             return "ostacolo_frontale_durante_cammino" in nome
 
-    # Urto ai piedi durante cammino: serve condizione specifica.
     if camminando and tipo == "urto_piedi":
         return "urto_piedi_durante_cammino" in nome
 
-    # Eventi sociali durante cammino: serve condizione specifica.
     if camminando and tipo == "carezza":
         return "carezza_durante_cammino" in nome
 
@@ -726,10 +716,16 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     if camminando and tipo == "volto_ignoto":
         return "volto_ignoto_durante_cammino" in nome
 
-    # Se l'evento e' una carezza da fermo,
-    # non deve passare carezza_durante_cammino.
-    if not camminando and tipo == "carezza":
-        return "carezza_testa" in nome and "durante_cammino" not in nome
+    # Da fermo non deve passare una condizione durante_cammino.
+    if not camminando and "durante_cammino" in nome:
+        return False
+
+    # Caso noto e semplice: passa solo se il nome evento è presente negli eventi attivi.
+    if nome_evento in eventi_attivi:
+        return True
+
+    if tipo and tipo in nome:
+        return True
 
     return True
 

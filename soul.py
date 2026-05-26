@@ -39,8 +39,8 @@ from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
-from NAOTirocinio.behaviors.condition_system.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
-from NAOTirocinio.behaviors.condition_system.condition_generator import (
+from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
+from behaviors.condition_generator import (
     estrai_eventi,
     costruisci_evento_strutturato
 )
@@ -716,6 +716,11 @@ def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, 
     stato_runtime["memoria"] = memoria_fisica
     stato_runtime["stato_robot"] = stato_robot
     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+
+    # Abilita davvero la generazione autonoma di condizioni sconosciute.
+    # Senza questo flag il supervisore simula soltanto.
+    stato_runtime["abilita_generazione_eventi_sconosciuti"] = True  
+
     stato_runtime["evento_composto"] = evento_composto
     stato_runtime["forza_generazione_safety"] = forza_safety
     stato_runtime["motivo_safety"] = motivo_safety

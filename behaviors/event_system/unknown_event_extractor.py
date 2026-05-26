@@ -15,7 +15,7 @@ testo sensoriale nuovo -> evento candidato -> futura condizione autonoma.
 
 import re
 try:
-    from NAOTirocinio.behaviors.event_system.event_novelty_memory import registra_evento_sconosciuto
+    from behaviors.event_system.event_novelty_memory import registra_evento_sconosciuto
 except Exception:
     registra_evento_sconosciuto = None
 

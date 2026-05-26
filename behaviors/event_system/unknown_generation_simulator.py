@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from NAOTirocinio.behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
+from behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
 
 
 PAROLE_TROPPO_GENERICHE = [
