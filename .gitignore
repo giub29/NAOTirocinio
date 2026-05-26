@@ -8,25 +8,25 @@ __pycache__/
 
 # comportamenti generati runtime
 NAOTirocinio/behaviors/generated/*
-NAOTirocinio/behaviors/generated_conditions/*
-
-#solo init
 !NAOTirocinio/behaviors/generated/__init__.py
-!NAOTirocinio/behaviors/generated_conditions/__init__.py
 
-# comportamenti generati runtime
 behaviors/generated/*
 !behaviors/generated/.gitkeep
 
-# condizioni generate runtime
-NAOTirocinio/behaviors/quarantine_conditions/*
-NAOTirocinio/behaviors/rejected_conditions/*
-NAOTirocinio/behaviors/generated_conditions/*
+# generated_conditions RESTANO SU GIT
+!behaviors/condition_system/generated_conditions/
+!behaviors/condition_system/generated_conditions/**
 
-!NAOTirocinio/behaviors/quarantine_conditions/.gitkeep
-!NAOTirocinio/behaviors/rejected_conditions/.gitkeep
-!NAOTirocinio/behaviors/generated_conditions/.gitkeep
+# quarantena / rifiutate NON su Git
+behaviors/condition_system/rejected_conditions/*
+behaviors/condition_system/quarantine_conditions/*
 
-behaviors/rejected_conditions/
-behaviors/quarantine_conditions/
-behaviors/rejected_metadata/
+!behaviors/condition_system/rejected_conditions/.gitkeep
+!behaviors/condition_system/quarantine_conditions/.gitkeep
+
+# metadata runtime NON su Git
+behaviors/condition_system/rejected_metadata/*
+behaviors/condition_system/quarantine_metadata/*
+
+!behaviors/condition_system/rejected_metadata/.gitkeep
+!behaviors/condition_system/quarantine_metadata/.gitkeep

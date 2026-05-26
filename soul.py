@@ -39,8 +39,8 @@ from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
 from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
-from behaviors.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
-from behaviors.condition_generator import (
+from behaviors.condition_system.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
+from behaviors.condition_system.condition_generator import (
     estrai_eventi,
     costruisci_evento_strutturato
 )
@@ -94,9 +94,10 @@ root_logger.addHandler(handler)
 root_logger.setLevel(logging.INFO)
 logging.getLogger("WATCHDOG").setLevel(logging.WARNING)
 logging.getLogger("behaviors.autonomy_supervisor").setLevel(logging.INFO)
-logging.getLogger("behaviors.condition_generator").setLevel(logging.INFO)
+logging.getLogger("behaviors.condition_system.condition_generator").setLevel(logging.INFO)
+logging.getLogger("behaviors.condition_system.condition_manager").setLevel(logging.INFO)
 logging.getLogger("behaviors.safety_behavior").setLevel(logging.WARNING)
-logging.getLogger("behaviors.condition_manager").setLevel(logging.INFO)
+
 
 logger = logging.getLogger(__name__)
 
@@ -944,11 +945,32 @@ def main():
         logger.info(u"Sistemi pronti")
         aggiorna_heartbeat()
 
+        startup_file = os.path.join(
+            HEARTBEAT_DIR,
+            "startup_done.txt"
+        )
+
+        primo_avvio = not os.path.exists(startup_file)
+
+        try:
+            with open(startup_file, "w") as f:
+                f.write(str(time.time()))
+        except Exception:
+            pass
+
         nome = memoria_fisica.get("nome_utente", "")
-        if not nome or nome.lower() in ["sconosciuto", "ignoto", ""]:
-            voce.parla(u"Ciao, io sono NAO.")
-        else:
-            voce.parla(u"Ciao {}, io sono NAO.".format(nome))
+        if primo_avvio:
+
+            if not nome or nome.lower() in [
+                "sconosciuto",
+                "ignoto",
+                ""
+            ]:
+                voce.parla(u"Ciao, io sono NAO.")
+            else:
+                voce.parla(
+                    u"Ciao {}, io sono NAO.".format(nome)
+                )
 
         stato_precedente = ""
         ultima_decisione = {"azioni": []}

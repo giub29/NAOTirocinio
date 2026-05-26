@@ -39,8 +39,8 @@ try:
 except NameError:
     basestring = str
 
-from behaviors.condition_manager import reset_cache_condizioni
-from behaviors.condition_memory import salva_metadati_condizione
+from behaviors.condition_system.condition_manager import reset_cache_condizioni
+from behaviors.condition_system.condition_memory import salva_metadati_condizione
 
 try:
     from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
@@ -1263,6 +1263,11 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
         u"- Se l'evento e' tocco mano o carezza durante cammino, NON trattarlo come ostacolo.\n"
         u"- Per tocco mano durante cammino: guarda verso la mano, usa occhi verdi/cyan e rispondi socialmente.\n"
         u"- Per tocco mano o carezza durante cammino, NON usare cammina/gira e NON cambiare traiettoria.\n"
+        u"- Per eventi tattili umani (mano sinistra, mano destra, carezza, entrambe le mani), usa frasi coerenti col contatto fisico.\n"
+        u"- Esempi validi: 'Ho sentito un tocco sulla mano sinistra', 'Ti ho sentito', 'Che bello sentirti vicino', 'Ho percepito la tua mano'.\n"
+        u"- NON usare frasi di identita' ('chi sei', 'come ti chiami', 'sei nuovo', 'non ti riconosco') per eventi tattili senza volto.\n"
+        u"- Se non e' presente un volto, NON assumere che ci sia una persona davanti.\n"
+        u"- Per tocco mano: guarda verso la mano e usa occhi verdi/cyan.\n"
         u"- Usa cammina/gira solo per ostacoli reali, urti ai piedi o pericolo.\n"
         u"- Massimo 4 azioni.\n"
         u"- Vietato generare un comportamento con una sola azione di tipo parla.\n"

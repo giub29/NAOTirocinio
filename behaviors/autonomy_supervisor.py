@@ -56,6 +56,31 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     logger.info("[AUTONOMIA] Supervisore attivo")
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
+
+    try:
+        stato_runtime["eventi"] = firma.get("eventi", {})
+        stato_runtime["eventi_reali"] = firma.get("eventi_attivi", {})
+
+        eventi_descritti = firma.get("eventi_descritti", {})
+        eventi_sconosciuti = [
+            nome
+            for nome, dati in eventi_descritti.items()
+            if not dati.get("conosciuto", True)
+        ]
+
+        if eventi_sconosciuti:
+            stato_runtime["evento_strutturato"] = {
+                "tipo": "unknown",
+                "categoria": "sconosciuta",
+                "origine": "scoperta",
+                "eventi_core": eventi_sconosciuti
+            }
+
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore propagando firma nel runtime: {}".format(e)
+        )
+
     logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
 
     if "eventi" not in stato_runtime:
@@ -204,7 +229,7 @@ def valuta_condizioni_generate_sicure(mondo, stato_runtime):
     """
 
     try:
-        import behaviors.condition_manager as condition_manager
+        import behaviors.condition_system.condition_manager as condition_manager
 
         # Caso piu' probabile nel tuo progetto:
         if hasattr(condition_manager, "valuta_condizioni_generate"):
@@ -580,7 +605,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     ULTIMA_GENERAZIONE = adesso
 
     try:
-        import behaviors.condition_generator as condition_generator
+        import behaviors.condition_system.condition_generator as condition_generator
 
         logger.info("[AUTONOMIA] Provo generazione autonoma. Motivo: {}".format(motivo))
 
@@ -618,8 +643,22 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 except Exception:
                     pass
             else:
-                logger.info("[AUTONOMIA] Nessuna nuova condizione generata")
-                return None
+                logger.info(
+                    "[AUTONOMIA] Nessuna nuova condizione generata: rivaluto condizioni esistenti"
+                )
+
+                try:
+                    from behaviors.condition_system.condition_manager import (
+                        reset_cache_condizioni
+                    )
+                    reset_cache_condizioni()
+                except Exception:
+                    pass
+
+                return valuta_condizioni_generate_sicure(
+                    mondo,
+                    stato_runtime
+                )
 
         elif hasattr(condition_generator, "genera_condizione_da_mondo"):
             condition_generator.genera_condizione_da_mondo(mondo, stato_runtime)

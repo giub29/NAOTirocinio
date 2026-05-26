@@ -24,7 +24,7 @@ import time
 import shutil
 import sys
 
-from behaviors.condition_memory import (
+from behaviors.condition_system.condition_memory import (
     registra_attivazione,
     registra_errore_condizione,
     marca_condizione_rifiutata,
@@ -32,7 +32,7 @@ from behaviors.condition_memory import (
     registra_esito_riparazione
 )
 
-from behaviors.condition_repair import tenta_riparazione_condizione
+from behaviors.condition_system.condition_repair import tenta_riparazione_condizione
 
 logger = logging.getLogger(__name__)
 
@@ -630,9 +630,19 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
             for e in eventi_core
         ]
 
+        eventi_attivi_unknown = []
+        for chiave, valore in eventi.items():
+            if valore not in [False, None, "", [], {}]:
+                eventi_attivi_unknown.append(
+                    str(chiave).lower().replace("-", "_")
+                )
+
         # Se esiste già una condizione generata esattamente per questo evento unknown,
         # allora può attivarsi. Altrimenti l'unknown deve tornare al supervisore.
-        if nome_evento in eventi_core_norm:
+        if (
+            nome_evento in eventi_core_norm
+            or nome_evento in eventi_attivi_unknown
+        ):
             return True
 
         return False
@@ -654,16 +664,29 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
         if chiave_norm not in eventi_attivi:
             eventi_attivi.append(chiave_norm)
 
+    eventi_significativi = [
+        e for e in eventi_attivi
+        if e not in [
+            "fermo",
+            "camminando",
+            "batteria",
+            "battery",
+            "batteria_percentuale",
+            "batteria_bassa",
+            "batteria_critica"
+        ]
+    ]
+
     evento_composto = (
         evento_strutturato.get("evento_composto", False)
-        or len(eventi_attivi) >= 2
+        or len(eventi_significativi) >= 2
     )
 
     # Se evento composto, una condizione semplice NON deve passare.
     if evento_composto:
         eventi_coperti = 0
 
-        for evento in eventi_attivi:
+        for evento in eventi_significativi:
             evento_norm = evento.replace("-", "_").lower()
             pezzi_evento = [
                 pezzo.strip()
