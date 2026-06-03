@@ -12,7 +12,7 @@ def comportamento():
         "azioni": [
             {"tipo": "occhi", "colore": "green"},
             {"tipo": "guarda", "x": -0.5, "y": -0.2},
-            {"tipo": "parla", "testo": "Ciao! Cosa stai facendo?"},
+            {"tipo": "parla", "testo": "Ho sentito un tocco sulla mano destra."},
             {"tipo": "fermati"}
         ],
         "memoria": []
