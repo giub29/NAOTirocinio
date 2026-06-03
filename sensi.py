@@ -259,20 +259,66 @@ class NaoSenses:
                 mano_dx_left  = self.memory.getData("Device/SubDeviceList/RHand/Touch/Left/Sensor/Value")
                 mano_dx_right = self.memory.getData("Device/SubDeviceList/RHand/Touch/Right/Sensor/Value")
 
-                mano_sx_toccata = mano_sx_back > 0.2 or mano_sx_left > 0.2 or mano_sx_right > 0.2
-                mano_dx_toccata = mano_dx_back > 0.2 or mano_dx_left > 0.2 or mano_dx_right > 0.2
+                # Filtro anti-falso positivo:
+                # soglia piu' alta della precedente 0.2, perche' i sensori capacitivi
+                # delle mani possono oscillare anche senza contatto reale.
+                soglia_mano = 0.55
+
+                mano_sx_valori = [
+                    mano_sx_back,
+                    mano_sx_left,
+                    mano_sx_right
+                ]
+
+                mano_dx_valori = [
+                    mano_dx_back,
+                    mano_dx_left,
+                    mano_dx_right
+                ]
+
+                mano_sx_zone_attive = 0
+                mano_dx_zone_attive = 0
+
+                for valore in mano_sx_valori:
+                    if valore is not None and valore > soglia_mano:
+                        mano_sx_zone_attive += 1
+
+                for valore in mano_dx_valori:
+                    if valore is not None and valore > soglia_mano:
+                        mano_dx_zone_attive += 1
+
+                # Debounce temporale:
+                # il tocco deve restare stabile per alcuni frame
+                # consecutivi, altrimenti e' rumore.
+                if not hasattr(self, "_mano_sx_stabile"):
+                    self._mano_sx_stabile = 0
+                    self._mano_dx_stabile = 0
+
+                if mano_sx_zone_attive >= 2:
+                    self._mano_sx_stabile += 1
+                else:
+                    self._mano_sx_stabile = 0
+
+                if mano_dx_zone_attive >= 2:
+                    self._mano_dx_stabile += 1
+                else:
+                    self._mano_dx_stabile = 0
+
+                # Serve stabilita' per ~150ms
+                mano_sx_toccata = self._mano_sx_stabile >= 3
+                mano_dx_toccata = self._mano_dx_stabile >= 3
 
                 if mano_sx_toccata and mano_dx_toccata:
-                    # Fronte di salita entrambe le mani
                     if not era_attivo["entrambe_mani"]:
                         if tempo_attuale - self.ultimo_evento.get("entrambe_mani", 0) > cooldown:
                             evento = u"Sento un tocco su entrambe le mani."
                             self._ricorda_evento("entrambe_mani", evento)
                             self.ultimo_evento["entrambe_mani"] = tempo_attuale
                             self._safe_print(u"[TOCCO] " + evento)
+
                     era_attivo["entrambe_mani"] = True
                     era_attivo["mano_sinistra"] = True
-                    era_attivo["mano_destra"]   = True
+                    era_attivo["mano_destra"] = True
 
                 else:
                     era_attivo["entrambe_mani"] = False
@@ -283,22 +329,20 @@ class NaoSenses:
                             self._ricorda_evento("mano_sinistra", evento)
                             self.ultimo_evento["mano_sinistra"] = tempo_attuale
                             self._safe_print(u"[TOCCO] " + evento)
+
                     era_attivo["mano_sinistra"] = mano_sx_toccata
 
                     if mano_dx_toccata and not era_attivo["mano_destra"]:
-                        ultimo_raw = self.ultimo_evento.get("_raw_touch_mano_destra", 0)
-
-                        if tempo_attuale - ultimo_raw > cooldown:
+                        if tempo_attuale - self.ultimo_evento.get("mano_destra", 0) > cooldown:
                             evento = u"Sento un tocco sulla mano destra."
                             self._ricorda_evento("mano_destra", evento)
-                            self.ultimo_evento["_raw_touch_mano_destra"] = tempo_attuale
                             self.ultimo_evento["mano_destra"] = tempo_attuale
                             self._safe_print(u"[TOCCO] " + evento)
 
                     era_attivo["mano_destra"] = mano_dx_toccata
 
             except Exception as e:
-                    print("[DEBUG MONITOR MANI ERROR] {}".format(e))
+                print("[DEBUG MONITOR MANI ERROR] {}".format(e))
 
             # PIEDI / BUMPER
             try:

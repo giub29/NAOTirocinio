@@ -22,11 +22,14 @@ SOUL_DIR = BASE_DIR
 
 RUNTIME_DIR = os.path.join(SOUL_DIR, "runtime")
 HEARTBEAT_FILE = os.path.join(RUNTIME_DIR, "heartbeat.txt")
+SOUL_LOCK_FILE = os.path.join(RUNTIME_DIR, "soul.lock")
+WATCHDOG_LOCK_FILE = os.path.join(RUNTIME_DIR, "watchdog.lock")
 
 TIMEOUT_HEARTBEAT = 180
 CONTROLLO_INTERVALLO = 3
 MAX_RIAVVII_CONSECUTIVI = 8
 PAUSA_RIAVVIO_BASE = 10
+PAUSA_RIAVVIO_MAX = 60
 
 processo = None
 STOP = False
@@ -36,20 +39,80 @@ def assicura_runtime():
     if not os.path.exists(RUNTIME_DIR):
         os.makedirs(RUNTIME_DIR)
 
+def acquisisci_lock_watchdog():
+    assicura_runtime()
 
-def reset_heartbeat():
+    try:
+        fd = os.open(
+            WATCHDOG_LOCK_FILE,
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY
+        )
+
+        os.write(fd, str(os.getpid()).encode("utf-8"))
+        os.close(fd)
+
+        logger.warning(
+            "Lock watchdog acquisito da PID {}".format(os.getpid())
+        )
+
+        return True
+
+    except OSError:
+        logger.error(
+            "Watchdog gia' attivo: blocco secondo avvio."
+        )
+        return False
+
+    except Exception as e:
+        logger.error(
+            "Errore acquisizione lock watchdog: {}".format(e)
+        )
+        return False
+
+
+def rilascia_lock_watchdog():
+    try:
+        if not os.path.exists(WATCHDOG_LOCK_FILE):
+            return
+
+        with open(WATCHDOG_LOCK_FILE, "r") as f:
+            pid_lock = f.read().strip()
+
+        if pid_lock == str(os.getpid()):
+            os.remove(WATCHDOG_LOCK_FILE)
+            logger.warning("Lock watchdog rilasciato")
+        else:
+            logger.warning(
+                "Non rimuovo watchdog.lock: appartiene al PID {}".format(
+                    pid_lock
+                )
+            )
+
+    except Exception as e:
+        logger.warning(
+            "Errore rilascio lock watchdog: {}".format(e)
+        )
+
+def reset_runtime():
     try:
         assicura_runtime()
 
         if os.path.exists(HEARTBEAT_FILE):
             os.remove(HEARTBEAT_FILE)
+            logger.info("Heartbeat precedente eliminato")
 
-        logger.info("Heartbeat precedente eliminato")
+        if os.path.exists(SOUL_LOCK_FILE):
+            os.remove(SOUL_LOCK_FILE)
+            logger.warning(
+                "soul.lock rimosso prima del riavvio "
+                "(era rimasto da un'esecuzione precedente)"
+            )
 
     except Exception as e:
-        logger.warning(
-            "Errore reset heartbeat: {}".format(e)
-        )
+        logger.warning("Errore reset runtime: {}".format(e))
+
+def reset_heartbeat():
+    reset_runtime()
 
 
 def heartbeat_scaduto():
@@ -162,6 +225,8 @@ def signal_handler(sig, frame):
     if processo:
         termina_processo(processo)
 
+    rilascia_lock_watchdog()
+
     sys.exit(0)
 
 
@@ -173,11 +238,15 @@ def main():
     global STOP
 
     assicura_runtime()
+    if not acquisisci_lock_watchdog():
+        print("[WATCHDOG] Altra istanza già attiva. Uscita.")
+        return
 
     if not os.path.exists(SOUL_PATH):
         logger.error(
             "soul.py non trovato: {}".format(SOUL_PATH)
         )
+        rilascia_lock_watchdog()
         return
 
     riavvii = 0
@@ -185,8 +254,7 @@ def main():
     try:
 
         while not STOP:
-
-            reset_heartbeat()
+            reset_runtime()
 
             processo = avvia_soul()
 
@@ -260,6 +328,7 @@ def main():
 
     finally:
 
+        rilascia_lock_watchdog()
         logger.info("Watchdog terminato")
 
 
