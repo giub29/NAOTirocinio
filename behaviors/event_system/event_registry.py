@@ -31,6 +31,11 @@ EVENTI_BASE_NOTI = {
         "categoria": "sociale",
         "descrizione": "tocco su entrambe le mani"
     },
+    "interazione_utente": {
+        "origine": "nota",
+        "categoria": "helper",
+        "descrizione": "marcatore generico di interazione umana"
+    },
     "volto_riconosciuto": {
         "origine": "nota",
         "categoria": "sociale",

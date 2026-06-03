@@ -1300,10 +1300,16 @@ def main():
                 _prepara_runtime_autonomo(mondo_evento)
 
                 decisione_condizione = valuta_condizioni_generate(mondo_evento, stato_runtime)
-
+                
                 if decisione_condizione:
                     decisione_condizione = valida_decisione(decisione_condizione, mondo_evento)
 
+                    logger.info(
+                    u"[SOUL][DEBUG] Decisione dopo valida_decisione: {}".format(
+                        decisione_condizione
+                    )
+)
+                    
                     stato_runtime["mantieni_pattugliamento"] = True
 
                     try:
@@ -1776,7 +1782,12 @@ def main():
 
                 
                 decisione_condizione = valida_decisione(decisione_condizione, mondo)
-
+                logger.info(
+                    u"[SOUL][DEBUG] Decisione dopo valida_decisione: {}".format(
+                        decisione_condizione
+                    )
+                )
+                
                 esegui_decisione(
                     decisione_condizione,
                     corpo,

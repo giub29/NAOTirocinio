@@ -37,6 +37,19 @@ logger = logging.getLogger(__name__)
 ULTIMA_GENERAZIONE = 0
 INTERVALLO_MINIMO_GENERAZIONE = 20
 ULTIMO_MONDO_GENERATO = None
+EVENTI_HELPER_NON_GENERATIVI = [
+    "interazione_utente"
+]
+
+
+def filtra_eventi_helper(eventi):
+    if not isinstance(eventi, list):
+        return []
+
+    return [
+        e for e in eventi
+        if str(e).lower().strip() not in EVENTI_HELPER_NON_GENERATIVI
+    ]
 
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
@@ -67,6 +80,8 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             for nome, dati in eventi_descritti.items()
             if not dati.get("conosciuto", True)
         ]
+
+        eventi_sconosciuti = filtra_eventi_helper(eventi_sconosciuti)
 
         if eventi_sconosciuti:
             stato_runtime["evento_strutturato"] = {
@@ -146,16 +161,21 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     eventi_reali = stato_runtime.get("eventi_reali", {})
 
-    numero_eventi_reali = len([
+    eventi_reali_generativi = [
         k for k, v in eventi_reali.items()
         if v not in [False, None, "", [], {}]
-    ])
+        and str(k).lower().strip() != "interazione_utente"
+    ]
+
+    numero_eventi_reali = len(eventi_reali_generativi)
+
+    eventi_attivi_generativi = [
+        e for e in eventi_attivi
+        if str(e).lower().strip() != "interazione_utente"
+    ]
 
     evento_composto = (
-        stato_runtime.get("evento_composto", False)
-        or firma.get("eventi_multipli", False)
-        or firma.get("situazione_composta", False)
-        or numero_eventi_reali >= 2
+        len(eventi_attivi_generativi) >= 2
     )
 
     # CASO SPECIALE:
@@ -281,9 +301,8 @@ def situazione_merita_generazione(mondo, stato_runtime):
     if not isinstance(eventi_core, list):
         eventi_core = []
 
-    # CASO CENTRALE DEL PROGETTO:
-    # se l'evento e' sconosciuto/scoperto e contiene almeno un evento core,
-    # deve poter generare una nuova condizione autonoma.
+    eventi_core = filtra_eventi_helper(eventi_core)
+
     if (
         tipo in ["unknown", "sconosciuto", "scoperta"]
         or categoria in ["unknown", "sconosciuta", "scoperta"]
@@ -500,6 +519,11 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     if not isinstance(eventi_core, list):
         eventi_core = []
 
+    eventi_core = [
+        e for e in eventi_core
+        if str(e).lower().strip() != "interazione_utente"
+    ]
+    
     numero_eventi_reali = len(eventi_attivi.keys())
 
     # Se gli eventi strutturati reali esistono,
@@ -513,10 +537,18 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         )
     ])
 
+    eventi_attivi_generativi = [
+        k for k in eventi_attivi.keys()
+        if str(k).lower().strip() != "interazione_utente"
+    ]
+
     eventi_multipli = (
         len(eventi_core) >= 2
-        or numero_eventi_reali >= 2
-        or evento_strutturato.get("evento_composto", False)
+        or len(eventi_attivi_generativi) >= 2
+        or (
+            evento_strutturato.get("evento_composto", False)
+            and len(eventi_core) >= 2
+        )
     )
 
     situazione_composta = False

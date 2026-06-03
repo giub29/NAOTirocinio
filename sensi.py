@@ -264,49 +264,18 @@ class NaoSenses:
                 # delle mani possono oscillare anche senza contatto reale.
                 soglia_mano = 0.55
 
-                mano_sx_valori = [
-                    mano_sx_back,
-                    mano_sx_left,
-                    mano_sx_right
-                ]
+                # Sul NAO reale funziona stabilmente solo il sensore Back delle mani.
+                # I sensori Left/Right restano spesso a 0.0, quindi non posso richiedere 2 zone attive.
 
-                mano_dx_valori = [
-                    mano_dx_back,
-                    mano_dx_left,
-                    mano_dx_right
-                ]
+                mano_sx_toccata = (
+                    mano_sx_back is not None and
+                    mano_sx_back > soglia_mano
+                )
 
-                mano_sx_zone_attive = 0
-                mano_dx_zone_attive = 0
-
-                for valore in mano_sx_valori:
-                    if valore is not None and valore > soglia_mano:
-                        mano_sx_zone_attive += 1
-
-                for valore in mano_dx_valori:
-                    if valore is not None and valore > soglia_mano:
-                        mano_dx_zone_attive += 1
-
-                # Debounce temporale:
-                # il tocco deve restare stabile per alcuni frame
-                # consecutivi, altrimenti e' rumore.
-                if not hasattr(self, "_mano_sx_stabile"):
-                    self._mano_sx_stabile = 0
-                    self._mano_dx_stabile = 0
-
-                if mano_sx_zone_attive >= 2:
-                    self._mano_sx_stabile += 1
-                else:
-                    self._mano_sx_stabile = 0
-
-                if mano_dx_zone_attive >= 2:
-                    self._mano_dx_stabile += 1
-                else:
-                    self._mano_dx_stabile = 0
-
-                # Serve stabilita' per ~150ms
-                mano_sx_toccata = self._mano_sx_stabile >= 3
-                mano_dx_toccata = self._mano_dx_stabile >= 3
+                mano_dx_toccata = (
+                    mano_dx_back is not None and
+                    mano_dx_back > soglia_mano
+                )
 
                 if mano_sx_toccata and mano_dx_toccata:
                     if not era_attivo["entrambe_mani"]:

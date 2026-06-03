@@ -618,6 +618,22 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
         eventi_reali.get("camminando", False)
     )
 
+    if tipo == "tocco_mano" and not camminando:
+
+        if direzione == "sinistra":
+            return (
+                "mano_sinistra" in nome
+                or "tocco_mano_sinistra" in nome
+            )
+
+        if direzione == "destra":
+            return (
+                "mano_destra" in nome
+                or "tocco_mano_destra" in nome
+            )
+
+        return "entrambe_mani" in nome
+    
     # Un evento sconosciuto/scoperto non deve essere catturato da condizioni vecchie.
     # Deve tornare al supervisore, che genera nuova condizione autonoma.
     if (
