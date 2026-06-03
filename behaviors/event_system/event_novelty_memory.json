@@ -26,6 +26,15 @@
     "ultima_volta": 1779796477,
     "visto": 2
   },
+  "muro_rotto": {
+    "esempi": [
+      "REPORT: Vedo un muro rotto. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780484946,
+    "ultima_volta": 1780485410,
+    "visto": 6
+  },
   "porta_aperta_laboratorio": {
     "esempi": [
       "REPORT: Vedo una porta aperta nel laboratorio. SONO FERMO."
@@ -34,5 +43,68 @@
     "prima_volta": 1779399980,
     "ultima_volta": 1779821233,
     "visto": 76
+  },
+  "porta_chiusa": {
+    "esempi": [
+      "REPORT: Vedo una porta chiusa. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780484946,
+    "ultima_volta": 1780485410,
+    "visto": 6
+  },
+  "prendi_liniziativa_osservazione_autonoma": {
+    "esempi": [
+      "REPORT: PRENDI LINIZIATIVA. OSSERVAZIONE_AUTONOMA. VEDO: uno zaino vicino alla porta. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780484946,
+    "ultima_volta": 1780484946,
+    "visto": 2
+  },
+  "sedia_spostata_vicino": {
+    "esempi": [
+      "REPORT: PRENDI LINIZIATIVA. OSSERVAZIONE_AUTONOMA. VEDO: una sedia spostata vicino al tavolo. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780485695,
+    "ultima_volta": 1780485699,
+    "visto": 4
+  },
+  "zaino": {
+    "esempi": [
+      "REPORT: Vedo uno zaino vicino. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780484946,
+    "ultima_volta": 1780484946,
+    "visto": 2
+  },
+  "zaino_vicino": {
+    "esempi": [
+      "REPORT: Vedo uno zaino vicino. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780485276,
+    "ultima_volta": 1780485410,
+    "visto": 4
+  },
+  "zaino_vicino_alla": {
+    "esempi": [
+      "REPORT: PRENDI LINIZIATIVA. OSSERVAZIONE_AUTONOMA. VEDO: uno zaino vicino alla porta. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780485276,
+    "ultima_volta": 1780485276,
+    "visto": 2
+  },
+  "zaino_vicino_porta": {
+    "esempi": [
+      "REPORT: PRENDI LINIZIATIVA. OSSERVAZIONE_AUTONOMA. VEDO: uno zaino vicino alla porta. SONO FERMO."
+    ],
+    "generato": false,
+    "prima_volta": 1780485410,
+    "ultima_volta": 1780485452,
+    "visto": 6
   }
 }

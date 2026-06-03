@@ -1073,19 +1073,12 @@ def main():
                 stato_runtime["ultima_curiosita_stop_tempo"] = adesso
 
                 # TEST ROBOT REALE:
-                # durante i test di eventi/safety non avvio curiosità dopo stop,
-                # altrimenti blocca il ciclo e il watchdog termina soul.py.
-                voce.parla(u"Mi fermo.")
-                stato_precedente = ""
-                time.sleep(0.1)
-                continue
+                # dopo lo stop avvio una sola osservazione autonoma,
+                # così NAO può creare una condizione UNKNOWN da visione reale.
                 voce.parla(u"Mi fermo. Ora osservo l'ambiente.")
                 aggiorna_heartbeat()
 
                 try:
-                    voce.parla(u"Mi fermo. Osservo l'ambiente.")
-                    aggiorna_heartbeat()
-
                     mondo_curioso = _gestisci_iniziativa_robot(
                         corpo,
                         voce,
@@ -1442,7 +1435,7 @@ def main():
                     ultimo_evento = stato_runtime.get("ultimo_evento_reale_tempo", 0)
                     adesso = time.time()
 
-                    if adesso - ultimo_evento < 10:
+                    if adesso - ultimo_evento < 2: #PER IL TEST < 2 ALTRIMENTI 10
                         logger.info(u"[SOUL] Iniziativa saltata: evento reale recente.")
                     else:
                         mondo = _gestisci_iniziativa_robot(

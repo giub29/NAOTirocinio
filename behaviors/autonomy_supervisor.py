@@ -160,6 +160,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         return None
 
     eventi_reali = stato_runtime.get("eventi_reali", {})
+    eventi_attivi = list(firma.get("eventi_attivi", {}).keys())
 
     eventi_reali_generativi = [
         k for k, v in eventi_reali.items()

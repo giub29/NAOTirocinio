@@ -48,9 +48,43 @@ PAROLE_BANALI = [
     "sul",
     "sulla",
     "sullo",
-    "vicino",
-    "davanti",
-    "dietro",
+    "al",
+    "allo",
+    "alla",
+    "ai",
+    "agli",
+    "alle",
+    "dal",
+    "dallo",
+    "dalla",
+    "dai",
+    "dagli",
+    "dalle",
+    "del",
+    "dello",
+    "della",
+    "dei",
+    "degli",
+    "delle",
+    "nel",
+    "nello",
+    "nella",
+    "nei",
+    "negli",
+    "nelle",
+    "col",
+    "coi",
+
+    # marcatori tecnici/autonomi
+    "prendi",
+    "liniziativa",
+    "iniziativa",
+    "osservazione",
+    "autonoma",
+    "autonomo",
+    "autonomamente",
+
+    # parole troppo generiche
     "destra",
     "sinistra",
     "qualcosa",
@@ -118,7 +152,17 @@ PAROLE_INTERESSANTI = [
     "computer",
     "robot",
     "cibo",
-    "tazza"
+    "tazza",
+    "vicino",
+    "davanti",
+    "dietro",
+    "accanto",
+    "spostata",
+    "spostato",
+    "rotto",
+    "rotta",
+    "insolito",
+    "insolita"
 ]
 
 PAROLE_NEUTRE_DA_SOLE = [
@@ -135,12 +179,27 @@ PAROLE_NEUTRE_DA_SOLE = [
 
 def _normalizza_testo(testo):
     testo = (testo or "").lower()
-    testo = testo.replace("report:", " ")
-    testo = testo.replace("evento recente:", " ")
+
+    marcatori = [
+        "report:",
+        "evento recente:",
+        "interazione_utente",
+        "prendi l'iniziativa",
+        "prendi l iniziativa",
+        "prendi liniziativa",
+        "osservazione_autonoma",
+        "osservazione autonoma",
+        "vedo:",
+        "sono fermo",
+        "sto camminando"
+    ]
+
+    for m in marcatori:
+        testo = testo.replace(m, " ")
+
     testo = re.sub(r"[^a-z0-9àèéìòù_ ]+", " ", testo)
     testo = re.sub(r"\s+", " ", testo).strip()
     return testo
-
 
 def _slug(parole):
     parole_pulite = []
@@ -214,11 +273,6 @@ def estrai_eventi_sconosciuti(mondo, eventi_noti=None):
 
     parole_evento = nome_evento.split("_")
 
-    contiene_interessante = any(
-        parola in PAROLE_INTERESSANTI
-        for parola in parole_evento
-    )
-
     solo_neutre = all(
         parola in PAROLE_NEUTRE_DA_SOLE
         for parola in parole_evento
@@ -227,7 +281,10 @@ def estrai_eventi_sconosciuti(mondo, eventi_noti=None):
     if solo_neutre:
         return {}
 
-    if not contiene_interessante and len(parole_evento) < 2:
+    # Evita eventi formati da una sola parola troppo generica.
+    # Però consente concetti nuovi composti, anche se non presenti
+    # in una lista manuale di oggetti.
+    if len(parole_evento) < 2:
         return {}
 
     if nome_evento in PAROLE_NOTE:

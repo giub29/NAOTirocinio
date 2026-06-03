@@ -1344,10 +1344,19 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     except:
         testo_mondo = ""
 
-    # Non generiamo condizioni statiche dalla curiosità dinamica.
-    if "prendi l'iniziativa" in testo_mondo or "prendi l iniziativa" in testo_mondo:
-        logger.info(u"[GENERATOR] Curiosita visiva dinamica: non genero condizione statica.")
-        return False
+    # Osservazione autonoma/visiva:
+    # NON generiamo una condizione su "PRENDI L'INIZIATIVA",
+    # ma possiamo generare condizioni su dettagli visivi concreti
+    # emersi dall'immagine: zaino, porta chiusa, muro rotto, sedia spostata, ecc.
+    osservazione_autonoma = (
+        "prendi l'iniziativa" in testo_mondo or
+        "prendi l iniziativa" in testo_mondo or
+        "osservazione_autonoma" in testo_mondo or
+        "vedo:" in testo_mondo
+    )
+
+    if osservazione_autonoma:
+        logger.info(u"[GENERATOR] Osservazione autonoma visiva: valuto eventi sconosciuti concreti, non il trigger di iniziativa.")
 
     # Eventi utili. Bastano a far partire la generazione.
     eventi_generabili = [
@@ -1685,16 +1694,28 @@ def _costruisci_condizione_specifica_da_slug(nome_base):
     righe.append("")
     return "\n".join(righe)
 
-def _forza_condizione_specifica(codice, mondo):
+def _forza_condizione_specifica(codice, mondo, eventi_sconosciuti=None):
     """
     Sostituisce automaticamente la funzione condizione() generata dall'LLM
     con una versione più precisa, quando l'evento è riconoscibile.
 
-    Il comportamento resta generato dall'LLM.
-    Il trigger invece viene reso sicuro e specifico dal sistema.
+    PRIORITÀ:
+    1. evento sconosciuto estratto autonomamente;
+    2. slug testuale per eventi noti;
+    3. nessuna forzatura.
     """
 
-    nome_base = _slug_testo(mondo)
+    nome_base = None
+
+    try:
+        if eventi_sconosciuti:
+            nome_base = list(eventi_sconosciuti.keys())[0]
+    except Exception:
+        nome_base = None
+
+    if not nome_base:
+        nome_base = _slug_testo(mondo)
+
     condizione_specifica = _costruisci_condizione_specifica_da_slug(nome_base)
 
     if not condizione_specifica:
@@ -1725,17 +1746,27 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
     try:
         logger.info(u"[GENERATOR] Richiesta nuova condizione Python al LLM")
 
+        eventi_sconosciuti = None
+
+        try:
+            from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
+            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo, {})
+        except Exception as e:
+            logger.warning(u"[GENERATOR] Errore pre-estrazione eventi sconosciuti: {}".format(e))
+            eventi_sconosciuti = None
+
         risposta = _chiama_llm_codice(
             mondo,
             dati_memoria,
             stato_robot,
-            chiave_privata
+            chiave_privata,
+            eventi_sconosciuti=eventi_sconosciuti
         )
 
         codice = _estrai_codice_python(risposta)
 
         codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
-        codice = _forza_condizione_specifica(codice, mondo)
+        codice = _forza_condizione_specifica(codice, mondo, eventi_sconosciuti=eventi_sconosciuti)
 
         # Valida la condizione se è legata a un evento sconosciuto
         try:
@@ -1771,6 +1802,13 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             logger.warning(u"[GENERATOR] Errore validazione sconosciuto: {}".format(e))
 
         nome_base = _slug_testo(mondo)
+
+        try:
+            if eventi_sconosciuti:
+                nome_base = list(eventi_sconosciuti.keys())[0]
+        except Exception:
+            pass
+
         nome_file = "condizione_{}.py".format(nome_base)
 
         path_generato = os.path.join(GENERATED_DIR, nome_file)
