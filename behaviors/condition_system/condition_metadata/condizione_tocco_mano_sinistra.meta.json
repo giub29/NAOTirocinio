@@ -1,30 +1,6 @@
 {
-  "aggiornata_il": "2026-05-26 20:39:42",
+  "aggiornata_il": "2026-05-26 20:46:22",
   "attivazioni_recenti": [
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green",
-            "tipo": "occhi"
-          },
-          {
-            "tipo": "guarda",
-            "x": 0.5,
-            "y": -0.2
-          },
-          {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
-            "tipo": "parla"
-          }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
-        "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
-      "tempo": "2026-05-26 20:27:36"
-    },
     {
       "decisione": {
         "azioni": [
@@ -120,6 +96,30 @@
       },
       "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
       "tempo": "2026-05-26 20:39:42"
+    },
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green",
+            "tipo": "occhi"
+          },
+          {
+            "tipo": "guarda",
+            "x": 0.5,
+            "y": -0.2
+          },
+          {
+            "testo": "Ho sentito un tocco sulla mano sinistra.",
+            "tipo": "parla"
+          }
+        ],
+        "memoria": [],
+        "obiettivo": "rispondere al tocco",
+        "stato_interno": "curioso"
+      },
+      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
+      "tempo": "2026-05-26 20:46:22"
     }
   ],
   "creata_il": "2026-05-26 20:24:23",
@@ -169,10 +169,10 @@
     "ultimo_motivo": ""
   },
   "statistiche": {
-    "attivazioni": 5,
+    "attivazioni": 6,
     "errori_runtime": 0,
     "rifiuti": 0,
-    "ultima_attivazione": "2026-05-26 20:39:42",
+    "ultima_attivazione": "2026-05-26 20:46:22",
     "ultimo_errore": ""
   },
   "stato": "promossa",

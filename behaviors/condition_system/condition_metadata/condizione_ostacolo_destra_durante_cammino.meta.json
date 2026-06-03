@@ -1,5 +1,36 @@
 {
-  "aggiornata_il": "2026-05-19 21:44:59",
+  "aggiornata_il": "2026-05-26 20:47:22",
+  "attivazioni_recenti": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "red",
+            "tipo": "occhi"
+          },
+          {
+            "tipo": "guarda",
+            "x": 0.0,
+            "y": -0.25
+          },
+          {
+            "g": 0.12,
+            "tipo": "cammina",
+            "x": 0.16
+          },
+          {
+            "testo": "Attenzione, ostacolo a destra!",
+            "tipo": "parla"
+          }
+        ],
+        "memoria": [],
+        "obiettivo": "Evitare ostacolo a destra.",
+        "stato_interno": "allerta"
+      },
+      "mondo": "REPORT: Ostacolo a destra. STO CAMMINANDO.",
+      "tempo": "2026-05-26 20:47:22"
+    }
+  ],
   "creata_il": "2026-05-19 21:44:59",
   "eventi_attivi_origine": [
     "ostacolo_destra",
@@ -47,10 +78,10 @@
     "ultimo_motivo": ""
   },
   "statistiche": {
-    "attivazioni": 0,
+    "attivazioni": 1,
     "errori_runtime": 0,
     "rifiuti": 0,
-    "ultima_attivazione": "",
+    "ultima_attivazione": "2026-05-26 20:47:22",
     "ultimo_errore": ""
   },
   "stato": "promossa",
