@@ -228,26 +228,58 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
     
-        # Curiosità epistemica:
-        # se non ci sono condizioni attive e la scena non merita ancora
-        # una condizione permanente, NAO può decidere di osservare meglio.
+    # Curiosità epistemica:
+    # se non ci sono condizioni attive e la scena non merita ancora
+    # una condizione permanente, NAO può decidere di osservare meglio.
     try:
         if costruisci_decisione_curiosa is not None:
-            mondo_unknown = _pulisci_mondo_per_unknown(mondo)
-            decisione_curiosa = costruisci_decisione_curiosa(mondo_unknown)
+
+            mondo_unknown = _pulisci_mondo_per_unknown(
+                mondo
+            )
+
+            logger.info(
+                u"[AUTONOMIA][UNKNOWN] mondo_unknown={}".format(
+                    mondo_unknown
+                )
+            )
+
+            decisione_curiosa = (
+                costruisci_decisione_curiosa(
+                    mondo_unknown
+                )
+            )
+
+            logger.info(
+                u"[AUTONOMIA][UNKNOWN] decisione_curiosa={}".format(
+                    decisione_curiosa
+                )
+            )
 
             if decisione_curiosa is not None:
-                logger.info("[AUTONOMIA] Decisione curiosa autonoma senza generare condizione")
+                logger.info(
+                    "[AUTONOMIA] Decisione curiosa autonoma senza generare condizione"
+                )
                 return decisione_curiosa
 
     except Exception as e:
-            logger.warning("[AUTONOMIA] Errore curiosita epistemica: {}".format(e))
-    deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
+        logger.warning(
+            "[AUTONOMIA] Errore curiosita epistemica: {}".format(
+                e
+            )
+        )
 
-    logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
-        deve_generare,
-        motivo
-    ))
+    deve_generare, motivo = situazione_merita_generazione(
+        mondo,
+        stato_runtime
+    )
+
+    logger.info(
+        "[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
+            deve_generare,
+            motivo
+        )
+    )
 
     if deve_generare:
         nuova_decisione = prova_generazione_autonoma(mondo, stato_runtime, motivo)

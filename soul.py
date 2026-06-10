@@ -115,6 +115,16 @@ VELOCITA_CAMMINO = 0.3
 
 ANGOLO_SGUARDO_NEUTRO = (0.0, -0.15)
 ANGOLO_SGUARDO_INIZIATIVA = (0.0, -0.2)
+ANGOLI_OSSERVAZIONE_MIRATA = [
+    (0.0, -0.30),
+    (0.18, -0.25),
+    (-0.18, -0.25),
+    (0.10, -0.35),
+    (-0.10, -0.35)
+]
+
+MAX_OSSERVAZIONI_MIRATE = 2
+COOLDOWN_OSSERVAZIONE_MIRATA = 25
 HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
 HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
 
@@ -191,7 +201,10 @@ stato_runtime = {
     "ultima_curiosita_stop_tempo": 0,
     "ultimo_volto_ignoto_rilevato": False,
     "ultimo_volto_ignoto_tempo": 0,
-    "ultimo_evento_reale_tempo": 0
+    "ultimo_evento_reale_tempo": 0,
+    "ultima_osservazione_mirata_tempo": 0,
+    "conteggio_osservazioni_mirate": 0,
+    "ultima_firma_osservazione_mirata": ""
 }
 
 def _estrai_ricordi_dalla_decisione(elementi):
@@ -723,6 +736,122 @@ def _decisione_richiede_osservazione_mirata(decisione):
         pass
 
     return False
+
+def _firma_osservazione_mirata(mondo):
+    try:
+        testo = normalizza_testo_ascii(mondo).lower()
+    except Exception:
+        testo = str(mondo).lower()
+
+    testo = re.sub(r"\s+", " ", testo).strip()
+    return testo[:220]
+
+
+def _puo_fare_osservazione_mirata(mondo):
+    adesso = time.time()
+
+    ultimo = stato_runtime.get("ultima_osservazione_mirata_tempo", 0)
+    if adesso - ultimo < COOLDOWN_OSSERVAZIONE_MIRATA:
+        logger.info(u"[SOUL] Curiosita conclusa senza nuove evidenze: cooldown osservazione mirata")
+        return False
+
+    ultimo = stato_runtime.get(
+        "ultima_osservazione_mirata_tempo", 0
+    )
+
+    # reset naturale dopo cooldown
+    if time.time() - ultimo > COOLDOWN_OSSERVAZIONE_MIRATA:
+        stato_runtime["conteggio_osservazioni_mirate"] = 0
+
+    conteggio = stato_runtime.get(
+        "conteggio_osservazioni_mirate", 0
+    )
+
+    if conteggio >= MAX_OSSERVAZIONI_MIRATE:
+        logger.info(u"[SOUL] Curiosita conclusa senza nuove evidenze: limite osservazioni mirate raggiunto")
+        return False
+
+    firma = _firma_osservazione_mirata(mondo)
+    ultima_firma = stato_runtime.get("ultima_firma_osservazione_mirata", "")
+
+    if firma and firma == ultima_firma:
+        logger.info(u"[SOUL] Curiosita conclusa senza nuove evidenze: stesso contesto gia' approfondito")
+        return False
+
+    return True
+
+
+def _gestisci_osservazione_mirata(corpo, voce, mondo_origine):
+    stato_runtime["ultima_osservazione_mirata_tempo"] = time.time()
+    stato_runtime["conteggio_osservazioni_mirate"] = (
+        stato_runtime.get("conteggio_osservazioni_mirate", 0) + 1
+    )
+    stato_runtime["ultima_firma_osservazione_mirata"] = (
+        _firma_osservazione_mirata(mondo_origine)
+    )
+
+    indice = stato_runtime.get("conteggio_osservazioni_mirate", 1) - 1
+    angolo = ANGOLI_OSSERVAZIONE_MIRATA[
+        indice % len(ANGOLI_OSSERVAZIONE_MIRATA)
+    ]
+
+    logger.info(
+        u"[SOUL] Cambio angolo osservazione: yaw={}, pitch={}".format(
+            angolo[0], angolo[1]
+        )
+    )
+
+    try:
+        corpo.fermati()
+    except Exception:
+        pass
+
+    corpo.imposta_colore_occhi("yellow")
+    corpo.guarda(angolo[0], angolo[1])
+    time.sleep(0.8)
+
+    img_b64 = corpo.scatta_foto(
+        camera_id=0,
+        nome_file="osservazione_mirata.jpg"
+    )
+
+    if img_b64:
+        descrizione = analizza_immagine(
+            img_b64,
+            CHIAVE_PRIVATA,
+            contesto="stanza"
+        )
+
+        testo_visivo = analizza_testo_visivo(
+            img_b64,
+            CHIAVE_PRIVATA
+        )
+
+        if testo_visivo not in [
+            "NESSUN_TESTO_VISIBILE",
+            "TESTO_NON_LEGGIBILE",
+            "CODICE_NON_LEGGIBILE"
+        ]:
+            descrizione += u" TESTO_VISIBILE: {}".format(testo_visivo)
+    else:
+        descrizione = (
+            u"non riesco a vedere chiaramente l'ambiente "
+            u"dopo il cambio di angolo"
+        )
+
+    logger.info(
+        u"[SOUL] Nuova osservazione dopo curiosita: {}".format(
+            testo_per_log(descrizione[:180])
+        )
+    )
+
+    return (
+        u"REPORT: PRENDI L'INIZIATIVA. "
+        u"OSSERVAZIONE_MIRATA. "
+        u"NESSUNA_CONDIZIONE_ATTIVA. "
+        u"SONO FERMO. "
+        u"VEDO: {}.".format(descrizione)
+    )
 
 def _pulisci_mondo_da_volti_salutati(mondo):
     for nome in stato_runtime["volti_salutati"]:
@@ -1853,55 +1982,72 @@ def main():
 
                 if richiede_osservazione_mirata:
                     logger.info(
-                        u"[SOUL] Curiosita richiede osservazione mirata: scatto nuova osservazione"
+                        u"[SOUL] Curiosita richiede osservazione mirata"
                     )
 
-                    mondo_mirato = _gestisci_iniziativa_robot(
-                        corpo,
-                        voce,
-                        motivo="osservazione mirata"
-                    )
+                    if _puo_fare_osservazione_mirata(mondo):
 
-                    logger.info(
-                        u"[SOUL] Mondo dopo osservazione mirata: {}".format(
-                            testo_per_log(mondo_mirato)
-                        )
-                    )
-
-                    _prepara_runtime_autonomo(
-                        mondo_mirato,
-                        evento_composto=False
-                    )
-
-                    decisione_mirata = autonomy_supervisor.gestisci_autonomia(
-                        mondo_mirato,
-                        stato_runtime
-                    )
-
-                    if decisione_mirata:
-                        decisione_mirata = valida_decisione(
-                            decisione_mirata,
-                            mondo_mirato
+                        mondo_mirato = _gestisci_osservazione_mirata(
+                            corpo,
+                            voce,
+                            mondo
                         )
 
                         logger.info(
-                            u"[SOUL] Decisione dopo osservazione mirata: {}".format(
-                                decisione_mirata
+                            u"[SOUL] Mondo dopo osservazione mirata: {}".format(
+                                testo_per_log(mondo_mirato)
                             )
                         )
 
-                        esegui_decisione(
-                            decisione_mirata,
-                            corpo,
-                            voce,
-                            vista,
-                            sistema,
-                            stato_runtime,
-                            aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                        _prepara_runtime_autonomo(
+                            mondo_mirato,
+                            evento_composto=False
                         )
 
-                        ultima_decisione = decisione_mirata
-                        ultimo_evento_tempo = time.time()
+                        decisione_mirata = autonomy_supervisor.gestisci_autonomia(
+                            mondo_mirato,
+                            stato_runtime
+                        )
+
+                        if decisione_mirata:
+                            decisione_mirata = valida_decisione(
+                                decisione_mirata,
+                                mondo_mirato
+                            )
+
+                            if _decisione_richiede_osservazione_mirata(
+                                decisione_mirata
+                            ):
+                                logger.info(
+                                    u"[SOUL] Curiosita conclusa senza nuove evidenze"
+                                )
+                            else:
+                                logger.info(
+                                    u"[SOUL] Decisione dopo osservazione mirata: {}".format(
+                                        decisione_mirata
+                                    )
+                                )
+
+                                esegui_decisione(
+                                    decisione_mirata,
+                                    corpo,
+                                    voce,
+                                    vista,
+                                    sistema,
+                                    stato_runtime,
+                                    aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                                )
+
+                                ultima_decisione = decisione_mirata
+                                ultimo_evento_tempo = time.time()
+                        else:
+                            logger.info(
+                                u"[SOUL] Curiosita conclusa senza nuove evidenze"
+                            )
+                    else:
+                        logger.info(
+                            u"[SOUL] Curiosita conclusa senza nuove evidenze"
+                        )
 
             _riprendi_cammino_automatico(corpo, ultima_decisione)
             stato_precedente = mondo

@@ -777,6 +777,56 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
 
     return True
 
+def _condizione_visiva_bloccata_da_negativi(nome_file, mondo):
+    """
+    Evita che condizioni visive si attivino quando il testo dice
+    chiaramente che NON ci sono contenuti leggibili.
+
+    Esempio bug reale:
+    monitor spento -> "Che interessante codice!"
+    """
+
+    try:
+        nome_norm = (nome_file or "").lower()
+        testo = (mondo or "").lower()
+    except Exception:
+        return False
+
+    # Solo condizioni visuali unknown
+    if "informazione_visiva" not in nome_norm:
+        return False
+
+    negativi = [
+        "non ci sono elementi leggibili",
+        "non ci sono elementi leggibili come testo",
+        "non ci sono testi leggibili",
+        "nessun testo visibile",
+        "nessuna informazione leggibile",
+        "non mostra alcun contenuto identificabile",
+        "non mostra contenuto identificabile",
+        "non contiene informazioni leggibili",
+        "non contiene codice",
+        "monitor spento",
+        "schermo nero",
+        "non e presente testo",
+        "non e presente alcun testo",
+        "non e' presente testo",
+        "non e' presente alcun testo",
+        "testo non leggibile",
+        "codice non leggibile"
+    ]
+
+    for negativo in negativi:
+        if negativo in testo:
+            logger.info(
+                u"[CONDIZIONI] Blocco condizione visiva per evidenza negativa: {}".format(
+                    nome_file
+                )
+            )
+            return True
+
+    return False
+
 def valuta_condizioni_generate(mondo, stato_runtime):
     """
     Valuta tutte le condizioni generate.
@@ -821,6 +871,12 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                 logger.info(u"[CONDIZIONI] Skip anti-loop: {} ancora in cooldown".format(nome))
                 continue
 
+            if _condizione_visiva_bloccata_da_negativi(
+                nome,
+                mondo
+            ):
+                continue
+            
             condizione_vera = modulo.condizione(mondo, stato_runtime)
 
             if condizione_vera:
