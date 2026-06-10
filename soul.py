@@ -1380,15 +1380,48 @@ def main():
                 time.sleep(0.1)
                 continue
 
-            if mondo.strip() in [
+            # Curiosità autonoma su mondo neutro:
+            # se non succede nulla per un po', NAO osserva da solo.
+            mondo_neutro = mondo.strip() in [
                 u"REPORT:",
                 u"REPORT: SONO FERMO.",
                 u"SONO FERMO.",
                 u""
-            ]:
-                stato_precedente = mondo
-                time.sleep(0.1)
-                continue
+            ]
+
+            if mondo_neutro:
+                tempo_di_inerzia = time.time() - ultimo_evento_tempo
+                ultima_curiosita = stato_runtime.get("ultima_curiosita_inerzia_tempo", 0)
+                adesso = time.time()
+
+                tempo_da_ultima_curiosita = adesso - ultima_curiosita
+
+                if (
+                    not corpo.sta_camminando() and
+                    not stato_runtime.get("in_pattugliamento", False) and
+                    messaggio_utente == "" and
+                    tempo_di_inerzia >= 10 and
+                    tempo_da_ultima_curiosita >= 20
+                ):
+                    logger.info(
+                        u"[SOUL] Avvio curiosita autonoma per inerzia: "
+                        u"silenzio da {:.1f}s".format(tempo_di_inerzia)
+                    )
+
+                    stato_runtime["ultima_curiosita_inerzia_tempo"] = adesso
+
+                    mondo = _gestisci_iniziativa_robot(
+                        corpo,
+                        voce,
+                        motivo="inerzia"
+                    )
+
+                    ultimo_evento_tempo = time.time()
+
+                else:
+                    stato_precedente = mondo
+                    time.sleep(0.1)
+                    continue
 
             interazione_reale = _valuta_interazione_reale(mondo)
 
@@ -1417,33 +1450,6 @@ def main():
             if interazione_reale:
                 ultimo_evento_tempo = time.time()
                 stato_runtime["ultimo_evento_reale_tempo"] = time.time()
-
-            else:
-                tempo_di_inerzia = time.time() - ultimo_evento_tempo
-
-                if (
-                    not corpo.sta_camminando() and
-                    messaggio_utente == "" and
-                    tempo_di_inerzia > TEMPO_INERZIA_INIZIATIVA
-                    and mondo.strip() in [
-                        u"REPORT:",
-                        u"REPORT: SONO FERMO.",
-                        u"SONO FERMO.",
-                        u""
-                    ]
-                ):
-                    ultimo_evento = stato_runtime.get("ultimo_evento_reale_tempo", 0)
-                    adesso = time.time()
-
-                    if adesso - ultimo_evento < 2: #PER IL TEST < 2 ALTRIMENTI 10
-                        logger.info(u"[SOUL] Iniziativa saltata: evento reale recente.")
-                    else:
-                        mondo = _gestisci_iniziativa_robot(
-                            corpo,
-                            voce,
-                            motivo="inerzia"
-                        )
-                        ultimo_evento_tempo = time.time()
 
             mondo = _pulisci_mondo_da_volti_salutati(mondo)
             mondo = re.sub(r"\s+", " ", mondo).strip()

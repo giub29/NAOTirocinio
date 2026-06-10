@@ -372,6 +372,40 @@ def _estrai_eventi_noti_minimi(mondo):
 
     return eventi
 
+def _pulisci_mondo_per_unknown(mondo):
+    """
+    Rimuove marker tecnici usati da soul.py per attivare la curiosità.
+    Gli eventi UNKNOWN devono nascere dal contenuto osservato,
+    non da PRENDI L'INIZIATIVA / OSSERVAZIONE_AUTONOMA.
+    """
+    testo = (mondo or "").lower()
+
+    marker = [
+        "report:",
+        "prendi l'iniziativa",
+        "prendi l iniziativa",
+        "prendi liniziativa",
+        "osservazione_autonoma",
+        "osservazione autonoma",
+        "nessuna_condizione_attiva",
+        "nessuna condizione attiva",
+        "sono fermo",
+        "sto camminando"
+    ]
+
+    for m in marker:
+        testo = testo.replace(m, " ")
+
+    # Se c'è VEDO:, privilegio la parte visiva.
+    if "vedo:" in testo:
+        testo = testo.split("vedo:", 1)[1]
+
+    testo = testo.replace("vedo:", " ")
+    testo = testo.replace(".", " ")
+    testo = " ".join(testo.split())
+
+    return testo
+
 def costruisci_firma_situazione(mondo, stato_runtime):
     """
     Trasforma il mondo attuale in una descrizione piu' astratta.
@@ -405,9 +439,17 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     
     # Eventi sconosciuti:
     # se il mondo contiene concetti nuovi, li trasformo in eventi candidati.
+    # Per osservazione autonoma pulisco i marker tecnici e passo solo
+    # il contenuto visivo reale all'estrattore unknown.
     try:
         if arricchisci_eventi_con_sconosciuti is not None:
-            eventi = arricchisci_eventi_con_sconosciuti(mondo, eventi)
+            mondo_unknown = _pulisci_mondo_per_unknown(mondo)
+
+            if mondo_unknown:
+                eventi = arricchisci_eventi_con_sconosciuti(
+                    mondo_unknown,
+                    eventi
+                )
     except Exception as e:
         logger.warning("[AUTONOMIA] Errore estrazione eventi sconosciuti: {}".format(e))
     

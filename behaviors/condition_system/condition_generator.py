@@ -941,7 +941,21 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
 
         eventi_originali = estrai_eventi(mondo_originale, stato_runtime_originale)
         nome_base = _slug_testo(mondo_originale)
-        
+
+        # Se il mondo nasce da osservazione autonoma, aggiungo anche
+        # gli eventi unknown estratti dal testo visivo pulito.
+        try:
+            from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
+
+            mondo_unknown = _pulisci_mondo_per_unknown(mondo_originale)
+            eventi_unknown = estrai_eventi_sconosciuti(mondo_unknown, {})
+
+            if eventi_unknown:
+                eventi_originali.update(eventi_unknown)
+                nome_base = list(eventi_unknown.keys())[0]
+
+        except Exception as e:
+            logger.warning(u"[GENERATOR] Errore arricchendo runtime positivo unknown: {}".format(e))
         runtime_positivo = {
             "eventi": eventi_originali,
             "eventi_reali": eventi_originali
@@ -1736,6 +1750,40 @@ def _forza_condizione_specifica(codice, mondo, eventi_sconosciuti=None):
 
     return codice
 
+def _pulisci_mondo_per_unknown(mondo):
+    """
+    Rimuove marker tecnici della curiosita autonoma.
+    Gli eventi sconosciuti devono nascere dal contenuto visivo reale,
+    non da PRENDI L'INIZIATIVA / OSSERVAZIONE_AUTONOMA.
+    """
+    testo = (mondo or "").lower()
+
+    marker = [
+        "report:",
+        "prendi l'iniziativa",
+        "prendi l iniziativa",
+        "prendi liniziativa",
+        "osservazione_autonoma",
+        "osservazione autonoma",
+        "nessuna_condizione_attiva",
+        "nessuna condizione attiva",
+        "sono fermo",
+        "sto camminando"
+    ]
+
+    for m in marker:
+        testo = testo.replace(m, " ")
+
+    if "vedo:" in testo:
+        testo = testo.split("vedo:", 1)[1]
+
+    testo = testo.replace("vedo:", " ")
+    testo = testo.replace(".", " ")
+    testo = " ".join(testo.split())
+
+    return testo
+
+
 def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata):
     _assicura_cartelle()
 
@@ -1746,11 +1794,15 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
     try:
         logger.info(u"[GENERATOR] Richiesta nuova condizione Python al LLM")
 
+        # Pulisco il mondo solo per l'estrazione dell'evento sconosciuto.
+        # Il mondo originale resta usato per prompt, validazione e metadati.
+        mondo_unknown = _pulisci_mondo_per_unknown(mondo)
+
         eventi_sconosciuti = None
 
         try:
             from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
-            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo, {})
+            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo_unknown, {})
         except Exception as e:
             logger.warning(u"[GENERATOR] Errore pre-estrazione eventi sconosciuti: {}".format(e))
             eventi_sconosciuti = None
@@ -1766,14 +1818,18 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
         codice = _estrai_codice_python(risposta)
 
         codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
-        codice = _forza_condizione_specifica(codice, mondo, eventi_sconosciuti=eventi_sconosciuti)
+        codice = _forza_condizione_specifica(
+            codice,
+            mondo,
+            eventi_sconosciuti=eventi_sconosciuti
+        )
 
         # Valida la condizione se è legata a un evento sconosciuto
         try:
             from behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
             from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
 
-            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo, {})
+            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo_unknown, {})
 
             if eventi_sconosciuti:
                 nome_ev = list(eventi_sconosciuti.keys())[0]
@@ -1781,21 +1837,31 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
 
                 if not valido_sconosciuto:
                     logger.warning(u"[GENERATOR] Condizione per evento sconosciuto '{}' troppo generica: {}. Ri-chiedo al LLM.".format(
-                        nome_ev, motivo_sconosciuto))
+                        nome_ev, motivo_sconosciuto
+                    ))
 
                     risposta = _chiama_llm_codice(
-                        mondo, dati_memoria, stato_robot, chiave_privata,
+                        mondo,
+                        dati_memoria,
+                        stato_robot,
+                        chiave_privata,
                         eventi_sconosciuti=eventi_sconosciuti
                     )
+
                     codice = _estrai_codice_python(risposta)
                     codice = _aggiungi_condizione_automatica_se_manca(codice, mondo)
-                    codice = _forza_condizione_specifica(codice, mondo)
+                    codice = _forza_condizione_specifica(
+                        codice,
+                        mondo,
+                        eventi_sconosciuti=eventi_sconosciuti
+                    )
 
                     # Ri-valida dopo il retry: se ancora generica, abbandona
                     valido_retry, motivo_retry = valida_condizione_sconosciuta(nome_ev, codice)
                     if not valido_retry:
                         logger.warning(u"[GENERATOR] Anche dopo retry la condizione e' generica: {}. Abbandono.".format(
-                            motivo_retry))
+                            motivo_retry
+                        ))
                         return None
 
         except Exception as e:
@@ -1846,6 +1912,7 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
                 "stato_robot": stato_robot
             }
         )
+
         if not valido:
             _sposta_in_rejected(path_quarantine, motivo)
             return None
