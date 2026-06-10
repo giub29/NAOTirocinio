@@ -39,18 +39,45 @@ def valuta_curiosita_autonoma(testo_osservato):
         }
 
     ragionamento = ragiona_situazione_sconosciuta(testo_osservato)
-
-    # Se è già generativa, non serve curiosità:
-    # sarà il generator a creare condizione.
+    print(
+        "[DEBUG CURIOSITA] ragionamento={}".format(
+            ragionamento
+        )
+    )
+    # Anche se la situazione potrebbe generare
+    # una condizione, prima provo una curiosità
+    # epistemica se il contenuto è osservabile.
     if ragionamento.get("genera_condizione", False):
-        return {
-            "approfondisci": False,
-            "motivo": "situazione gia' significativa",
-            "azione": None,
-            "frase": None
-        }
+
+        tipo = ragionamento.get("tipo", "")
+
+        if tipo in [
+            "informazione_visiva",
+            "informazione_visiva_incerta"
+        ]:
+            return {
+                "approfondisci": True,
+                "motivo": "informazione interessante da osservare meglio",
+                "azione": "osserva_meglio",
+                "frase": (
+                    "Ho trovato qualcosa di interessante. "
+                    "Lo osservo meglio."
+                )
+            }
 
     tipo = ragionamento.get("tipo", "")
+    azione_cognitiva = ragionamento.get("azione_cognitiva", "")
+
+    if azione_cognitiva == "osserva_meglio":
+        return {
+            "approfondisci": True,
+            "motivo": ragionamento.get(
+                "ipotesi",
+                "osservazione potenzialmente utile ma non ancora chiara"
+            ),
+            "azione": "osserva_meglio",
+            "frase": "Ho notato qualcosa che potrebbe essere utile. Lo osservo meglio prima di decidere."
+        }
 
     # Curiosità leggera: non genera condizioni, ma può produrre
     # un comportamento esplorativo.

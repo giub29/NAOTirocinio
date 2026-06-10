@@ -190,6 +190,27 @@ def estrai_eventi_sconosciuti(testo):
             "l'ambiente contiene una zona nuova o non riconosciuta"
         ))
 
+    # 7. Contenitore con istruzioni visibili.
+    if (
+        _contiene(testo, [
+            "contenitore", "scatola", "cartone", "cestino",
+            "secchio", "area", "punto", "zona"
+        ])
+        and
+        _contiene(testo, [
+            "testo leggibile", "scritta", "indica",
+            "istruzioni", "conferisci", "inserisci",
+            "metti", "qui", "materiali", "fogli",
+            "documenti", "oggetti"
+        ])
+    ):
+        eventi.append({
+            "nome": "contenitore_con_istruzioni_visibili",
+            "categoria": "sconosciuta",
+            "descrizione": "contenitore o area con istruzioni leggibili potenzialmente utili",
+            "valore": True
+        })
+
     # Rimuove duplicati mantenendo ordine.
     visti = set()
     puliti = []

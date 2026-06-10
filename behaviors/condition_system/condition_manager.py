@@ -813,7 +813,31 @@ def _condizione_visiva_bloccata_da_negativi(nome_file, mondo):
         "non e' presente testo",
         "non e' presente alcun testo",
         "testo non leggibile",
-        "codice non leggibile"
+        "codice non leggibile",
+        "non ci sono monitor o computer visibili",
+        "non ci sono monitor o computer visibili con contenuti leggibili",
+        "non ci sono informazioni chiare",
+        "testo leggibile definiti",
+        "non e possibile leggere il testo in modo chiaro",
+        "non e' possibile leggere il testo in modo chiaro",
+        "lavagna nera con scritte e disegni",
+        "non ci sono monitor o computer",
+        "non ci sono schermi o monitor accesi",
+        "non e presente testo leggibile ne codice",
+        "non e' presente testo leggibile ne' codice",
+        "interfaccia grafica senza contenuti chiari",
+        "senza contenuti chiari",
+        "non contengono informazioni visibili",
+        "non contiene informazioni leggibili",
+        "solo un monitor acceso",
+        "testo non identificabile",
+        "codice o testo non identificabile",
+        "cartone di raccolta",
+        "conferisci qui",
+        "fogli fotocopie quaderni",
+        "quaderni usati",
+        "raccolta",
+        "non ci sono schermi o computer accesi"
     ]
 
     for negativo in negativi:
@@ -876,7 +900,7 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                 mondo
             ):
                 continue
-            
+
             condizione_vera = modulo.condizione(mondo, stato_runtime)
 
             if condizione_vera:
