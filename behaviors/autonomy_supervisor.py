@@ -278,6 +278,65 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 )
             )
 
+            # Politica: osserva con prudenza
+            try:
+                from behaviors.event_system.unknown_situation_reasoner import (
+                    ragiona_situazione_sconosciuta
+                )
+
+                ragionamento = ragiona_situazione_sconosciuta(
+                    mondo_unknown
+                )
+
+                if (
+                    ragionamento is not None
+                    and ragionamento.get("azione_cognitiva")
+                    == "osserva_con_prudenza"
+                ):
+                    return {
+                        "stato_interno": "prudente",
+                        "obiettivo":
+                            "valutare un elemento vicino a una zona rilevante",
+                        "azioni": [
+                            {
+                                "tipo": "occhi",
+                                "colore": "yellow"
+                            },
+                            {
+                                "tipo": "guarda",
+                                "x": 0.0,
+                                "y": -0.25
+                            },
+                            {
+                                "tipo": "parla",
+                                "testo": (
+                                    "Ho notato qualcosa vicino "
+                                    "a una zona importante. "
+                                    "Lo osservo con prudenza "
+                                    "prima di decidere."
+                                )
+                            }
+                        ],
+                        "memoria": [
+                            {
+                                "tipo": "politica_agentica",
+                                "azione":
+                                    "osserva_con_prudenza",
+                                "motivo":
+                                    ragionamento.get(
+                                        "ipotesi",
+                                        "elemento vicino "
+                                        "a una zona rilevante"
+                                    )
+                            }
+                        ]
+                    }
+
+            except Exception as e:
+                logger.warning(
+                    "[AUTONOMIA] Errore politica prudenza: {}".format(e)
+                )
+
             if decisione_curiosa is not None:
                 logger.info(
                     "[AUTONOMIA] Decisione curiosa autonoma senza generare condizione"
@@ -538,16 +597,48 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                 mondo
             )
 
-            if mondo_unknown:
+        if mondo_unknown:
+            # Reasoner semantico generalista
+            try:
+                from behaviors.event_system.unknown_situation_reasoner import (
+                    ragiona_situazione_sconosciuta
+                )
 
-                eventi_unknown = (
-                    estrai_eventi_sconosciuti(
+                ragionamento = (
+                    ragiona_situazione_sconosciuta(
                         mondo_unknown
                     )
                 )
 
-                for ev in eventi_unknown:
+                if (
+                    isinstance(ragionamento, dict)
+                    and ragionamento.get("evento")
+                ):
+                    eventi[
+                        ragionamento["evento"]
+                    ] = True
 
+            except Exception as e:
+                logger.warning(
+                    "[AUTONOMIA] Errore reasoner semantico: {}".format(e)
+                )
+
+            # Extractor eventi sconosciuti
+            eventi_unknown = (
+                estrai_eventi_sconosciuti(
+                    mondo_unknown
+                )
+            )
+
+            for ev in eventi_unknown:
+
+                if not isinstance(ev, dict):
+                    continue
+
+                nome = ev.get("nome")
+
+                if nome:
+                    eventi[nome] = True
                     if not isinstance(ev, dict):
                         continue
 

@@ -24,6 +24,37 @@ def _contiene(testo, parole):
             return True
     return False
 
+def _oggetto_in_zona_rilevante(testo):
+    testo = testo.lower()
+
+    zone_rilevanti = [
+        "porta", "ingresso", "uscita",
+        "corridoio", "passaggio",
+        "accesso", "entrata"
+    ]
+
+    indicatori_prossimita = [
+        "vicino", "davanti", "ostruisce",
+        "accanto", "sul passaggio",
+        "in mezzo", "qualcosa"
+    ]
+
+    presenza_zona = any(z in testo for z in zone_rilevanti)
+    presenza_prossimita = any(p in testo for p in indicatori_prossimita)
+
+    if presenza_zona and presenza_prossimita:
+        return {
+            "categoria": "zona_rilevante",
+            "evento": "oggetto_in_zona_rilevante",
+            "significato": (
+                "elemento osservato vicino a una zona funzionalmente rilevante"
+            ),
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "osserva_con_prudenza"
+        }
+
+    return None
 
 def interpreta_contenuto_visivo(testo_osservato):
     """
@@ -39,6 +70,9 @@ def interpreta_contenuto_visivo(testo_osservato):
     """
 
     testo = _normalizza(testo_osservato)
+    zona = _oggetto_in_zona_rilevante(testo)
+    if zona:
+        return zona
 
     risultato_base = {
         "categoria": "nessuna_interpretazione",

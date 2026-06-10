@@ -37,6 +37,49 @@ def ragiona_situazione_sconosciuta(testo):
     """
 
     testo = _normalizza(testo)
+    zone_rilevanti = [
+        "porta", "ingresso", "uscita",
+        "corridoio", "passaggio", "accesso", "entrata"
+    ]
+
+    indicatori_prossimita = [
+        "vicino", "davanti", "ostruisce",
+        "accanto", "in mezzo", "sul passaggio", "qualcosa"
+    ]
+
+    if (
+        any(z in testo for z in zone_rilevanti)
+        and any(p in testo for p in indicatori_prossimita)
+    ):
+        return {
+            "significativa": True,
+            "genera_condizione": False,
+            "tipo": "zona_rilevante",
+            "evento": "oggetto_in_zona_rilevante",
+            "ipotesi": (
+                "un elemento si trova vicino a una zona funzionalmente rilevante"
+            ),
+            "azione_cognitiva": "osserva_con_prudenza"
+        }
+
+    indicatori_ambiguita = [
+        "sfocato", "sfocata",
+        "lontano", "lontana",
+        "confuso", "confusa",
+        "non leggibile"
+    ]
+
+    if any(x in testo for x in indicatori_ambiguita):
+        return {
+            "significativa": False,
+            "genera_condizione": False,
+            "tipo": "ambiguita_visiva",
+            "evento": None,
+            "ipotesi": (
+                "la scena osservata non e' ancora abbastanza chiara"
+            ),
+            "azione_cognitiva": "osserva_meglio"
+        }
 
     if not testo:
         return {
@@ -113,7 +156,7 @@ def ragiona_situazione_sconosciuta(testo):
         "possibile discernere",
         "dettagli specifici",
         "sfocato", "sfocata", "sfocata sopra",
-        "lontano", "lontana"
+        "lontano", "lontana", "confusa", "confuso",
         "non e leggibile",
         "non e leggibili",
         "non e chiaro",

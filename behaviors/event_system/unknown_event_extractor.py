@@ -157,6 +157,22 @@ def estrai_eventi_sconosciuti(testo):
                     "origine": "unknown_autonomo"
                 }
             ]
+        
+    # Contenuto presente ma non ancora interpretabile:
+    # non deve diventare memoria o informazione operativa.
+    indicatori_non_leggibile = [
+        "non leggibile",
+        "illeggibile",
+        "sfocato",
+        "sfocata",
+        "confuso",
+        "confusa",
+        "lontano",
+        "lontana"
+    ]
+
+    if any(x in testo for x in indicatori_non_leggibile):
+        return []
 
     # 1. Interprete semantico visuale:
     # deve venire PRIMA del filtro "descrizione generica",
