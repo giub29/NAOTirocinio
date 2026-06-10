@@ -10,7 +10,25 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
             "Authorization": "Bearer " + str(chiave_privata or "")
         }
 
-        testo_prompt = "Descrivi brevemente cosa vedi in una frase naturale." if contesto == "stanza" else "Cosa vedi? Max 10 parole."
+        if contesto == "stanza":
+            testo_prompt = (
+                "Osserva attentamente la scena come un robot autonomo. "
+                "NON limitarti a descrivere genericamente l'ambiente. "
+                "Se vedi schermi, monitor, documenti, cartelli, fogli o testo leggibile, "
+                "prova a capire se contengono informazioni utili. "
+                "Indica SEMPRE se c'e' testo visibile, codice sorgente, messaggi, documenti, "
+                "contenuti leggibili, schermate di programmi, finestre aperte, errori o avvisi. "
+                "Se vedi un monitor o un computer acceso, specifica se mostra codice, testo, finestre, "
+                "documenti, programmi o solo elementi non leggibili. "
+                "Se non c'e' nulla di leggibile, dillo chiaramente. "
+                "Non inventare parole non visibili. "
+                "Rispondi in una frase naturale breve."
+            )
+        else:
+            testo_prompt = (
+                "Cosa vedi? Max 15 parole. "
+                "Segnala se c'e' testo visibile, ostacoli, danni, passaggi bloccati o elementi anomali."
+            )
 
         payload = {
             "model": "gpt-4o-mini",
@@ -31,11 +49,77 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
             timeout=10
         )
 
-        return res.json()['choices'][0]['message']['content']
+        dati = res.json()
+
+        if "choices" not in dati:
+            print(u"[ERRORE ANALISI IMMAGINE HTTP {}]: {}".format(
+                res.status_code,
+                dati
+            ))
+            return u"un ambiente familiare"
+
+        return dati['choices'][0]['message']['content']
 
     except:
         return u"un ambiente familiare"
 
+def analizza_testo_visivo(img_b64, chiave_privata):
+    """
+    Prova a leggere testo visibile da schermi, fogli, documenti,
+    cartelli o codice nell'immagine.
+
+    Non inventa: se non legge chiaramente, restituisce TESTO_NON_LEGGIBILE.
+    """
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + str(chiave_privata or "")
+        }
+
+        testo_prompt = (
+            "Osserva attentamente l'immagine. "
+            "Se vedi uno schermo, un monitor, un foglio, un documento, un cartello o codice, "
+            "trascrivi SOLO il testo chiaramente leggibile. "
+            "Se riconosci che c'e' codice ma non riesci a leggerlo, scrivi CODICE_NON_LEGGIBILE. "
+            "Se vedi testo ma non riesci a leggerlo, scrivi TESTO_NON_LEGGIBILE. "
+            "Se non c'e' testo visibile, scrivi NESSUN_TESTO_VISIBILE. "
+            "Non inventare parole."
+        )
+
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": testo_prompt},
+                    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + img_b64}}
+                ]
+            }],
+            "max_tokens": 160,
+            "temperature": 0.0
+        }
+
+        res = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=12
+        )
+
+        dati = res.json()
+
+        if "choices" not in dati:
+            print(u"[ERRORE TESTO VISIVO HTTP {}]: {}".format(
+                res.status_code,
+                dati
+            ))
+            return u"TESTO_NON_LEGGIBILE"
+
+        return dati['choices'][0]['message']['content'].strip()
+
+    except Exception as e:
+        print(u"[ERRORE LETTURA TESTO VISIVO]: " + str(e))
+        return u"TESTO_NON_LEGGIBILE"
 
 def estrai_json(testo):
     try:
@@ -139,7 +223,16 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
 
     try:
         res = requests.post(url, headers=headers, data=json.dumps(payload), timeout=5)
-        risposta = res.json()['choices'][0]['message']['content'].strip()
+        dati = res.json()
+
+        if "choices" not in dati:
+            print(u"[ERRORE LLM HTTP {}]: {}".format(
+                res.status_code,
+                dati
+            ))
+            return {"azioni": []}
+
+        risposta = dati['choices'][0]['message']['content'].strip()
         return estrai_json(risposta)
 
     except Exception as e:

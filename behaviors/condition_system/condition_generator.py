@@ -251,6 +251,43 @@ def estrai_eventi(mondo, stato_runtime):
 
     return eventi
 
+def _normalizza_eventi_sconosciuti(eventi_sconosciuti):
+    """
+    Converte gli eventi unknown in formato compatibile col generator.
+
+    INPUT:
+    [
+        {
+            "nome": "accesso_non_disponibile",
+            "priorita": "alta",
+            ...
+        }
+    ]
+
+    OUTPUT:
+    {
+        "accesso_non_disponibile": True
+    }
+    """
+
+    risultato = {}
+
+    if not eventi_sconosciuti:
+        return risultato
+
+    for ev in eventi_sconosciuti:
+
+        if isinstance(ev, dict):
+            nome = ev.get("nome")
+
+            if nome:
+                risultato[nome] = True
+
+        elif isinstance(ev, basestring):
+            risultato[ev] = True
+
+    return risultato
+
 def _carica_modulo_da_file(nome_modulo, path_file):
     """
     Carica un modulo Python da file.
@@ -948,12 +985,15 @@ def _valida_semantica_condizione(path_file, mondo_originale, stato_runtime_origi
             from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
 
             mondo_unknown = _pulisci_mondo_per_unknown(mondo_originale)
-            eventi_unknown = estrai_eventi_sconosciuti(mondo_unknown, {})
+            eventi_unknown = estrai_eventi_sconosciuti(mondo_unknown)
+
+            eventi_unknown = _normalizza_eventi_sconosciuti(
+                eventi_unknown
+            )
 
             if eventi_unknown:
                 eventi_originali.update(eventi_unknown)
                 nome_base = list(eventi_unknown.keys())[0]
-
         except Exception as e:
             logger.warning(u"[GENERATOR] Errore arricchendo runtime positivo unknown: {}".format(e))
         runtime_positivo = {
@@ -1429,35 +1469,66 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         ))
         return True
     
-    # EVENTI SCONOSCIUTI: se non c'è evento noto, controlla concetti nuovi
-    if evento_rilevato is None and arricchisci_eventi_con_sconosciuti is not None:
+        # EVENTI UNKNOWN AUTONOMI
+    if evento_rilevato is None:
         try:
-            eventi_tutti = estrai_eventi(mondo, {"memoria": dati_memoria, "stato_robot": stato_robot})
-            sconosciuti = {
-                k: v for k, v in eventi_tutti.items()
-                if v and k not in [
-                    "batteria_percentuale", "batteria_bassa", "batteria_critica",
-                    "fermo", "camminando"
-                ] and k not in [
-                    "carezza_testa", "mano_sinistra", "mano_destra", "entrambe_mani",
-                    "ostacolo_sinistra", "ostacolo_destra", "ostacolo_frontale",
-                    "urto", "urto_piedi", "entrambi_piedi", "pericolo",
-                    "rumore_improvviso", "rumore_singolo", "battiti_mani",
-                    "volto_riconosciuto", "volto_ignoto",
-                    "piede_sinistro", "piede_destro"
-                ]
-            }
-            
-            if sconosciuti:
-                nome_evento_sconosciuto = list(sconosciuti.keys())[0]
-                nome_file = "condizione_{}.py".format(nome_evento_sconosciuto)
-                path_generato = os.path.join(GENERATED_DIR, nome_file)
-                path_quarantena = os.path.join(QUARANTINE_DIR, nome_file)
-                if not os.path.exists(path_generato) and not os.path.exists(path_quarantena):
-                    logger.info(u"[GENERATOR] Evento sconosciuto rilevato: {} -> genero condizione".format(nome_evento_sconosciuto))
+            from behaviors.event_system.unknown_event_extractor import (
+                estrai_eventi_sconosciuti
+            )
+
+            mondo_unknown = _pulisci_mondo_per_unknown(
+                mondo
+            )
+
+            eventi_unknown = estrai_eventi_sconosciuti(
+                mondo_unknown
+            )
+
+            eventi_unknown = (
+                _normalizza_eventi_sconosciuti(
+                    eventi_unknown
+                )
+            )
+
+            if eventi_unknown:
+
+                nome_evento = list(
+                    eventi_unknown.keys()
+                )[0]
+
+                nome_file = (
+                    "condizione_{}.py"
+                    .format(nome_evento)
+                )
+
+                path_generato = os.path.join(
+                    GENERATED_DIR,
+                    nome_file
+                )
+
+                path_quarantena = os.path.join(
+                    QUARANTINE_DIR,
+                    nome_file
+                )
+
+                if (
+                    not os.path.exists(path_generato)
+                    and
+                    not os.path.exists(path_quarantena)
+                ):
+
+                    logger.info(
+                        u"[GENERATOR] Evento unknown significativo rilevato: {} -> genero condizione".format(
+                            nome_evento
+                        )
+                    )
+
                     return True
+
         except Exception as e:
-            logger.warning(u"[GENERATOR] Errore valutazione eventi sconosciuti: {}".format(e))
+            logger.warning(
+                u"[GENERATOR] Errore valutazione unknown: {}".format(e)
+            )
 
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
@@ -1802,7 +1873,13 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
 
         try:
             from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
-            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo_unknown, {})
+            eventi_sconosciuti = estrai_eventi_sconosciuti(
+                mondo_unknown
+            )
+
+            eventi_sconosciuti = _normalizza_eventi_sconosciuti(
+                eventi_sconosciuti
+            )
         except Exception as e:
             logger.warning(u"[GENERATOR] Errore pre-estrazione eventi sconosciuti: {}".format(e))
             eventi_sconosciuti = None
@@ -1829,7 +1906,13 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             from behaviors.event_system.unknown_condition_validator import valida_condizione_sconosciuta
             from behaviors.event_system.unknown_event_extractor import estrai_eventi_sconosciuti
 
-            eventi_sconosciuti = estrai_eventi_sconosciuti(mondo_unknown, {})
+            eventi_sconosciuti = estrai_eventi_sconosciuti(
+                mondo_unknown
+            )
+
+            eventi_sconosciuti = _normalizza_eventi_sconosciuti(
+                eventi_sconosciuti
+            )
 
             if eventi_sconosciuti:
                 nome_ev = list(eventi_sconosciuti.keys())[0]

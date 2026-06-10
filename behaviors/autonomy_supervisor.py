@@ -22,14 +22,23 @@ import time
 import os
 
 try:
-    from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
+    from behaviors.event_system.unknown_event_extractor import (
+        estrai_eventi_sconosciuti
+    )
 except Exception:
-    arricchisci_eventi_con_sconosciuti = None
+    estrai_eventi_sconosciuti = None
 
 try:
     from behaviors.event_system.event_registry import arricchisci_eventi_registro
 except Exception:
     arricchisci_eventi_registro = None
+
+try:
+    from behaviors.event_system.autonomous_curiosity_manager import (
+        costruisci_decisione_curiosa
+    )
+except Exception:
+    costruisci_decisione_curiosa = None
 
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
@@ -105,26 +114,21 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         stato_runtime["eventi_reali"] = firma.get("eventi_attivi", {})
 
     # EVENTI UNKNOWN:
-    # gli eventi scoperti autonomamente devono entrare anche
-    # in stato_runtime["eventi"], altrimenti le condizioni
-    # autogenerate non possono attivarsi davvero.
+    # propago TUTTI gli eventi attivi della firma dentro stato_runtime["eventi"],
+    # inclusi quelli scoperti autonomamente.
     try:
-        eventi_core = firma.get("eventi_core", [])
+        stato_runtime.setdefault("eventi", {})
 
-        if not isinstance(eventi_core, list):
-            eventi_core = []
+        eventi_attivi_firma = firma.get("eventi_attivi", {})
 
-        eventi_reali_correnti = stato_runtime.get("eventi_reali", {})
-        for nome_evento in eventi_core:
-            nome_evento = str(nome_evento).lower().strip()
-
-            if nome_evento and eventi_reali_correnti.get(nome_evento, False):
-                stato_runtime.setdefault("eventi", {})
-                stato_runtime["eventi"][nome_evento] = True
+        if isinstance(eventi_attivi_firma, dict):
+            for nome_evento, valore in eventi_attivi_firma.items():
+                if valore not in [False, None, "", [], {}]:
+                    stato_runtime["eventi"][nome_evento] = True
 
     except Exception as e:
         logger.warning(
-            "[AUTONOMIA] Errore propagando eventi_core nel runtime: {}".format(e)
+            "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
         )
 
     if stato_runtime.get("forza_generazione_safety", False):
@@ -223,7 +227,21 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         return decisione
 
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
+    
+        # Curiosità epistemica:
+        # se non ci sono condizioni attive e la scena non merita ancora
+        # una condizione permanente, NAO può decidere di osservare meglio.
+    try:
+        if costruisci_decisione_curiosa is not None:
+            mondo_unknown = _pulisci_mondo_per_unknown(mondo)
+            decisione_curiosa = costruisci_decisione_curiosa(mondo_unknown)
 
+            if decisione_curiosa is not None:
+                logger.info("[AUTONOMIA] Decisione curiosa autonoma senza generare condizione")
+                return decisione_curiosa
+
+    except Exception as e:
+            logger.warning("[AUTONOMIA] Errore curiosita epistemica: {}".format(e))
     deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
 
     logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
@@ -299,6 +317,24 @@ def situazione_merita_generazione(mondo, stato_runtime):
     origine = str(evento_strutturato.get("origine", "")).lower()
 
     eventi_core = firma.get("eventi_core", [])
+
+        # Propago SEMPRE tutti gli eventi attivi della firma
+    # dentro stato_runtime["eventi"], inclusi gli unknown.
+    try:
+        stato_runtime.setdefault("eventi", {})
+
+        eventi_attivi_firma = firma.get("eventi_attivi", {})
+
+        if isinstance(eventi_attivi_firma, dict):
+            for nome_evento, valore in eventi_attivi_firma.items():
+                if valore not in [False, None, "", [], {}]:
+                    stato_runtime["eventi"][nome_evento] = True
+
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
+        )
+
     if not isinstance(eventi_core, list):
         eventi_core = []
 
@@ -437,21 +473,39 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         if chiave not in eventi:
             eventi[chiave] = valore
     
-    # Eventi sconosciuti:
-    # se il mondo contiene concetti nuovi, li trasformo in eventi candidati.
-    # Per osservazione autonoma pulisco i marker tecnici e passo solo
-    # il contenuto visivo reale all'estrattore unknown.
+    # Eventi UNKNOWN cognitivamente significativi.
+    # NON trasformiamo descrizioni statiche in eventi.
+    # Usiamo solo situazioni utili al comportamento.
+
     try:
-        if arricchisci_eventi_con_sconosciuti is not None:
-            mondo_unknown = _pulisci_mondo_per_unknown(mondo)
+        if estrai_eventi_sconosciuti is not None:
+
+            mondo_unknown = _pulisci_mondo_per_unknown(
+                mondo
+            )
 
             if mondo_unknown:
-                eventi = arricchisci_eventi_con_sconosciuti(
-                    mondo_unknown,
-                    eventi
+
+                eventi_unknown = (
+                    estrai_eventi_sconosciuti(
+                        mondo_unknown
+                    )
                 )
+
+                for ev in eventi_unknown:
+
+                    if not isinstance(ev, dict):
+                        continue
+
+                    nome = ev.get("nome")
+
+                    if nome:
+                        eventi[nome] = True
+
     except Exception as e:
-        logger.warning("[AUTONOMIA] Errore estrazione eventi sconosciuti: {}".format(e))
+        logger.warning(
+            "[AUTONOMIA] Errore estrazione eventi sconosciuti: {}".format(e)
+        )
     
     parole_banali = [
         "la mia batteria",
@@ -609,9 +663,18 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                 situazione_composta = True
                 break
 
+    eventi_significativi = [
+        k for k in eventi_attivi.keys()
+        if str(k).lower().strip() not in [
+            "fermo",
+            "camminando",
+            "interazione_utente"
+        ]
+    ]
+
     ha_novita_runtime = (
         presenza_eventi_reali
-        or len(eventi_attivi.keys()) > 0
+        or len(eventi_significativi) > 0
         or evento_strutturato.get("tipo", "generico") != "generico"
     )
 

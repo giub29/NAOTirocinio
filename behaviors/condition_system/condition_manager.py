@@ -655,11 +655,20 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
 
         # Se esiste già una condizione generata esattamente per questo evento unknown,
         # allora può attivarsi. Altrimenti l'unknown deve tornare al supervisore.
-        if (
-            nome_evento in eventi_core_norm
-            or nome_evento in eventi_attivi_unknown
-        ):
-            return True
+        eventi_unknown_norm = set(eventi_core_norm + eventi_attivi_unknown)
+
+        for ev in eventi_unknown_norm:
+            ev = str(ev).lower().replace("-", "_").strip()
+
+            if not ev:
+                continue
+
+            if (
+                nome_evento == ev
+                or nome_evento.endswith(ev)
+                or ev in nome_evento
+            ):
+                return True
 
         return False
 

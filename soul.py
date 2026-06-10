@@ -37,7 +37,11 @@ from core.robot_state import crea_stato_robot, aggiorna_stato_robot
 from behaviors import autonomy_supervisor
 from behaviors.action_behavior import valida_decisione, esegui_decisione
 from behaviors.safety_behavior import gestisci_emergenza, gestisci_ostacoli_durante_cammino
-from behaviors.llm_behavior import genera_decisione_anima, analizza_immagine
+from behaviors.llm_behavior import (
+    genera_decisione_anima,
+    analizza_immagine,
+    analizza_testo_visivo
+)
 from behaviors.face_behavior import gestisci_volto_durante_cammino, gestisci_input_nome
 from behaviors.condition_system.condition_manager import esegui_condizione_per_nome, valuta_condizioni_generate
 from behaviors.condition_system.condition_generator import (
@@ -662,10 +666,32 @@ def _gestisci_iniziativa_robot(corpo, voce, motivo="inerzia"):
         descrizione = analizza_immagine(
             img_b64,
             CHIAVE_PRIVATA,
-            contesto="osservazione autonoma ambiente"
+            contesto="stanza"
         )
+
+        # Seconda osservazione cognitiva:
+        # se c'e' qualcosa di potenzialmente utile,
+        # provo a leggere eventuale testo/codice.
+        testo_visivo = analizza_testo_visivo(
+            img_b64,
+            CHIAVE_PRIVATA
+        )
+
+        if testo_visivo not in [
+            "NESSUN_TESTO_VISIBILE",
+            "TESTO_NON_LEGGIBILE",
+            "CODICE_NON_LEGGIBILE"
+        ]:
+            descrizione += (
+                u" TESTO_VISIBILE: {}"
+                .format(testo_visivo)
+            )
+
     else:
-        descrizione = u"non riesco a vedere chiaramente l'ambiente"
+        descrizione = (
+            u"non riesco a vedere "
+            u"chiaramente l'ambiente"
+        )
 
     logger.info(u"[SOUL] Osservazione autonoma: {}".format(
         testo_per_log(descrizione[:180])
@@ -678,6 +704,25 @@ def _gestisci_iniziativa_robot(corpo, voce, motivo="inerzia"):
         u"SONO FERMO. "
         u"VEDO: {}.".format(descrizione)
     )
+
+def _decisione_richiede_osservazione_mirata(decisione):
+    try:
+        memoria = decisione.get("memoria", [])
+
+        for item in memoria:
+            if not isinstance(item, dict):
+                continue
+
+            if (
+                item.get("tipo") == "curiosita_autonoma"
+                and item.get("azione") == "osserva_meglio"
+            ):
+                return True
+
+    except Exception:
+        pass
+
+    return False
 
 def _pulisci_mondo_da_volti_salutati(mondo):
     for nome in stato_runtime["volti_salutati"]:
@@ -1786,6 +1831,12 @@ def main():
                         decisione_condizione
                     )
                 )
+
+                richiede_osservazione_mirata = (
+                    _decisione_richiede_osservazione_mirata(
+                        decisione_condizione
+                    )
+                )
                 
                 esegui_decisione(
                     decisione_condizione,
@@ -1800,20 +1851,57 @@ def main():
                 ultima_decisione = decisione_condizione
                 ultimo_evento_tempo = time.time()
 
-            if not decisione_condizione and mondo_cambiato and mondo_valido:
-                # Nessuna condizione autonoma applicabile/generata dal supervisore:
-                # uso il normale comportamento LLM, ma NON genero qui nuove condizioni.
-                # La generazione autonoma ordinaria deve rimanere centralizzata in
-                # behaviors/autonomy_supervisor.py, per evitare doppioni e chiamate LLM duplicate.
-                ultima_decisione = _elabora_decisione(
-                    mondo,
-                    corpo,
-                    voce,
-                    vista,
-                    sistema
-                )
+                if richiede_osservazione_mirata:
+                    logger.info(
+                        u"[SOUL] Curiosita richiede osservazione mirata: scatto nuova osservazione"
+                    )
 
-                ultimo_evento_tempo = time.time()
+                    mondo_mirato = _gestisci_iniziativa_robot(
+                        corpo,
+                        voce,
+                        motivo="osservazione mirata"
+                    )
+
+                    logger.info(
+                        u"[SOUL] Mondo dopo osservazione mirata: {}".format(
+                            testo_per_log(mondo_mirato)
+                        )
+                    )
+
+                    _prepara_runtime_autonomo(
+                        mondo_mirato,
+                        evento_composto=False
+                    )
+
+                    decisione_mirata = autonomy_supervisor.gestisci_autonomia(
+                        mondo_mirato,
+                        stato_runtime
+                    )
+
+                    if decisione_mirata:
+                        decisione_mirata = valida_decisione(
+                            decisione_mirata,
+                            mondo_mirato
+                        )
+
+                        logger.info(
+                            u"[SOUL] Decisione dopo osservazione mirata: {}".format(
+                                decisione_mirata
+                            )
+                        )
+
+                        esegui_decisione(
+                            decisione_mirata,
+                            corpo,
+                            voce,
+                            vista,
+                            sistema,
+                            stato_runtime,
+                            aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                        )
+
+                        ultima_decisione = decisione_mirata
+                        ultimo_evento_tempo = time.time()
 
             _riprendi_cammino_automatico(corpo, ultima_decisione)
             stato_precedente = mondo
