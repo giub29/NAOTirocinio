@@ -1302,6 +1302,17 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
         u"- cammina: solo per micro-movimenti prudenti, x tra -0.2 e 0.2, g tra -0.2 e 0.2\n"
         u"- gira: rotazione prudente, v tra -0.3 e 0.3\n\n"
 
+        u"REGOLE SEMANTICHE PER EVENTI FUNZIONALI:\n"
+        u"- Se l'evento e' elemento_ambientale_anomalo o elemento_fuori_posto: usa stato_interno 'prudente' o 'allerta', occhi yellow/red, guarda l'elemento e pronuncia una frase breve di cautela o osservazione. Non usare tono sociale.\n"
+        u"- Se l'evento riguarda accesso_non_disponibile o accesso_o_percorso_limitato: usa prudenza, occhi red/yellow, guarda verso l'accesso/percorso e NON proporre esplorazione immediata.\n"
+        u"- Se l'evento riguarda accesso_disponibile: usa curiosita' controllata, occhi green/yellow, guarda verso l'accesso e proponi esplorazione cauta.\n"
+        u"- Se l'evento riguarda informazione_operativa: usa stato_interno 'attento', occhi blue/yellow, guarda il contenuto e memorizza/considera l'informazione. Non generare allerta rossa.\n"
+        u"- Se l'evento riguarda contenuto_informativo_rilevante o contenuto_testuale_da_approfondire: usa curiosita' o attenzione, occhi blue/yellow, osserva meglio.\n"
+        u"- Se l'evento riguarda vincolo_comportamentale: usa prudenza, occhi red/yellow e frase che indichi rispetto del vincolo.\n"
+        u"- Se l'evento riguarda oggetto_in_zona_rilevante: usa prudenza spaziale, occhi yellow/red, guarda l'elemento e non camminare se il robot e' fermo.\n"
+        u"- Non nominare oggetti specifici se non sono presenti nel MONDO. Ragiona sulla funzione dell'evento.\n"
+        u"- Non trasformare eventi cognitivi in saluti o dialogo sociale.\n\n"
+
         u"REGOLE PER COMPORTAMENTO AUTONOMO:\n"
         u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
         u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"

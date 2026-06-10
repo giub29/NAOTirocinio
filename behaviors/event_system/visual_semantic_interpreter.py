@@ -29,14 +29,13 @@ def interpreta_contenuto_visivo(testo_osservato):
     """
     Interprete semantico visuale generalista.
 
-    Non riconosce oggetti specifici.
-    Cerca di capire la FUNZIONE del contenuto osservato:
-    - istruzione ambientale
-    - regola/divieto
-    - stato di accesso
-    - informazione digitale
-    - avviso/poster
-    - contenuto leggibile generico
+    Non classifica oggetti specifici.
+    Cerca l'implicazione funzionale per NAO:
+    - informazione_operativa
+    - vincolo_comportamentale
+    - accesso_non_disponibile / accesso_disponibile
+    - contenuto_informativo_rilevante
+    - contenuto_testuale_da_approfondire
     """
 
     testo = _normalizza(testo_osservato)
@@ -53,8 +52,68 @@ def interpreta_contenuto_visivo(testo_osservato):
     if not testo:
         return risultato_base
 
-    # 1. ISTRUZIONI AMBIENTALI / OPERATIVE
-    # Esempi: "conferisci qui", "inserire", "mettere", "usare", "premere".
+    # 1. VINCOLI COMPORTAMENTALI / LIMITI ALL'AZIONE
+    if _contiene(testo, [
+        "vietato",
+        "non entrare",
+        "non usare",
+        "non toccare",
+        "non conferire",
+        "obbligo",
+        "obbligatorio",
+        "attenzione",
+        "pericolo",
+        "riservato",
+        "accesso vietato",
+        "solo personale",
+        "uscita di emergenza"
+    ]):
+        return {
+            "categoria": "vincolo_azione",
+            "evento": "vincolo_comportamentale",
+            "significato": "il contenuto osservato limita o condiziona il comportamento possibile",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "rispetta_vincolo"
+        }
+
+    # 2. STATO FUNZIONALE DI ACCESSO / PASSAGGIO
+    if _contiene(testo, [
+        "chiuso",
+        "chiusa",
+        "bloccato",
+        "bloccata",
+        "non accessibile",
+        "accesso impedito",
+        "passaggio impedito",
+        "non posso passare"
+    ]):
+        return {
+            "categoria": "stato_accesso",
+            "evento": "accesso_non_disponibile",
+            "significato": "l'osservazione suggerisce che un accesso o passaggio non sia disponibile",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "valuta_accesso"
+        }
+
+    if _contiene(testo, [
+        "aperto",
+        "aperta",
+        "accessibile",
+        "passaggio libero",
+        "accesso libero"
+    ]):
+        return {
+            "categoria": "stato_accesso",
+            "evento": "accesso_disponibile",
+            "significato": "l'osservazione suggerisce che un accesso o passaggio sia disponibile",
+            "rilevanza": "media",
+            "genera_condizione": True,
+            "azione_cognitiva": "valuta_esplorazione"
+        }
+
+    # 3. INFORMAZIONE OPERATIVA: indica come usare un oggetto/spazio/interfaccia.
     if _contiene(testo, [
         "conferisci qui",
         "conferire",
@@ -74,127 +133,40 @@ def interpreta_contenuto_visivo(testo_osservato):
         "materiali accettabili"
     ]):
         return {
-            "categoria": "istruzione_ambientale",
-            "evento": "istruzione_ambientale_visibile",
-            "significato": "il contenuto osservato sembra indicare come usare un oggetto o uno spazio",
+            "categoria": "informazione_operativa",
+            "evento": "informazione_operativa",
+            "significato": "il contenuto osservato fornisce indicazioni utili per agire o usare qualcosa",
             "rilevanza": "alta",
             "genera_condizione": True,
             "azione_cognitiva": "interpreta_e_memorizza"
         }
 
-    # 2. REGOLE, DIVIETI, OBBLIGHI
-    if _contiene(testo, [
-        "vietato",
-        "non entrare",
-        "non usare",
-        "non toccare",
-        "non conferire",
-        "obbligo",
-        "obbligatorio",
-        "attenzione",
-        "pericolo",
-        "riservato",
-        "accesso vietato",
-        "solo personale",
-        "uscita di emergenza"
-    ]):
-        return {
-            "categoria": "regola_o_divieto",
-            "evento": "regola_ambientale_visibile",
-            "significato": "il contenuto osservato sembra comunicare una regola, un divieto o un avviso operativo",
-            "rilevanza": "alta",
-            "genera_condizione": True,
-            "azione_cognitiva": "rispetta_regola"
-        }
-
-    # 3. STATO DI ACCESSO / PASSAGGIO
-    if _contiene(testo, [
-        "porta aperta",
-        "porta chiusa",
-        "chiuso",
-        "aperto",
-        "bloccato",
-        "non accessibile",
-        "entrata",
-        "uscita",
-        "passaggio",
-        "accesso",
-        "laboratorio chiuso",
-        "aula chiusa"
-    ]):
-        return {
-            "categoria": "stato_accesso",
-            "evento": "stato_accesso_visibile",
-            "significato": "il contenuto osservato sembra indicare lo stato di un accesso o di un passaggio",
-            "rilevanza": "alta",
-            "genera_condizione": True,
-            "azione_cognitiva": "valuta_accesso"
-        }
-
-    # 4. INFORMAZIONE DIGITALE / TECNICA
+    # 4. CONTENUTO INFORMATIVO RILEVANTE: digitale, cartaceo, ambientale.
     if (
         _contiene(testo, [
-            "monitor",
-            "schermo",
-            "display",
-            "computer",
-            "terminale",
-            "interfaccia"
+            "monitor", "schermo", "display", "computer",
+            "terminale", "interfaccia", "poster", "cartello",
+            "avviso", "locandina", "foglio appeso",
+            "documento appeso", "parete", "muro", "bacheca"
         ])
         and
         _contiene(testo, [
-            "codice",
-            "programma",
-            "file",
-            "errore",
-            "finestra",
-            "testo leggibile",
+            "codice", "programma", "file", "errore",
+            "testo", "scritto", "leggibile", "informazione",
+            "messaggio", "evento", "attivita",
             "contenuto leggibile"
         ])
     ):
         return {
-            "categoria": "informazione_digitale",
-            "evento": "informazione_digitale_visibile",
-            "significato": "il contenuto osservato sembra provenire da un supporto digitale o tecnico",
-            "rilevanza": "alta",
-            "genera_condizione": True,
-            "azione_cognitiva": "analizza_contenuto_digitale"
-        }
-
-    # 5. POSTER / AVVISO / INFORMAZIONE SU PARETE
-    if (
-        _contiene(testo, [
-            "poster",
-            "cartello",
-            "avviso",
-            "locandina",
-            "foglio appeso",
-            "documento appeso",
-            "parete",
-            "muro",
-            "bacheca"
-        ])
-        and
-        _contiene(testo, [
-            "testo",
-            "scritto",
-            "leggibile",
-            "informazione",
-            "messaggio",
-            "evento",
-            "attivita"
-        ])
-    ):
-        return {
-            "categoria": "informazione_ambientale",
-            "evento": "informazione_ambientale_visibile",
-            "significato": "il contenuto osservato sembra comunicare informazioni sull'ambiente",
+            "categoria": "contenuto_informativo",
+            "evento": "contenuto_informativo_rilevante",
+            "significato": "il contenuto osservato contiene informazioni potenzialmente utili per comprendere l'ambiente",
             "rilevanza": "media",
             "genera_condizione": True,
-            "azione_cognitiva": "memorizza_informazione"
+            "azione_cognitiva": "analizza_o_memorizza"
         }
 
-    # 6. TESTO LEGGIBILE GENERICO
+    # 5. TESTO LEGGIBILE MA FUNZIONE ANCORA INCERTA
     if _contiene(testo, [
         "testo leggibile",
         "testi visibili",
@@ -205,9 +177,9 @@ def interpreta_contenuto_visivo(testo_osservato):
         "testo_visibile"
     ]):
         return {
-            "categoria": "contenuto_testuale_generico",
-            "evento": "contenuto_testuale_visibile",
-            "significato": "e' presente testo osservabile, ma la funzione non e' ancora chiara",
+            "categoria": "contenuto_testuale_incerto",
+            "evento": "contenuto_testuale_da_approfondire",
+            "significato": "e' presente testo osservabile, ma la sua funzione non e' ancora chiara",
             "rilevanza": "media",
             "genera_condizione": False,
             "azione_cognitiva": "osserva_meglio"

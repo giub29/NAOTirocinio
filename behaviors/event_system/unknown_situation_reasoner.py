@@ -60,7 +60,7 @@ def ragiona_situazione_sconosciuta(testo):
             "significativa": True,
             "genera_condizione": True,
             "tipo": "spaziale_safety",
-            "evento": "percorso_o_accesso_problematico",
+            "evento": "accesso_o_percorso_limitato",
             "ipotesi": "qualcosa potrebbe limitare il movimento o l'accesso",
             "azione_cognitiva": "prudenza"
         }
@@ -185,7 +185,7 @@ def ragiona_situazione_sconosciuta(testo):
             "significativa": True,
             "genera_condizione": True,
             "tipo": "informazione_visiva",
-            "evento": "informazione_visiva_rilevante",
+            "evento": "contenuto_informativo_rilevante",
             "ipotesi": "c'e' informazione visiva utile osservabile",
             "azione_cognitiva": "approfondisci_osservazione"
         }

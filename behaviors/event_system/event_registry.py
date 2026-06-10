@@ -95,6 +95,61 @@ EVENTI_BASE_NOTI = {
         "origine": "nota",
         "categoria": "stato_robot",
         "descrizione": "robot in movimento"
+    },
+    "accesso_non_disponibile": {
+        "origine": "semantica",
+        "categoria": "spaziale",
+        "descrizione": "accesso o passaggio non disponibile o limitato"
+    },
+    "accesso_disponibile": {
+        "origine": "semantica",
+        "categoria": "spaziale",
+        "descrizione": "accesso o passaggio disponibile per esplorazione o movimento"
+    },
+    "accesso_o_percorso_limitato": {
+        "origine": "semantica",
+        "categoria": "spaziale_safety",
+        "descrizione": "movimento, percorso o accesso potenzialmente limitato"
+    },
+    "oggetto_in_zona_rilevante": {
+        "origine": "semantica",
+        "categoria": "spaziale",
+        "descrizione": "elemento collocato in una zona rilevante per movimento, accesso o esplorazione"
+    },
+    "informazione_operativa": {
+        "origine": "semantica",
+        "categoria": "cognitiva",
+        "descrizione": "contenuto osservato che fornisce indicazioni utili per agire"
+    },
+    "contenuto_informativo_rilevante": {
+        "origine": "semantica",
+        "categoria": "cognitiva",
+        "descrizione": "contenuto osservato potenzialmente utile per comprendere l'ambiente"
+    },
+    "contenuto_testuale_da_approfondire": {
+        "origine": "semantica",
+        "categoria": "cognitiva",
+        "descrizione": "testo visibile ma non ancora interpretato in modo affidabile"
+    },
+    "vincolo_comportamentale": {
+        "origine": "semantica",
+        "categoria": "cognitiva_safety",
+        "descrizione": "contenuto o situazione che limita o condiziona le azioni possibili"
+    },
+    "elemento_ambientale_anomalo": {
+        "origine": "semantica",
+        "categoria": "safety",
+        "descrizione": "elemento dell'ambiente anomalo, danneggiato o fuori posto"
+    },
+    "elemento_fuori_posto": {
+        "origine": "semantica",
+        "categoria": "spaziale",
+        "descrizione": "elemento osservato fuori dalla posizione attesa"
+    },
+    "zona_da_esplorare": {
+        "origine": "semantica",
+        "categoria": "esplorativa",
+        "descrizione": "zona nuova o non riconosciuta da esplorare con cautela"
     }
 }
 

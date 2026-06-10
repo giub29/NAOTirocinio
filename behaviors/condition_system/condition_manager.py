@@ -590,6 +590,7 @@ def _condizione_ammessa_per_evento(nome_condizione, mondo, stato_runtime):
     nome = (nome_condizione or "").lower()
     nome_evento = nome.replace("condizione_", "").replace(".py", "")
 
+    
     eventi = stato_runtime.get("eventi", {})
     eventi_reali = stato_runtime.get("eventi_reali", {})
     evento_strutturato = stato_runtime.get("evento_strutturato", {})

@@ -40,6 +40,13 @@ try:
 except Exception:
     costruisci_decisione_curiosa = None
 
+try:
+    from behaviors.agentic_system.agentic_orchestrator import (
+        esegui_ciclo_agentico
+    )
+except Exception:
+    esegui_ciclo_agentico = None
+
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
 logger = logging.getLogger(__name__)
@@ -76,6 +83,21 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         stato_runtime = {}
 
     logger.info("[AUTONOMIA] Supervisore attivo")
+
+    if stato_runtime.get("usa_agentic_orchestrator", False):
+        if esegui_ciclo_agentico is not None:
+            logger.info("[AUTONOMIA] Uso orchestratore agentico")
+
+            return esegui_ciclo_agentico(
+                mondo,
+                stato_runtime,
+                costruisci_firma_situazione,
+                valuta_condizioni_generate_sicure,
+                situazione_merita_generazione,
+                prova_generazione_autonoma,
+                costruisci_decisione_curiosa,
+                _pulisci_mondo_per_unknown
+            )
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
 

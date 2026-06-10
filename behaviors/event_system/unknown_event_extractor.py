@@ -88,6 +88,76 @@ def estrai_eventi_sconosciuti(testo):
 
     eventi = []
 
+    # Oggetti vicino a zone di passaggio/accesso.
+    # Esempio: zaino davanti alla porta.
+    if (
+        _contiene(testo, [
+            "zaino", "borsa", "scatola", "sedia", "oggetto",
+            "cartone", "pacco", "ostacolo", "ingombro"
+        ])
+        and
+        _contiene(testo, [
+            "davanti", "vicino", "accanto", "in mezzo", "sul"
+        ])
+        and
+        _contiene(testo, [
+            "porta", "accesso", "passaggio", "percorso",
+            "corridoio", "entrata", "uscita", "varco"
+        ])
+    ):
+        return [
+            {
+                "nome": "oggetto_in_zona_rilevante",
+                "categoria": "sconosciuta",
+                "descrizione": "oggetto vicino a una zona utile per movimento, accesso o esplorazione",
+                "valore": True,
+                "priorita": "media",
+                "origine": "unknown_autonomo"
+            }
+        ]
+    
+    # 0. Regole semantiche specifiche ad alta priorita'.
+    # Devono venire PRIMA dell'interprete visuale generico,
+    # altrimenti una porta chiusa rischia di diventare
+
+    if _contiene(testo, ["porta", "varco", "ingresso", "uscita"]):
+
+        if _contiene(testo, ["davanti", "vicino", "accanto", "in mezzo", "sul"]):
+            return [
+                {
+                    "nome": "oggetto_in_zona_rilevante",
+                    "categoria": "sconosciuta",
+                    "descrizione": "oggetto vicino a porta, accesso o passaggio potenzialmente rilevante",
+                    "valore": True,
+                    "priorita": "media",
+                    "origine": "unknown_autonomo"
+                }
+            ]
+
+        if _contiene(testo, ["chius", "serrata", "bloccata", "bloccato"]):
+            return [
+                {
+                    "nome": "accesso_non_disponibile",
+                    "categoria": "sconosciuta",
+                    "descrizione": "accesso o passaggio potenzialmente non disponibile",
+                    "valore": True,
+                    "priorita": "alta",
+                    "origine": "unknown_autonomo"
+                }
+            ]
+
+        if _contiene(testo, ["apert", "spalancata", "socchiusa"]):
+            return [
+                {
+                    "nome": "accesso_disponibile",
+                    "categoria": "sconosciuta",
+                    "descrizione": "accesso o passaggio potenzialmente disponibile",
+                    "valore": True,
+                    "priorita": "media",
+                    "origine": "unknown_autonomo"
+                }
+            ]
+
     # 1. Interprete semantico visuale:
     # deve venire PRIMA del filtro "descrizione generica",
     # altrimenti testi utili su oggetti/pareti/contenitori vengono ignorati.
@@ -222,7 +292,7 @@ def estrai_eventi_sconosciuti(testo):
         ])
     ):
         eventi.append({
-            "nome": "contenitore_con_istruzioni_visibili",
+            "nome": "informazione_operativa",
             "categoria": "sconosciuta",
             "descrizione": "contenitore o area con istruzioni leggibili potenzialmente utili",
             "valore": True
