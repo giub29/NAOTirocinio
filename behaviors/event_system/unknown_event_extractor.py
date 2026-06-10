@@ -4,6 +4,12 @@ from __future__ import unicode_literals
 import re
 import unicodedata
 try:
+    from behaviors.event_system.visual_semantic_interpreter import (
+        interpreta_contenuto_visivo
+    )
+except Exception:
+    interpreta_contenuto_visivo = None
+try:
     from behaviors.event_system.unknown_situation_reasoner import (
         ragiona_situazione_sconosciuta
     )
@@ -71,12 +77,8 @@ def estrai_eventi_sconosciuti(testo):
     """
     Estrae eventi unknown da situazioni comportamentalmente utili.
 
-    NON genera condizioni da semplici oggetti o colori.
-    Genera eventi solo se il testo suggerisce:
-    - accessibilità modificata
-    - ostacolo o ingombro
-    - danno/anomalia
-    - relazione spaziale che può influenzare movimento/esplorazione
+    Prima prova a interpretare semanticamente il contenuto osservato.
+    Solo dopo usa il reasoner generico e le regole spaziali/safety.
     """
 
     testo = _normalizza(testo)
@@ -84,13 +86,37 @@ def estrai_eventi_sconosciuti(testo):
     if not testo:
         return []
 
+    eventi = []
+
+    # 1. Interprete semantico visuale:
+    # deve venire PRIMA del filtro "descrizione generica",
+    # altrimenti testi utili su oggetti/pareti/contenitori vengono ignorati.
+    if interpreta_contenuto_visivo is not None:
+        interpretazione = interpreta_contenuto_visivo(testo)
+
+        if interpretazione.get("genera_condizione", False):
+            nome_evento = interpretazione.get("evento")
+
+            if nome_evento:
+                eventi.append({
+                    "nome": nome_evento,
+                    "categoria": "sconosciuta",
+                    "descrizione": interpretazione.get(
+                        "significato",
+                        "contenuto visivo semanticamente rilevante"
+                    ),
+                    "valore": True,
+                    "interpretazione": interpretazione
+                })
+
+    if eventi:
+        return eventi
+
+    # 2. Ora posso scartare descrizioni davvero generiche.
     if _solo_descrizione_generica(testo):
         return []
-    
-    # Ragionamento cognitivo generale:
-    # decide se la scena è solo descrittiva,
-    # curiosa ma non generativa,
-    # oppure utile per una condizione autonoma.
+
+    # 3. Reasoner generale: fallback.
     if ragiona_situazione_sconosciuta is not None:
         ragionamento = ragiona_situazione_sconosciuta(testo)
 
@@ -108,9 +134,7 @@ def estrai_eventi_sconosciuti(testo):
                 )
             ]
 
-    eventi = []
-
-    # 1. Accessibilità: qualcosa non sembra attraversabile/usabile.
+    # 4. Regole simboliche residuali.
     if _contiene(testo, [
         "chius", "serrat", "blocc", "non aper",
         "non accessibile", "accesso impedito",
@@ -122,7 +146,6 @@ def estrai_eventi_sconosciuti(testo):
             "l'osservazione suggerisce che un accesso o passaggio potrebbe non essere disponibile"
         ))
 
-    # 2. Passaggio/percorso ostruito.
     if _contiene(testo, [
         "passaggio ostruito", "percorso ostruito",
         "passaggio bloccato", "percorso bloccato",
@@ -138,8 +161,6 @@ def estrai_eventi_sconosciuti(testo):
             "l'osservazione suggerisce un possibile ostacolo sul percorso"
         ))
 
-    # 3. Relazione spaziale rilevante:
-    # qualcosa vicino/ad/accanto a zona di movimento/accesso.
     if (
         _contiene(testo, ["vicino", "accanto", "davanti", "sul", "in mezzo"])
         and
@@ -155,7 +176,6 @@ def estrai_eventi_sconosciuti(testo):
             "un elemento osservato si trova vicino a una zona utile per movimento o esplorazione"
         ))
 
-    # 4. Danno o anomalia nell'ambiente.
     if _contiene(testo, [
         "rotto", "rotta", "danneggiato", "danneggiata",
         "crepa", "crepato", "rovinato", "rovinata",
@@ -167,7 +187,6 @@ def estrai_eventi_sconosciuti(testo):
             "l'osservazione suggerisce un elemento danneggiato o anomalo"
         ))
 
-    # 5. Oggetto fuori posto/caduto.
     if _contiene(testo, [
         "fuori posto", "caduto", "caduta",
         "a terra", "spostato", "spostata"
@@ -178,7 +197,6 @@ def estrai_eventi_sconosciuti(testo):
             "un elemento sembra fuori dalla posizione normale e potrebbe richiedere attenzione"
         ))
 
-    # 6. Zona nuova/esplorabile.
     if _contiene(testo, [
         "zona sconosciuta", "area sconosciuta",
         "zona nuova", "area nuova",
@@ -190,7 +208,6 @@ def estrai_eventi_sconosciuti(testo):
             "l'ambiente contiene una zona nuova o non riconosciuta"
         ))
 
-    # 7. Contenitore con istruzioni visibili.
     if (
         _contiene(testo, [
             "contenitore", "scatola", "cartone", "cestino",
