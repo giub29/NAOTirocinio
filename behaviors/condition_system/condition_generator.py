@@ -40,7 +40,11 @@ except NameError:
     basestring = str
 
 from behaviors.condition_system.condition_manager import reset_cache_condizioni
-from behaviors.condition_system.condition_memory import salva_metadati_condizione
+from behaviors.condition_system.condition_memory import (
+    memoria_cognitiva_condizioni,
+    salva_metadati_condizione,
+    trova_condizioni_simili
+)
 
 try:
     from behaviors.event_system.unknown_event_extractor import arricchisci_eventi_con_sconosciuti
@@ -1251,6 +1255,20 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
             u"Non generare una condizione generica: deve riconoscere esattamente questo concetto.\n\n"
         ).format(nome_ev=nome_ev, parole_ev=parole_ev)
 
+    try:
+        memoria_cognitiva = memoria_cognitiva_condizioni(limite=8)
+    except Exception:
+        memoria_cognitiva = []
+
+    try:
+        condizioni_simili = trova_condizioni_simili(
+            mondo,
+            eventi_sconosciuti or {},
+            limite=5
+        )
+    except Exception:
+        condizioni_simili = []
+
     return (
         u"Sei un generatore di codice Python per un robot NAO.\n"
         u"Devi generare UNA nuova condizione Python autonoma.\n\n"
@@ -1312,6 +1330,21 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
         u"- Se l'evento riguarda oggetto_in_zona_rilevante: usa prudenza spaziale, occhi yellow/red, guarda l'elemento e non camminare se il robot e' fermo.\n"
         u"- Non nominare oggetti specifici se non sono presenti nel MONDO. Ragiona sulla funzione dell'evento.\n"
         u"- Non trasformare eventi cognitivi in saluti o dialogo sociale.\n\n"
+
+        u"MEMORIA COGNITIVA DELLE CONDIZIONI ESISTENTI:\n"
+        u"- Usa questa memoria per capire quali famiglie di situazioni NAO ha gia' appreso.\n"
+        u"- Non copiare vecchi comportamenti in modo cieco.\n"
+        u"- Se una categoria simile esiste gia', genera solo se il nuovo evento e' semanticamente diverso o piu' specifico.\n"
+        u"- Le riparazioni e i rifiuti indicano cautela: preferisci condizioni piu' strette e azioni piu' prudenti.\n"
+        + json.dumps(memoria_cognitiva, ensure_ascii=False)
+        + u"\n\n"
+
+        u"CONDIZIONI SIMILI RICHIAMATE DALLA MEMORIA:\n"
+        u"- Usa questi richiami per evitare duplicati semantici.\n"
+        u"- Se una condizione simile ha esempi negativi, restringi il trigger e scegli azioni prudenti.\n"
+        u"- Se la somiglianza e' alta ma il nuovo evento e' diverso, genera una condizione piu' specifica.\n"
+        + json.dumps(condizioni_simili, ensure_ascii=False)
+        + u"\n\n"
 
         u"REGOLE PER COMPORTAMENTO AUTONOMO:\n"
         u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
@@ -1541,6 +1574,20 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
                 u"[GENERATOR] Errore valutazione unknown: {}".format(e)
             )
 
+    try:
+        memoria_cognitiva = memoria_cognitiva_condizioni(limite=8)
+    except Exception:
+        memoria_cognitiva = []
+
+    try:
+        condizioni_simili = trova_condizioni_simili(
+            mondo,
+            {},
+            limite=5
+        )
+    except Exception:
+        condizioni_simili = []
+
     prompt = (
         u"Sei il supervisore cognitivo di un robot NAO.\n"
         u"Devi decidere se la situazione osservata merita la creazione di una NUOVA condizione Python autonoma.\n\n"
@@ -1557,12 +1604,17 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         u"Devi rispondere false se:\n"
         u"- è solo batteria, stato fermo/cammino o informazione banale;\n"
         u"- riguarda un input diretto dell'utente non riutilizzabile;\n"
+        u"- la memoria cognitiva mostra gia' una condizione semanticamente equivalente;\n"
         u"- la decisione corrente è già adeguata e non c'è nulla di nuovo da apprendere.\n\n"
 
         u"MONDO:\n"
         + mondo +
         u"\n\nULTIMA DECISIONE:\n"
         + json.dumps(ultima_decisione, ensure_ascii=False) +
+        u"\n\nMEMORIA COGNITIVA CONDIZIONI:\n"
+        + json.dumps(memoria_cognitiva, ensure_ascii=False) +
+        u"\n\nCONDIZIONI SIMILI RICHIAMATE:\n"
+        + json.dumps(condizioni_simili, ensure_ascii=False) +
         u"\n\nMEMORIA:\n"
         + json.dumps(dati_memoria, ensure_ascii=False) +
         u"\n\nSTATO ROBOT:\n"

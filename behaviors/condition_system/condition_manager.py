@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(__file__)
 CONDIZIONI_DIR = os.path.join(BASE_DIR, "generated_conditions")
 REJECTED_DIR = os.path.join(BASE_DIR, "rejected_conditions")
+METADATA_DIR = os.path.join(BASE_DIR, "condition_metadata")
+REJECTED_METADATA_DIR = os.path.join(BASE_DIR, "rejected_metadata")
 
 _condizioni_cache = None
 _firma_cache_condizioni = None
@@ -141,6 +143,12 @@ def _assicura_cartelle():
     if not os.path.exists(REJECTED_DIR):
         os.makedirs(REJECTED_DIR)
 
+    if not os.path.exists(METADATA_DIR):
+        os.makedirs(METADATA_DIR)
+
+    if not os.path.exists(REJECTED_METADATA_DIR):
+        os.makedirs(REJECTED_METADATA_DIR)
+
 def _firma_evento_corrente(mondo, stato_runtime):
     """
     Crea una firma stabile dell'evento corrente.
@@ -195,7 +203,8 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
         nome_modulo = nome_modulo[:-3]
 
     origine_py = os.path.join(CONDIZIONI_DIR, nome_modulo + ".py")
-    origine_meta = os.path.join(CONDIZIONI_DIR, nome_modulo + ".meta.json")
+    origine_meta = os.path.join(METADATA_DIR, nome_modulo + ".meta.json")
+    origine_meta_legacy = os.path.join(CONDIZIONI_DIR, nome_modulo + ".meta.json")
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
 
@@ -205,7 +214,7 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
     )
 
     destinazione_meta = os.path.join(
-        REJECTED_DIR,
+        REJECTED_METADATA_DIR,
         nome_modulo + "_rejected_" + timestamp + ".meta.json"
     )
 
@@ -220,9 +229,6 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
 
         if os.path.exists(origine_py):
             shutil.move(origine_py, destinazione_py)
-
-        if os.path.exists(origine_meta):
-            shutil.move(origine_meta, destinazione_meta)
 
         _rimuovi_modulo_da_memoria(nome_modulo)
         _pulisci_bytecode_condizione(nome_modulo)
@@ -273,6 +279,11 @@ def _sposta_in_rejected(nome_modulo, motivo, mondo=None, stato_runtime=None):
                 e
             ))
 
+        if os.path.exists(origine_meta):
+            shutil.move(origine_meta, destinazione_meta)
+        elif os.path.exists(origine_meta_legacy):
+            shutil.move(origine_meta_legacy, destinazione_meta)
+
     except Exception as e:
         logger.error(u"[CONDIZIONI] Impossibile spostare {} in rejected_conditions: {}".format(
             nome_modulo,
@@ -307,12 +318,37 @@ def _registra_errore(nome_modulo, errore, mondo=None, stato_runtime=None):
             e
         ))
 
+    try:
+        valutazione = valuta_affidabilita_condizione(nome_base)
+    except Exception as e:
+        logger.warning(u"[CONDIZIONI] Errore valutazione affidabilita' dopo errore {}: {}".format(
+            nome_base,
+            e
+        ))
+        valutazione = {
+            "azione": "mantieni",
+            "motivo": "valutazione affidabilita non disponibile"
+        }
+
     logger.warning(u"[CONDIZIONI] Errore runtime in {} ({}/{}): {}".format(
         nome_base,
         numero_errori,
         MAX_ERRORI_CONDIZIONE,
         errore
     ))
+
+    if valutazione.get("azione") in ["disattiva", "rigenera"]:
+        motivo = u"{} dopo errore runtime: {}".format(
+            valutazione.get("azione"),
+            valutazione.get("motivo", "")
+        )
+        _sposta_in_rejected(
+            nome_base,
+            motivo,
+            mondo,
+            stato_runtime
+        )
+        return True
 
     if numero_errori >= MAX_ERRORI_CONDIZIONE:
         _sposta_in_rejected(
@@ -391,6 +427,25 @@ def carica_condizioni_generate():
         path_file = os.path.join(CONDIZIONI_DIR, nome_file)
 
         try:
+            valutazione = valuta_affidabilita_condizione(nome_modulo)
+            if valutazione.get("azione") == "disattiva":
+                logger.warning(u"[CONDIZIONI] Non carico condizione disattivata dalla memoria: {} | {}".format(
+                    nome_file,
+                    valutazione.get("motivo", "")
+                ))
+                continue
+
+            if valutazione.get("azione") == "rigenera":
+                logger.warning(u"[CONDIZIONI] Condizione fragile: sposto in rejected per rigenerazione: {} | {}".format(
+                    nome_file,
+                    valutazione.get("motivo", "")
+                ))
+                _sposta_in_rejected(
+                    nome_modulo,
+                    valutazione.get("motivo", "")
+                )
+                continue
+
             modulo = _carica_modulo_da_file(nome_modulo, path_file)
 
             if not hasattr(modulo, "condizione"):

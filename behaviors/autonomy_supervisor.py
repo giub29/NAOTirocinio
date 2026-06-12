@@ -47,9 +47,29 @@ try:
 except Exception:
     esegui_ciclo_agentico = None
 
+try:
+    from behaviors.condition_system.condition_memory import trova_condizioni_simili
+except Exception:
+    trova_condizioni_simili = None
+
+try:
+    from behaviors.event_system.episodic_hypothesis_memory import (
+        valuta_ipotesi_temporanee,
+        costruisci_decisione_ipotesi
+    )
+except Exception:
+    valuta_ipotesi_temporanee = None
+    costruisci_decisione_ipotesi = None
+
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
 logger = logging.getLogger(__name__)
+BASE_DIR = os.path.dirname(__file__)
+CONDIZIONI_GENERATE_DIR = os.path.join(
+    BASE_DIR,
+    "condition_system",
+    "generated_conditions"
+)
 ULTIMA_GENERAZIONE = 0
 INTERVALLO_MINIMO_GENERAZIONE = 20
 ULTIMO_MONDO_GENERATO = None
@@ -212,7 +232,30 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     if evento_composto:
         logger.info("[AUTONOMIA] Evento composto: priorita' alla generazione autonoma")
 
+        esito_ipotesi = valuta_ipotesi_temporanee_sicura(
+            mondo,
+            firma,
+            stato_runtime
+        )
+
+        if esito_ipotesi.get("ha_ipotesi") and not esito_ipotesi.get("genera_condizione"):
+            decisione_ipotesi = None
+
+            if costruisci_decisione_ipotesi is not None:
+                decisione_ipotesi = costruisci_decisione_ipotesi(esito_ipotesi)
+
+            if decisione_ipotesi is not None:
+                logger.info("[AUTONOMIA] Decisione da ipotesi temporanea composta")
+                return decisione_ipotesi
+
         deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
+
+        if esito_ipotesi.get("genera_condizione"):
+            deve_generare = True
+            motivo = esito_ipotesi.get(
+                "motivo",
+                "ipotesi temporanea confermata"
+            )
 
         logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
             deve_generare,
@@ -249,6 +292,22 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         return decisione
 
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
+
+    esito_ipotesi = valuta_ipotesi_temporanee_sicura(
+        mondo,
+        firma,
+        stato_runtime
+    )
+
+    if esito_ipotesi.get("ha_ipotesi") and not esito_ipotesi.get("genera_condizione"):
+        decisione_ipotesi = None
+
+        if costruisci_decisione_ipotesi is not None:
+            decisione_ipotesi = costruisci_decisione_ipotesi(esito_ipotesi)
+
+        if decisione_ipotesi is not None:
+            logger.info("[AUTONOMIA] Decisione da ipotesi temporanea")
+            return decisione_ipotesi
     
     # Curiosità epistemica:
     # se non ci sono condizioni attive e la scena non merita ancora
@@ -355,6 +414,13 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         stato_runtime
     )
 
+    if esito_ipotesi.get("genera_condizione"):
+        deve_generare = True
+        motivo = esito_ipotesi.get(
+            "motivo",
+            "ipotesi temporanea confermata"
+        )
+
     logger.info(
         "[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
             deve_generare,
@@ -398,6 +464,233 @@ def valuta_condizioni_generate_sicure(mondo, stato_runtime):
         logger.error("[AUTONOMIA] Errore valutando condizioni generate: {}".format(e))
         logger.error(traceback.format_exc())
         return None
+
+
+def _eventi_per_memoria_cognitiva(firma, stato_runtime):
+    eventi = {}
+
+    for sorgente in [
+        firma.get("eventi", {}),
+        firma.get("eventi_attivi", {}),
+        stato_runtime.get("eventi", {}),
+        stato_runtime.get("eventi_reali", {})
+    ]:
+        if not isinstance(sorgente, dict):
+            continue
+
+        for nome_evento, valore in sorgente.items():
+            if valore not in [False, None, "", [], {}]:
+                eventi[nome_evento] = True
+
+    evento_strutturato = firma.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    for nome_evento in eventi_core:
+        nome_evento = str(nome_evento).strip()
+        if nome_evento:
+            eventi[nome_evento] = True
+
+    return eventi
+
+
+def _condizione_memoria_eseguibile(voce):
+    nome = voce.get("nome", "")
+
+    if not nome:
+        return False
+
+    if nome.endswith(".py"):
+        nome = nome[:-3]
+
+    path_file = os.path.join(CONDIZIONI_GENERATE_DIR, nome + ".py")
+
+    return os.path.exists(path_file)
+
+
+def _evento_coperto_da_voce(evento, voce):
+    evento_norm = str(evento).lower().replace("-", "_").strip()
+
+    if not evento_norm:
+        return False
+
+    testi_voce = [
+        voce.get("nome", ""),
+        voce.get("contesto_semantico", "")
+    ]
+
+    for evento_voce in voce.get("eventi_attivi_origine", []):
+        testi_voce.append(str(evento_voce))
+
+    testo_voce = " ".join(testi_voce).lower().replace("-", "_")
+
+    if evento_norm in testo_voce:
+        return True
+
+    pezzi = [
+        pezzo.strip()
+        for pezzo in evento_norm.split("_")
+        if len(pezzo.strip()) >= 4
+    ]
+
+    for pezzo in pezzi:
+        if pezzo in testo_voce:
+            return True
+
+    return False
+
+
+def _numero_eventi_coperti_da_voce(firma, stato_runtime, voce):
+    eventi = _eventi_per_memoria_cognitiva(firma, stato_runtime)
+    coperti = 0
+
+    for nome_evento in eventi.keys():
+        nome_norm = str(nome_evento).lower().strip()
+
+        if nome_norm in [
+            "fermo",
+            "interazione_utente"
+        ]:
+            continue
+
+        if _evento_coperto_da_voce(nome_evento, voce):
+            coperti += 1
+
+    return coperti
+
+
+def _generazione_gia_coperta_da_memoria(mondo, firma, stato_runtime):
+    """
+    Recupera condizioni simili prima di arrivare al prompt LLM.
+
+    Il filtro e' conservativo: blocca la generazione solo quando la memoria
+    contiene una condizione molto vicina e non chiaramente fragile.
+    """
+
+    if trova_condizioni_simili is None:
+        return False, "", []
+
+    try:
+        eventi = _eventi_per_memoria_cognitiva(firma, stato_runtime)
+        simili = trova_condizioni_simili(mondo, eventi, limite=5)
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore recuperando condizioni simili: {}".format(e)
+        )
+        return False, "", []
+
+    if not simili:
+        return False, "", []
+
+    simili_eseguibili = [
+        voce for voce in simili
+        if _condizione_memoria_eseguibile(voce)
+    ]
+
+    if not simili_eseguibili:
+        return False, "", simili
+
+    stato_runtime["condizioni_simili_richiamate"] = simili
+
+    scena_composta = (
+        firma.get("eventi_multipli", False)
+        or firma.get("situazione_composta", False)
+    )
+
+    for voce in simili_eseguibili:
+        punteggio = voce.get("punteggio_similarita", 0)
+        positivi = voce.get("numero_esempi_positivi", 0)
+        negativi = voce.get("numero_esempi_negativi", 0)
+        motivi = voce.get("motivi_similarita", [])
+
+        eventi_match = [
+            motivo for motivo in motivi
+            if str(motivo).startswith("evento:")
+        ]
+
+        testo_match = [
+            motivo for motivo in motivi
+            if str(motivo).startswith("testo:")
+        ]
+
+        if negativi > positivi and negativi >= 2:
+            continue
+
+        if scena_composta:
+            eventi_coperti = _numero_eventi_coperti_da_voce(
+                firma,
+                stato_runtime,
+                voce
+            )
+
+            if eventi_coperti < 2:
+                continue
+
+        if punteggio >= 11:
+            return True, (
+                "condizione simile gia' appresa: {} (punteggio {})"
+                .format(voce.get("nome", "sconosciuta"), punteggio)
+            ), simili
+
+        if punteggio >= 8 and eventi_match and testo_match:
+            return True, (
+                "condizione simile recuperata dalla memoria: {}"
+                .format(voce.get("nome", "sconosciuta"))
+            ), simili
+
+        if punteggio >= 7 and eventi_match and positivi >= 2 and negativi == 0:
+            return True, (
+                "condizione simile affidabile gia' presente: {}"
+                .format(voce.get("nome", "sconosciuta"))
+            ), simili
+
+    return False, "", simili
+
+
+def valuta_ipotesi_temporanee_sicura(mondo, firma, stato_runtime):
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    cache = stato_runtime.get("_esito_ipotesi_temporanea")
+
+    if isinstance(cache, dict) and cache.get("mondo") == mondo:
+        return cache.get("esito", {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "ipotesi temporanea non disponibile"
+        })
+
+    if valuta_ipotesi_temporanee is None:
+        return {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "memoria ipotesi temporanee non disponibile"
+        }
+
+    try:
+        esito = valuta_ipotesi_temporanee(
+            mondo,
+            firma,
+            stato_runtime
+        )
+        stato_runtime["_esito_ipotesi_temporanea"] = {
+            "mondo": mondo,
+            "esito": esito
+        }
+        return esito
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore memoria ipotesi temporanee: {}".format(e)
+        )
+        return {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "errore memoria ipotesi temporanee"
+        }
     
 def situazione_merita_generazione(mondo, stato_runtime):
     """
@@ -452,6 +745,53 @@ def situazione_merita_generazione(mondo, stato_runtime):
         eventi_core = []
 
     eventi_core = filtra_eventi_helper(eventi_core)
+
+    gia_coperta, motivo_memoria, condizioni_simili = (
+        _generazione_gia_coperta_da_memoria(
+            mondo,
+            firma,
+            stato_runtime
+        )
+    )
+
+    if condizioni_simili:
+        logger.info(
+            "[AUTONOMIA][MEMORIA] Condizioni simili richiamate: {}".format(
+                [
+                    (
+                        voce.get("nome"),
+                        voce.get("punteggio_similarita")
+                    )
+                    for voce in condizioni_simili[:3]
+                ]
+            )
+        )
+
+    if gia_coperta:
+        logger.info(
+            "[AUTONOMIA][MEMORIA] Generazione evitata: {}".format(
+                motivo_memoria
+            )
+        )
+        return False, motivo_memoria
+
+    esito_ipotesi = valuta_ipotesi_temporanee_sicura(
+        mondo,
+        firma,
+        stato_runtime
+    )
+
+    if esito_ipotesi.get("ha_ipotesi"):
+        if esito_ipotesi.get("genera_condizione"):
+            return True, esito_ipotesi.get(
+                "motivo",
+                "ipotesi temporanea confermata"
+            )
+
+        return False, esito_ipotesi.get(
+            "motivo",
+            "ipotesi temporanea ancora debole"
+        )
 
     if (
         tipo in ["unknown", "sconosciuto", "scoperta"]

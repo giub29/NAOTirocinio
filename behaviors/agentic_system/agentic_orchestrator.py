@@ -5,6 +5,58 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
+try:
+    from behaviors.event_system.episodic_hypothesis_memory import (
+        valuta_ipotesi_temporanee,
+        costruisci_decisione_ipotesi
+    )
+except Exception:
+    valuta_ipotesi_temporanee = None
+    costruisci_decisione_ipotesi = None
+
+
+def valuta_ipotesi_temporanee_sicura(mondo, firma, stato_runtime):
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    cache = stato_runtime.get("_esito_ipotesi_temporanea")
+
+    if isinstance(cache, dict) and cache.get("mondo") == mondo:
+        return cache.get("esito", {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "ipotesi temporanea non disponibile"
+        })
+
+    if valuta_ipotesi_temporanee is None:
+        return {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "memoria ipotesi temporanee non disponibile"
+        }
+
+    try:
+        esito = valuta_ipotesi_temporanee(
+            mondo,
+            firma,
+            stato_runtime
+        )
+        stato_runtime["_esito_ipotesi_temporanea"] = {
+            "mondo": mondo,
+            "esito": esito
+        }
+        return esito
+    except Exception as e:
+        logger.warning(
+            "[AGENTIC] Errore memoria ipotesi temporanee: {}".format(e)
+        )
+        return {
+            "ha_ipotesi": False,
+            "genera_condizione": False,
+            "motivo": "errore memoria ipotesi temporanee"
+        }
+
+
 def decidi_politica_evento(firma, motivo):
     """
     Decide cosa fare prima di generare codice.
@@ -280,11 +332,44 @@ def esegui_ciclo_agentico(
 
         stato["step"].append("nessuna_condizione_attiva")
 
-        # 2. Politica agentica preventiva sugli eventi semantici
-        politica_pre = decidi_politica_evento(
+        esito_ipotesi = valuta_ipotesi_temporanee_sicura(
+            mondo,
             firma,
-            "politica preventiva su evento semantico"
+            stato_runtime
         )
+
+        ipotesi_confermata = False
+
+        if esito_ipotesi.get("ha_ipotesi"):
+            logger.info(
+                "[AGENTIC] Ipotesi temporanea: {}".format(esito_ipotesi)
+            )
+
+            if esito_ipotesi.get("genera_condizione"):
+                ipotesi_confermata = True
+                stato["step"].append("ipotesi_temporanea_confermata")
+            else:
+                decisione_ipotesi = None
+
+                if costruisci_decisione_ipotesi is not None:
+                    decisione_ipotesi = costruisci_decisione_ipotesi(
+                        esito_ipotesi
+                    )
+
+                if decisione_ipotesi is not None:
+                    stato["decisione"] = decisione_ipotesi
+                    stato["motivo"] = "ipotesi_temporanea"
+                    stato["step"].append("decisione_da_ipotesi_temporanea")
+                    return decisione_ipotesi
+
+        # 2. Politica agentica preventiva sugli eventi semantici
+        politica_pre = {"azione": "genera", "motivo": "ipotesi confermata"}
+
+        if not ipotesi_confermata:
+            politica_pre = decidi_politica_evento(
+                firma,
+                "politica preventiva su evento semantico"
+            )
 
         logger.info(
             "[AGENTIC] Politica preventiva evento: {}".format(
@@ -292,7 +377,10 @@ def esegui_ciclo_agentico(
             )
         )
 
-        if politica_pre.get("azione") not in ["genera", "nessuna_politica"]:
+        if (
+            not ipotesi_confermata and
+            politica_pre.get("azione") not in ["genera", "nessuna_politica"]
+        ):
             decisione_politica = costruisci_decisione_da_politica(
                 politica_pre,
                 mondo,
@@ -335,10 +423,20 @@ def esegui_ciclo_agentico(
             )    
 
         # 4. Valuto se generare una nuova condizione
-        deve_generare, motivo = situazione_merita_generazione(
-            mondo,
-            stato_runtime
-        )
+        deve_generare = False
+        motivo = ""
+
+        if ipotesi_confermata:
+            deve_generare = True
+            motivo = esito_ipotesi.get(
+                "motivo",
+                "ipotesi temporanea confermata"
+            )
+        else:
+            deve_generare, motivo = situazione_merita_generazione(
+                mondo,
+                stato_runtime
+            )
 
         stato["motivo"] = motivo
         stato["step"].append("valutazione_generazione")
@@ -348,7 +446,13 @@ def esegui_ciclo_agentico(
             motivo
         ))
         if deve_generare:
-            politica = decidi_politica_evento(firma, motivo)
+            politica = {
+                "azione": "genera",
+                "motivo": "ipotesi temporanea confermata"
+            }
+
+            if not ipotesi_confermata:
+                politica = decidi_politica_evento(firma, motivo)
 
             logger.info("[AGENTIC] Politica evento: {}".format(politica))
 

@@ -86,6 +86,34 @@ def interpreta_contenuto_visivo(testo_osservato):
     if not testo:
         return risultato_base
 
+    segnali_contenuto_assente_o_incerto = [
+        "monitor spento",
+        "schermo spento",
+        "schermo nero",
+        "senza testo leggibile",
+        "senza informazioni chiare",
+        "senza contenuti informativi",
+        "nessun testo visibile",
+        "nessuna informazione leggibile",
+        "non contiene informazioni leggibili",
+        "non contiene testo leggibile",
+        "non e presente testo",
+        "non e presente alcun testo",
+        "testo non leggibile",
+        "contenuto non leggibile",
+        "cartello non leggibile"
+    ]
+
+    if _contiene(testo, segnali_contenuto_assente_o_incerto):
+        return {
+            "categoria": "contenuto_visivo_incerto",
+            "evento": None,
+            "significato": "il contenuto osservato non e' abbastanza leggibile o utile",
+            "rilevanza": "bassa",
+            "genera_condizione": False,
+            "azione_cognitiva": "osserva_meglio"
+        }
+
     # 1. VINCOLI COMPORTAMENTALI / LIMITI ALL'AZIONE
     if _contiene(testo, [
         "vietato",
