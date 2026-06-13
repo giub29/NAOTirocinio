@@ -2,17 +2,236 @@
 
 import logging
 import traceback
+import time
 
 logger = logging.getLogger(__name__)
 
 try:
     from behaviors.event_system.episodic_hypothesis_memory import (
         valuta_ipotesi_temporanee,
-        costruisci_decisione_ipotesi
+        costruisci_decisione_ipotesi,
+        aggiorna_ipotesi_da_osservazione_mirata
     )
 except Exception:
     valuta_ipotesi_temporanee = None
     costruisci_decisione_ipotesi = None
+    aggiorna_ipotesi_da_osservazione_mirata = None
+
+try:
+    from behaviors.event_system.world_model_memory import (
+        aggiorna_world_model,
+        costruisci_decisione_world_model,
+        aggiorna_world_model_da_osservazione_mirata
+    )
+except Exception:
+    aggiorna_world_model = None
+    costruisci_decisione_world_model = None
+    aggiorna_world_model_da_osservazione_mirata = None
+
+try:
+    from behaviors.event_system.active_perception_planner import (
+        costruisci_decisione_osservazione_mirata,
+        valuta_risposta_osservazione_mirata
+    )
+except Exception:
+    costruisci_decisione_osservazione_mirata = None
+    valuta_risposta_osservazione_mirata = None
+
+
+def aggiorna_world_model_sicuro(mondo, firma, stato_runtime):
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    if aggiorna_world_model is None:
+        return {
+            "aggiornato": False,
+            "motivo": "world model non disponibile"
+        }
+
+    try:
+        esito = aggiorna_world_model(
+            mondo,
+            firma,
+            stato_runtime
+        )
+        stato_runtime["world_model"] = esito
+        return esito
+    except Exception as e:
+        logger.warning("[AGENTIC] Errore world model: {}".format(e))
+        return {
+            "aggiornato": False,
+            "motivo": "errore world model"
+        }
+
+
+def costruisci_osservazione_mirata_sicura(
+    mondo,
+    azione_cognitiva=None,
+    motivo=None,
+    ipotesi=None,
+    world_model=None,
+    ragionamento=None,
+    firma=None
+):
+    if costruisci_decisione_osservazione_mirata is None:
+        return None
+
+    try:
+        return costruisci_decisione_osservazione_mirata(
+            mondo=mondo,
+            azione_cognitiva=azione_cognitiva,
+            motivo=motivo,
+            ipotesi=ipotesi,
+            world_model=world_model,
+            ragionamento=ragionamento,
+            firma=firma
+        )
+    except Exception as e:
+        logger.warning(
+            "[AGENTIC] Errore osservazione mirata: {}".format(e)
+        )
+        return None
+
+
+def registra_osservazione_mirata_corrente(stato_runtime, decisione):
+    if stato_runtime is None or not isinstance(decisione, dict):
+        return decisione
+
+    piano = None
+    memoria = decisione.get("memoria", [])
+
+    if isinstance(memoria, list):
+        for voce in memoria:
+            if isinstance(voce, dict) and voce.get("tipo") == "osservazione_mirata":
+                piano = dict(voce)
+                break
+
+    if piano is None:
+        return decisione
+
+    piano_precedente = stato_runtime.get("osservazione_mirata_corrente", {})
+    if not isinstance(piano_precedente, dict):
+        piano_precedente = {}
+
+    stesso_target = (
+        piano_precedente.get("target")
+        and piano_precedente.get("target") == piano.get("target")
+    )
+
+    piano["attiva_il"] = piano_precedente.get(
+        "attiva_il",
+        time.strftime("%Y-%m-%d %H:%M:%S")
+    )
+    piano["tentativi"] = (
+        int(piano_precedente.get("tentativi", 0))
+        if stesso_target else 0
+    )
+    piano["stato"] = "attiva"
+    stato_runtime["osservazione_mirata_corrente"] = piano
+
+    storia = stato_runtime.get("osservazioni_mirate_recenti", [])
+    if not isinstance(storia, list):
+        storia = []
+
+    storia.append(piano)
+    stato_runtime["osservazioni_mirate_recenti"] = storia[-5:]
+
+    return decisione
+
+
+def valuta_osservazione_mirata_corrente_sicura(
+    mondo,
+    firma,
+    stato_runtime,
+    world_model=None
+):
+    if stato_runtime is None:
+        return None
+
+    piano = stato_runtime.get("osservazione_mirata_corrente")
+    if not isinstance(piano, dict):
+        return None
+
+    if valuta_risposta_osservazione_mirata is None:
+        return None
+
+    try:
+        esito = valuta_risposta_osservazione_mirata(
+            mondo,
+            piano,
+            firma=firma,
+            world_model=world_model
+        )
+    except Exception as e:
+        logger.warning(
+            "[AGENTIC] Errore valutando risposta osservazione: {}".format(e)
+        )
+        return None
+
+    if not isinstance(esito, dict):
+        return None
+
+    tentativi = int(piano.get("tentativi", 0)) + 1
+    piano["tentativi"] = tentativi
+    esito["tentativo"] = tentativi
+    stato_runtime["esito_osservazione_mirata"] = esito
+    aggiorna_ipotesi_da_osservazione_mirata_sicura(
+        esito,
+        stato_runtime
+    )
+    aggiorna_world_model_da_osservazione_mirata_sicura(
+        esito,
+        stato_runtime
+    )
+
+    storia = stato_runtime.get("esiti_osservazioni_mirate", [])
+    if not isinstance(storia, list):
+        storia = []
+
+    storia.append(esito)
+    stato_runtime["esiti_osservazioni_mirate"] = storia[-5:]
+
+    if esito.get("trovato") or tentativi >= 3:
+        piano["stato"] = "completata" if esito.get("trovato") else "scaduta"
+        stato_runtime.pop("osservazione_mirata_corrente", None)
+    else:
+        stato_runtime["osservazione_mirata_corrente"] = piano
+
+    logger.info("[AGENTIC] Esito osservazione mirata: {}".format(esito))
+
+    return esito
+
+
+def aggiorna_ipotesi_da_osservazione_mirata_sicura(esito, stato_runtime):
+    if aggiorna_ipotesi_da_osservazione_mirata is None:
+        return None
+
+    try:
+        return aggiorna_ipotesi_da_osservazione_mirata(
+            esito,
+            stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AGENTIC] Errore aggiornando ipotesi da osservazione: {}".format(e)
+        )
+        return None
+
+
+def aggiorna_world_model_da_osservazione_mirata_sicura(esito, stato_runtime):
+    if aggiorna_world_model_da_osservazione_mirata is None:
+        return None
+
+    try:
+        return aggiorna_world_model_da_osservazione_mirata(
+            esito,
+            stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AGENTIC] Errore aggiornando world model da osservazione: {}".format(e)
+        )
+        return None
 
 
 def valuta_ipotesi_temporanee_sicura(mondo, firma, stato_runtime):
@@ -181,6 +400,24 @@ def costruisci_decisione_da_politica(politica, mondo, firma):
     if azione == "genera":
         return None
 
+    azione_percettiva = {
+        "memoria": "interpreta_e_memorizza",
+        "prudenza": "osserva_con_prudenza",
+        "curiosita": "osserva_meglio",
+        "osserva_meglio": "osserva_meglio"
+    }.get(azione)
+
+    if azione_percettiva:
+        decisione_mirata = costruisci_osservazione_mirata_sicura(
+            mondo,
+            azione_cognitiva=azione_percettiva,
+            motivo=politica.get("motivo"),
+            firma=firma
+        )
+
+        if decisione_mirata is not None:
+            return decisione_mirata
+
     colore = "yellow"
 
     if azione == "prudenza":
@@ -295,6 +532,17 @@ def esegui_ciclo_agentico(
         firma = costruisci_firma_situazione(mondo, stato_runtime)
         stato["firma"] = firma
         stato["step"].append("firma_costruita")
+        esito_world_model = aggiorna_world_model_sicuro(
+            mondo,
+            firma,
+            stato_runtime
+        )
+        valuta_osservazione_mirata_corrente_sicura(
+            mondo,
+            firma,
+            stato_runtime,
+            world_model=esito_world_model
+        )
 
         logger.info("[AGENTIC] Firma situazione: {}".format(firma))
 
@@ -351,6 +599,39 @@ def esegui_ciclo_agentico(
             else:
                 decisione_ipotesi = None
 
+                if (
+                    esito_world_model.get("familiare")
+                    and not esito_world_model.get("anomalia")
+                    and costruisci_decisione_world_model is not None
+                ):
+                    decisione_world = costruisci_decisione_world_model(
+                        esito_world_model
+                    )
+
+                    if decisione_world is not None:
+                        stato["decisione"] = decisione_world
+                        stato["motivo"] = "world_model_stabile"
+                        stato["step"].append("decisione_da_world_model")
+                        return decisione_world
+
+                decisione_mirata = costruisci_osservazione_mirata_sicura(
+                    mondo,
+                    azione_cognitiva=esito_ipotesi.get("azione_temporanea"),
+                    motivo=esito_ipotesi.get("motivo"),
+                    ipotesi=esito_ipotesi.get("ipotesi"),
+                    world_model=esito_world_model,
+                    firma=firma
+                )
+
+                if decisione_mirata is not None:
+                    stato["decisione"] = decisione_mirata
+                    stato["motivo"] = "osservazione_mirata"
+                    stato["step"].append("decisione_osservazione_mirata")
+                    return registra_osservazione_mirata_corrente(
+                        stato_runtime,
+                        decisione_mirata
+                    )
+
                 if costruisci_decisione_ipotesi is not None:
                     decisione_ipotesi = costruisci_decisione_ipotesi(
                         esito_ipotesi
@@ -393,7 +674,10 @@ def esegui_ciclo_agentico(
                 stato["step"].append(
                     "decisione_politica_pre_curiosita"
                 )
-                return decisione_politica
+                return registra_osservazione_mirata_corrente(
+                    stato_runtime,
+                    decisione_politica
+                )
             
         # 3. Curiosita' autonoma, se disponibile.
         # Arriva dopo la politica agentica preventiva:
@@ -405,6 +689,48 @@ def esegui_ciclo_agentico(
 
                 if pulisci_mondo_per_unknown is not None:
                     mondo_unknown = pulisci_mondo_per_unknown(mondo)
+
+                try:
+                    from behaviors.event_system.unknown_situation_reasoner import (
+                        ragiona_situazione_sconosciuta
+                    )
+
+                    ragionamento = ragiona_situazione_sconosciuta(
+                        mondo_unknown
+                    )
+
+                    if ragionamento is not None:
+                        decisione_mirata = (
+                            costruisci_osservazione_mirata_sicura(
+                                mondo,
+                                azione_cognitiva=ragionamento.get(
+                                    "azione_cognitiva"
+                                ),
+                                motivo=ragionamento.get("ipotesi"),
+                                world_model=esito_world_model,
+                                ragionamento=ragionamento,
+                                firma=firma
+                            )
+                        )
+
+                        if decisione_mirata is not None:
+                            stato["decisione"] = decisione_mirata
+                            stato["motivo"] = "osservazione_mirata"
+                            stato["step"].append(
+                                "decisione_osservazione_mirata"
+                            )
+                            logger.info(
+                                "[AGENTIC] Decisione osservazione mirata"
+                            )
+                            return registra_osservazione_mirata_corrente(
+                                stato_runtime,
+                                decisione_mirata
+                            )
+
+                except Exception as e:
+                    logger.warning(
+                        "[AGENTIC] Errore planner osservazione: {}".format(e)
+                    )
 
                 decisione_curiosa = costruisci_decisione_curiosa(
                     mondo_unknown
@@ -467,7 +793,10 @@ def esegui_ciclo_agentico(
                     stato["decisione"] = decisione_politica
                     stato["motivo"] = "politica_agentica"
                     stato["step"].append("decisione_da_politica")
-                    return decisione_politica
+                    return registra_osservazione_mirata_corrente(
+                        stato_runtime,
+                        decisione_politica
+                    )
 
             if stato_runtime.get("agentic_dry_run", False):
                 logger.info(

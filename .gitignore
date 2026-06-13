@@ -6,6 +6,9 @@ runtime/
 *.pyc
 __pycache__/
 
+# memoria runtime del world model
+behaviors/event_system/world_model_memory.json
+
 # comportamenti generati runtime
 NAOTirocinio/behaviors/generated/*
 !NAOTirocinio/behaviors/generated/__init__.py

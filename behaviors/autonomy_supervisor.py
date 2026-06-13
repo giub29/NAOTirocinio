@@ -55,11 +55,33 @@ except Exception:
 try:
     from behaviors.event_system.episodic_hypothesis_memory import (
         valuta_ipotesi_temporanee,
-        costruisci_decisione_ipotesi
+        costruisci_decisione_ipotesi,
+        aggiorna_ipotesi_da_osservazione_mirata
     )
 except Exception:
     valuta_ipotesi_temporanee = None
     costruisci_decisione_ipotesi = None
+    aggiorna_ipotesi_da_osservazione_mirata = None
+
+try:
+    from behaviors.event_system.world_model_memory import (
+        aggiorna_world_model,
+        costruisci_decisione_world_model,
+        aggiorna_world_model_da_osservazione_mirata
+    )
+except Exception:
+    aggiorna_world_model = None
+    costruisci_decisione_world_model = None
+    aggiorna_world_model_da_osservazione_mirata = None
+
+try:
+    from behaviors.event_system.active_perception_planner import (
+        costruisci_decisione_osservazione_mirata,
+        valuta_risposta_osservazione_mirata
+    )
+except Exception:
+    costruisci_decisione_osservazione_mirata = None
+    valuta_risposta_osservazione_mirata = None
 
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
@@ -86,6 +108,205 @@ def filtra_eventi_helper(eventi):
         e for e in eventi
         if str(e).lower().strip() not in EVENTI_HELPER_NON_GENERATIVI
     ]
+
+
+def aggiorna_world_model_sicuro(mondo, firma, stato_runtime):
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    if aggiorna_world_model is None:
+        return {
+            "aggiornato": False,
+            "motivo": "world model non disponibile"
+        }
+
+    try:
+        esito = aggiorna_world_model(
+            mondo,
+            firma,
+            stato_runtime
+        )
+        stato_runtime["world_model"] = esito
+        return esito
+    except Exception as e:
+        logger.warning("[AUTONOMIA] Errore world model: {}".format(e))
+        return {
+            "aggiornato": False,
+            "motivo": "errore world model"
+        }
+
+
+def costruisci_osservazione_mirata_sicura(
+    mondo,
+    azione_cognitiva=None,
+    motivo=None,
+    ipotesi=None,
+    world_model=None,
+    ragionamento=None,
+    firma=None
+):
+    if costruisci_decisione_osservazione_mirata is None:
+        return None
+
+    try:
+        return costruisci_decisione_osservazione_mirata(
+            mondo=mondo,
+            azione_cognitiva=azione_cognitiva,
+            motivo=motivo,
+            ipotesi=ipotesi,
+            world_model=world_model,
+            ragionamento=ragionamento,
+            firma=firma
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore osservazione mirata: {}".format(e)
+        )
+        return None
+
+
+def registra_osservazione_mirata_corrente(stato_runtime, decisione):
+    if stato_runtime is None or not isinstance(decisione, dict):
+        return decisione
+
+    piano = None
+    memoria = decisione.get("memoria", [])
+
+    if isinstance(memoria, list):
+        for voce in memoria:
+            if isinstance(voce, dict) and voce.get("tipo") == "osservazione_mirata":
+                piano = dict(voce)
+                break
+
+    if piano is None:
+        return decisione
+
+    piano_precedente = stato_runtime.get("osservazione_mirata_corrente", {})
+    if not isinstance(piano_precedente, dict):
+        piano_precedente = {}
+
+    stesso_target = (
+        piano_precedente.get("target")
+        and piano_precedente.get("target") == piano.get("target")
+    )
+
+    piano["attiva_il"] = piano_precedente.get(
+        "attiva_il",
+        time.strftime("%Y-%m-%d %H:%M:%S")
+    )
+    piano["tentativi"] = (
+        int(piano_precedente.get("tentativi", 0))
+        if stesso_target else 0
+    )
+    piano["stato"] = "attiva"
+    stato_runtime["osservazione_mirata_corrente"] = piano
+
+    storia = stato_runtime.get("osservazioni_mirate_recenti", [])
+    if not isinstance(storia, list):
+        storia = []
+
+    storia.append(piano)
+    stato_runtime["osservazioni_mirate_recenti"] = storia[-5:]
+
+    return decisione
+
+
+def valuta_osservazione_mirata_corrente_sicura(
+    mondo,
+    firma,
+    stato_runtime,
+    world_model=None
+):
+    if stato_runtime is None:
+        return None
+
+    piano = stato_runtime.get("osservazione_mirata_corrente")
+    if not isinstance(piano, dict):
+        return None
+
+    if valuta_risposta_osservazione_mirata is None:
+        return None
+
+    try:
+        esito = valuta_risposta_osservazione_mirata(
+            mondo,
+            piano,
+            firma=firma,
+            world_model=world_model
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore valutando risposta osservazione mirata: {}".format(e)
+        )
+        return None
+
+    if not isinstance(esito, dict):
+        return None
+
+    tentativi = int(piano.get("tentativi", 0)) + 1
+    piano["tentativi"] = tentativi
+
+    esito["tentativo"] = tentativi
+    stato_runtime["esito_osservazione_mirata"] = esito
+    aggiorna_ipotesi_da_osservazione_mirata_sicura(
+        esito,
+        stato_runtime
+    )
+    aggiorna_world_model_da_osservazione_mirata_sicura(
+        esito,
+        stato_runtime
+    )
+
+    storia = stato_runtime.get("esiti_osservazioni_mirate", [])
+    if not isinstance(storia, list):
+        storia = []
+
+    storia.append(esito)
+    stato_runtime["esiti_osservazioni_mirate"] = storia[-5:]
+
+    if esito.get("trovato") or tentativi >= 3:
+        piano["stato"] = "completata" if esito.get("trovato") else "scaduta"
+        stato_runtime.pop("osservazione_mirata_corrente", None)
+    else:
+        stato_runtime["osservazione_mirata_corrente"] = piano
+
+    logger.info(
+        "[AUTONOMIA] Esito osservazione mirata: {}".format(esito)
+    )
+
+    return esito
+
+
+def aggiorna_ipotesi_da_osservazione_mirata_sicura(esito, stato_runtime):
+    if aggiorna_ipotesi_da_osservazione_mirata is None:
+        return None
+
+    try:
+        return aggiorna_ipotesi_da_osservazione_mirata(
+            esito,
+            stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore aggiornando ipotesi da osservazione: {}".format(e)
+        )
+        return None
+
+
+def aggiorna_world_model_da_osservazione_mirata_sicura(esito, stato_runtime):
+    if aggiorna_world_model_da_osservazione_mirata is None:
+        return None
+
+    try:
+        return aggiorna_world_model_da_osservazione_mirata(
+            esito,
+            stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore aggiornando world model da osservazione: {}".format(e)
+        )
+        return None
 
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
@@ -120,6 +341,17 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             )
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
+    esito_world_model = aggiorna_world_model_sicuro(
+        mondo,
+        firma,
+        stato_runtime
+    )
+    valuta_osservazione_mirata_corrente_sicura(
+        mondo,
+        firma,
+        stato_runtime,
+        world_model=esito_world_model
+    )
 
     try:
         stato_runtime["eventi"] = firma.get("eventi", {})
@@ -241,6 +473,24 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         if esito_ipotesi.get("ha_ipotesi") and not esito_ipotesi.get("genera_condizione"):
             decisione_ipotesi = None
 
+            decisione_mirata = costruisci_osservazione_mirata_sicura(
+                mondo,
+                azione_cognitiva=esito_ipotesi.get("azione_temporanea"),
+                motivo=esito_ipotesi.get("motivo"),
+                ipotesi=esito_ipotesi.get("ipotesi"),
+                world_model=esito_world_model,
+                firma=firma
+            )
+
+            if decisione_mirata is not None:
+                logger.info(
+                    "[AUTONOMIA] Decisione da osservazione mirata composta"
+                )
+                return registra_osservazione_mirata_corrente(
+                    stato_runtime,
+                    decisione_mirata
+                )
+
             if costruisci_decisione_ipotesi is not None:
                 decisione_ipotesi = costruisci_decisione_ipotesi(esito_ipotesi)
 
@@ -302,6 +552,35 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     if esito_ipotesi.get("ha_ipotesi") and not esito_ipotesi.get("genera_condizione"):
         decisione_ipotesi = None
 
+        if (
+            esito_world_model.get("familiare")
+            and not esito_world_model.get("anomalia")
+            and costruisci_decisione_world_model is not None
+        ):
+            decisione_world = costruisci_decisione_world_model(
+                esito_world_model
+            )
+
+            if decisione_world is not None:
+                logger.info("[AUTONOMIA] Decisione da world model stabile")
+                return decisione_world
+
+        decisione_mirata = costruisci_osservazione_mirata_sicura(
+            mondo,
+            azione_cognitiva=esito_ipotesi.get("azione_temporanea"),
+            motivo=esito_ipotesi.get("motivo"),
+            ipotesi=esito_ipotesi.get("ipotesi"),
+            world_model=esito_world_model,
+            firma=firma
+        )
+
+        if decisione_mirata is not None:
+            logger.info("[AUTONOMIA] Decisione da osservazione mirata")
+            return registra_osservazione_mirata_corrente(
+                stato_runtime,
+                decisione_mirata
+            )
+
         if costruisci_decisione_ipotesi is not None:
             decisione_ipotesi = costruisci_decisione_ipotesi(esito_ipotesi)
 
@@ -346,6 +625,26 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 ragionamento = ragiona_situazione_sconosciuta(
                     mondo_unknown
                 )
+
+                decisione_mirata = None
+                if ragionamento is not None:
+                    decisione_mirata = costruisci_osservazione_mirata_sicura(
+                        mondo,
+                        azione_cognitiva=ragionamento.get("azione_cognitiva"),
+                        motivo=ragionamento.get("ipotesi"),
+                        world_model=esito_world_model,
+                        ragionamento=ragionamento,
+                        firma=firma
+                    )
+
+                if decisione_mirata is not None:
+                    logger.info(
+                        "[AUTONOMIA] Decisione curiosa da osservazione mirata"
+                    )
+                    return registra_osservazione_mirata_corrente(
+                        stato_runtime,
+                        decisione_mirata
+                    )
 
                 if (
                     ragionamento is not None
@@ -793,6 +1092,14 @@ def situazione_merita_generazione(mondo, stato_runtime):
             "ipotesi temporanea ancora debole"
         )
 
+    esito_world_model = stato_runtime.get("world_model", {})
+    if (
+        isinstance(esito_world_model, dict)
+        and esito_world_model.get("familiare")
+        and not esito_world_model.get("anomalia")
+    ):
+        return False, "situazione gia' familiare nel world model"
+
     if (
         tipo in ["unknown", "sconosciuto", "scoperta"]
         or categoria in ["unknown", "sconosciuta", "scoperta"]
@@ -1233,8 +1540,22 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
         logger.info("[AUTONOMIA] Provo generazione autonoma. Motivo: {}".format(motivo))
 
         if hasattr(condition_generator, "genera_condizione_autonoma"):
-            dati_memoria = stato_runtime.get("memoria", {})
+            dati_memoria_runtime = stato_runtime.get("memoria", {})
+            if not isinstance(dati_memoria_runtime, dict):
+                dati_memoria_runtime = {}
+
+            dati_memoria = dict(dati_memoria_runtime)
+            if stato_runtime.get("world_model"):
+                dati_memoria["world_model"] = stato_runtime.get("world_model")
             stato_robot = stato_runtime.get("stato_robot", {})
+            storia_episodica = stato_runtime.get("ipotesi_temporanea")
+
+            if isinstance(storia_episodica, dict):
+                storia_episodica = dict(storia_episodica)
+                storia_episodica["motivo_cognitivo_generazione"] = motivo
+            else:
+                storia_episodica = None
+
             chiave_privata = (
                 stato_runtime.get("openai_api_key")
                 or os.environ.get("OPENAI_API_KEY")
@@ -1244,7 +1565,8 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 mondo,
                 dati_memoria,
                 stato_robot,
-                chiave_privata
+                chiave_privata,
+                storia_episodica=storia_episodica
             )
 
             if path_nuova_condizione:

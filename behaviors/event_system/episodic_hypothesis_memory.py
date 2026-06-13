@@ -35,7 +35,11 @@ def _token_contesto(testo):
     parole_vuote = [
         "report", "vedo", "sento", "rilevo", "una", "uno", "un",
         "la", "il", "lo", "le", "gli", "nel", "nella", "sul",
-        "sulla", "con", "che", "qui", "sono", "sto", "ancora"
+        "sulla", "con", "che", "qui", "sono", "sto", "ancora",
+        "stesso", "stessa", "senza", "testo", "leggibile",
+        "visibile", "spento", "spenta", "acceso", "accesa",
+        "contenuto", "informazione", "errore", "fermo",
+        "camminando"
     ]
 
     token = []
@@ -172,7 +176,7 @@ def _pulisci_scadute(adesso):
             del MEMORIA_IPOTESI[chiave]
 
 
-def _registra_smentite(ipotesi_corrente, adesso):
+def _registra_smentite(ipotesi_corrente, adesso, mondo):
     nome = ipotesi_corrente.get("ipotesi")
 
     opposti = {
@@ -189,10 +193,18 @@ def _registra_smentite(ipotesi_corrente, adesso):
         if nome_record == nome:
             continue
 
+        if record.get("risolta_da_osservazione_mirata"):
+            continue
+
         if nome in opposti.get(nome_record, []):
             record["smentite"] = int(record.get("smentite", 0)) + 1
             record["fiducia"] = max(0.0, float(record.get("fiducia", 0.0)) - 0.30)
             record["ultima_osservazione"] = adesso
+
+            esempi_smentite = record.get("esempi_smentite", [])
+            if mondo and mondo not in esempi_smentite:
+                esempi_smentite.append(mondo)
+            record["esempi_smentite"] = esempi_smentite[-3:]
 
 
 def valuta_ipotesi_temporanee(mondo, firma, stato_runtime=None):
@@ -219,7 +231,7 @@ def valuta_ipotesi_temporanee(mondo, firma, stato_runtime=None):
             "motivo": "nessuna ipotesi temporanea utile"
         }
 
-    _registra_smentite(ipotesi, adesso)
+    _registra_smentite(ipotesi, adesso, mondo)
 
     chiave = _chiave_ipotesi(mondo, ipotesi)
     record = MEMORIA_IPOTESI.get(chiave)
@@ -238,7 +250,8 @@ def valuta_ipotesi_temporanee(mondo, firma, stato_runtime=None):
             "diventa_condizione_se": {
                 "conferme_minime": ipotesi.get("conferme_minime", 2)
             },
-            "esempi": []
+            "esempi": [],
+            "esempi_smentite": []
         }
 
     record["conferme"] = int(record.get("conferme", 0)) + 1
@@ -345,6 +358,146 @@ def costruisci_decisione_ipotesi(esito):
             }
         ]
     }
+
+
+def _firma_esito_osservazione(esito):
+    return "{}::{}::{}".format(
+        esito.get("aggiornata_il", ""),
+        esito.get("target", ""),
+        esito.get("tentativo", "")
+    )
+
+
+def _trova_record_runtime(stato_runtime):
+    if not isinstance(stato_runtime, dict):
+        return None, None
+
+    ipotesi_runtime = stato_runtime.get("ipotesi_temporanea", {})
+    if not isinstance(ipotesi_runtime, dict):
+        return None, None
+
+    for chiave, record in MEMORIA_IPOTESI.items():
+        if record is ipotesi_runtime:
+            return chiave, record
+
+    nome = ipotesi_runtime.get("ipotesi")
+    prima = ipotesi_runtime.get("prima_osservazione")
+
+    for chiave, record in MEMORIA_IPOTESI.items():
+        if (
+            record.get("ipotesi") == nome
+            and record.get("prima_osservazione") == prima
+        ):
+            return chiave, record
+
+    return None, ipotesi_runtime
+
+
+def aggiorna_ipotesi_da_osservazione_mirata(esito, stato_runtime=None):
+    """
+    Usa l'esito di una osservazione mirata per confermare o indebolire
+    l'ipotesi temporanea corrente.
+
+    - segnali trovati: aumenta fiducia e conferme;
+    - niente segnali dopo piu' tentativi: registra smentita e abbassa fiducia.
+    """
+
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    if not isinstance(esito, dict):
+        return None
+
+    if esito.get("tipo") != "esito_osservazione_mirata":
+        return None
+
+    applicati = stato_runtime.get("_esiti_osservazione_mirata_applicati", [])
+    if not isinstance(applicati, list):
+        applicati = []
+
+    firma_esito = _firma_esito_osservazione(esito)
+    if firma_esito in applicati:
+        return stato_runtime.get("ipotesi_temporanea")
+
+    chiave, record = _trova_record_runtime(stato_runtime)
+    if not isinstance(record, dict):
+        return None
+
+    adesso = time.time()
+    record["ultima_osservazione"] = adesso
+
+    trovato = bool(esito.get("trovato"))
+    tentativo = int(esito.get("tentativo", 1))
+    mondo = esito.get("mondo", "")
+    segnali_trovati = esito.get("segnali_trovati", [])
+    segnali_mancanti = esito.get("segnali_mancanti", [])
+
+    if not isinstance(segnali_trovati, list):
+        segnali_trovati = []
+
+    if not isinstance(segnali_mancanti, list):
+        segnali_mancanti = []
+
+    if trovato:
+        incremento = 0.18
+        if esito.get("cambiamento_confermato"):
+            incremento = 0.25
+
+        record["conferme"] = int(record.get("conferme", 0)) + 1
+        record["fiducia"] = min(
+            1.0,
+            float(record.get("fiducia", 0.0)) + incremento
+        )
+
+        esempi = record.get("esempi", [])
+        if mondo and mondo not in esempi:
+            esempi.append(mondo)
+        record["esempi"] = esempi[-3:]
+        record["risolta_da_osservazione_mirata"] = True
+        record["ultimo_esito_osservazione"] = "confermata"
+
+    elif tentativo >= 2:
+        decremento = 0.30
+        if tentativo >= 3:
+            decremento = 0.45
+
+        record["smentite"] = int(record.get("smentite", 0)) + 1
+        record["fiducia"] = max(
+            0.0,
+            float(record.get("fiducia", 0.0)) - decremento
+        )
+
+        esempi_smentite = record.get("esempi_smentite", [])
+        if mondo and mondo not in esempi_smentite:
+            esempi_smentite.append(mondo)
+        record["esempi_smentite"] = esempi_smentite[-3:]
+        record["ultimo_esito_osservazione"] = "smentita"
+
+    tracce = record.get("osservazioni_mirate", [])
+    if not isinstance(tracce, list):
+        tracce = []
+
+    tracce.append({
+        "tempo": esito.get("aggiornata_il", ""),
+        "target": esito.get("target", ""),
+        "trovato": trovato,
+        "tentativo": tentativo,
+        "segnali_trovati": segnali_trovati,
+        "segnali_mancanti": segnali_mancanti,
+        "stato": esito.get("stato", "")
+    })
+    record["osservazioni_mirate"] = tracce[-5:]
+
+    if chiave:
+        MEMORIA_IPOTESI[chiave] = record
+
+    stato_runtime["ipotesi_temporanea"] = record
+    stato_runtime.pop("_esito_ipotesi_temporanea", None)
+
+    applicati.append(firma_esito)
+    stato_runtime["_esiti_osservazione_mirata_applicati"] = applicati[-10:]
+
+    return record
 
 
 def snapshot_ipotesi():

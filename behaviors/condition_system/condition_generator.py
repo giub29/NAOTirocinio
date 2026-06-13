@@ -56,6 +56,13 @@ try:
 except Exception:
     arricchisci_eventi_registro = None
 
+try:
+    from behaviors.event_system.world_model_memory import (
+        recupera_credenze_rilevanti
+    )
+except Exception:
+    recupera_credenze_rilevanti = None
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
@@ -1240,7 +1247,13 @@ def _promuovi_in_generated(path_file):
     return path_finale
 
 
-def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None):
+def _costruisci_prompt(
+    mondo,
+    dati_memoria,
+    stato_robot,
+    eventi_sconosciuti=None,
+    storia_episodica=None
+):
 
     sezione_sconosciuti = u""
     if eventi_sconosciuti:
@@ -1268,6 +1281,20 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
         )
     except Exception:
         condizioni_simili = []
+
+    try:
+        if recupera_credenze_rilevanti is not None:
+            credenze_world_model = recupera_credenze_rilevanti(
+                mondo,
+                {
+                    "eventi_attivi": eventi_sconosciuti or {}
+                },
+                limite=5
+            )
+        else:
+            credenze_world_model = []
+    except Exception:
+        credenze_world_model = []
 
     return (
         u"Sei un generatore di codice Python per un robot NAO.\n"
@@ -1346,6 +1373,22 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
         + json.dumps(condizioni_simili, ensure_ascii=False)
         + u"\n\n"
 
+        u"CREDENZE RILEVANTI DEL WORLD MODEL:\n"
+        u"- Usa queste credenze per capire se l'entita' osservata ha uno stato abituale noto.\n"
+        u"- Se stato_corrente differisce da stato_normale ed e' marcato come anomalia, genera un comportamento prudente o attento.\n"
+        u"- Se l'anomalia riguarda informazione_rilevante, usa stato_interno 'attento', occhi blue/yellow, guarda il contenuto e memorizza/considera l'informazione. Non usare curiosita' generica.\n"
+        u"- Se l'anomalia riguarda accesso non_disponibile rispetto a uno stato normale disponibile, usa prudenza, occhi red/yellow e non proporre esplorazione immediata.\n"
+        u"- Se la credenza e' familiare e non anomala, evita di trattarla come novita'.\n"
+        u"- Non inventare entita' o stati non presenti in MONDO o nel world model.\n"
+        + json.dumps(credenze_world_model, ensure_ascii=False)
+        + u"\n\n"
+
+        u"STORIA EPISODICA CHE HA PORTATO ALLA GENERAZIONE:\n"
+        u"- Se presente, questa e' l'evidenza accumulata prima di rendere stabile la condizione.\n"
+        u"- Usa conferme, smentite ed esempi per generare una condizione stretta e generalizzabile.\n"
+        + json.dumps(storia_episodica or {}, ensure_ascii=False)
+        + u"\n\n"
+
         u"REGOLE PER COMPORTAMENTO AUTONOMO:\n"
         u"- Il comportamento NON deve essere solo verbale, salvo casi banali.\n"
         u"- Combina almeno 2 azioni quando possibile: occhi + guarda + parla, oppure fermati + guarda + parla.\n"
@@ -1395,8 +1438,21 @@ def _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti=None
     )
 
 
-def _chiama_llm_codice(mondo, dati_memoria, stato_robot, chiave_privata, eventi_sconosciuti=None):
-    prompt = _costruisci_prompt(mondo, dati_memoria, stato_robot, eventi_sconosciuti)
+def _chiama_llm_codice(
+    mondo,
+    dati_memoria,
+    stato_robot,
+    chiave_privata,
+    eventi_sconosciuti=None,
+    storia_episodica=None
+):
+    prompt = _costruisci_prompt(
+        mondo,
+        dati_memoria,
+        stato_robot,
+        eventi_sconosciuti,
+        storia_episodica=storia_episodica
+    )
 
     payload = {
         "model": "gpt-4o-mini",
@@ -1918,7 +1974,13 @@ def _pulisci_mondo_per_unknown(mondo):
     return testo
 
 
-def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata):
+def genera_condizione_autonoma(
+    mondo,
+    dati_memoria,
+    stato_robot,
+    chiave_privata,
+    storia_episodica=None
+):
     _assicura_cartelle()
 
     if not chiave_privata:
@@ -1952,7 +2014,8 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
             dati_memoria,
             stato_robot,
             chiave_privata,
-            eventi_sconosciuti=eventi_sconosciuti
+            eventi_sconosciuti=eventi_sconosciuti,
+            storia_episodica=storia_episodica
         )
 
         codice = _estrai_codice_python(risposta)
@@ -1991,7 +2054,8 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
                         dati_memoria,
                         stato_robot,
                         chiave_privata,
-                        eventi_sconosciuti=eventi_sconosciuti
+                        eventi_sconosciuti=eventi_sconosciuti,
+                        storia_episodica=storia_episodica
                     )
 
                     codice = _estrai_codice_python(risposta)
@@ -2081,7 +2145,11 @@ def genera_condizione_autonoma(mondo, dati_memoria, stato_robot, chiave_privata)
                 mondo,
                 eventi_origine,
                 stato_robot,
-                origine="autogenerata_llm"
+                origine="autogenerata_llm",
+                storia_episodica=storia_episodica,
+                motivo_cognitivo=(
+                    storia_episodica or {}
+                ).get("motivo_cognitivo_generazione", None)
             )
 
         except Exception as e:

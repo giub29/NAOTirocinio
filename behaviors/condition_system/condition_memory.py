@@ -178,6 +178,18 @@ def _token_da_voce_memoria(voce):
             testi.append(esempio.get("mondo", ""))
             testi.append(esempio.get("motivo", ""))
 
+    storia = voce.get("storia_episodica_origine", {})
+    if isinstance(storia, dict):
+        testi.append(storia.get("ipotesi", ""))
+        testi.append(storia.get("descrizione", ""))
+        testi.append(storia.get("motivo_cognitivo_generazione", ""))
+
+        for esempio in storia.get("esempi_osservati", []):
+            testi.append(str(esempio))
+
+        for esempio in storia.get("esempi_smentite", []):
+            testi.append(str(esempio))
+
     return _tokenizza_testo(u" ".join([t for t in testi if t]))
 
 
@@ -489,6 +501,104 @@ def _crea_metadati_cognitivi(mondo, eventi, eventi_attivi, stato_robot):
     }
 
 
+def _normalizza_storia_episodica(storia, motivo_cognitivo=None):
+    if not isinstance(storia, dict):
+        return None
+
+    esempi = storia.get("esempi", [])
+    if not isinstance(esempi, list):
+        esempi = []
+
+    esempi_smentite = storia.get("esempi_smentite", [])
+    if not isinstance(esempi_smentite, list):
+        esempi_smentite = []
+
+    soglia = storia.get("diventa_condizione_se", {})
+    if not isinstance(soglia, dict):
+        soglia = {}
+
+    return {
+        "ipotesi": storia.get("ipotesi", ""),
+        "descrizione": storia.get("descrizione", ""),
+        "fiducia_finale": storia.get("fiducia", 0.0),
+        "conferme": int(storia.get("conferme", 0)),
+        "smentite": int(storia.get("smentite", 0)),
+        "prima_osservazione": storia.get("prima_osservazione", 0),
+        "ultima_osservazione": storia.get("ultima_osservazione", 0),
+        "azione_temporanea": storia.get("azione_temporanea", ""),
+        "rilevanza": storia.get("rilevanza", ""),
+        "soglia_conferme": int(soglia.get("conferme_minime", 0)),
+        "esempi_osservati": [
+            _testo_breve(esempio, 220)
+            for esempio in esempi[-5:]
+            if esempio
+        ],
+        "esempi_smentite": [
+            _testo_breve(esempio, 220)
+            for esempio in esempi_smentite[-5:]
+            if esempio
+        ],
+        "motivo_cognitivo_generazione": (
+            motivo_cognitivo or
+            storia.get("motivo_cognitivo_generazione", "") or
+            "ipotesi temporanea confermata dall'esperienza"
+        )
+    }
+
+
+def _integra_storia_episodica(metadati, storia_episodica, motivo_cognitivo=None):
+    storia = _normalizza_storia_episodica(
+        storia_episodica,
+        motivo_cognitivo=motivo_cognitivo
+    )
+
+    if not storia:
+        return metadati
+
+    metadati["origine_cognitiva"] = "ipotesi_temporanea_confermata"
+    metadati["storia_episodica_origine"] = storia
+    metadati["motivo_generazione"] = storia.get(
+        "motivo_cognitivo_generazione",
+        metadati.get("motivo_generazione", "")
+    )
+
+    esempi_positivi = metadati.get("esempi_positivi", [])
+    for esempio in storia.get("esempi_osservati", []):
+        esempi_positivi = _aggiungi_esempio_unico(
+            esempi_positivi,
+            {
+                "tempo": _adesso(),
+                "mondo": _testo_breve(esempio),
+                "motivo": storia.get("motivo_cognitivo_generazione", ""),
+                "fonte": "storia_episodica"
+            },
+            limite=8
+        )
+    metadati["esempi_positivi"] = esempi_positivi
+
+    esempi_negativi = metadati.get("esempi_negativi", [])
+    for esempio in storia.get("esempi_smentite", []):
+        esempi_negativi = _aggiungi_esempio_unico(
+            esempi_negativi,
+            {
+                "tempo": _adesso(),
+                "mondo": _testo_breve(esempio),
+                "motivo": "osservazione che ha smentito l'ipotesi",
+                "fonte": "smentita_episodica"
+            },
+            limite=8
+        )
+    metadati["esempi_negativi"] = esempi_negativi
+
+    note = metadati.get("note", [])
+    nota = "Questa condizione nasce da una ipotesi temporanea confermata nel tempo."
+    if nota not in note:
+        note.append(nota)
+    metadati["note"] = note
+
+    return metadati
+
+
 def _assicura_metadati_cognitivi(dati):
     if dati is None:
         return dati
@@ -614,7 +724,15 @@ def _scrivi_json(path_file, dati):
         return False
 
 
-def crea_metadati_base(nome_condizione, mondo, eventi, stato_robot=None, origine="autogenerata"):
+def crea_metadati_base(
+    nome_condizione,
+    mondo,
+    eventi,
+    stato_robot=None,
+    origine="autogenerata",
+    storia_episodica=None,
+    motivo_cognitivo=None
+):
     """
     Crea la struttura standard dei metadati per una condizione autonoma.
     """
@@ -681,11 +799,24 @@ def crea_metadati_base(nome_condizione, mondo, eventi, stato_robot=None, origine
     }
 
     metadati.update(metadati_cognitivi)
+    metadati = _integra_storia_episodica(
+        metadati,
+        storia_episodica,
+        motivo_cognitivo=motivo_cognitivo
+    )
 
     return metadati
 
 
-def salva_metadati_condizione(nome_condizione, mondo, eventi, stato_robot=None, origine="autogenerata"):
+def salva_metadati_condizione(
+    nome_condizione,
+    mondo,
+    eventi,
+    stato_robot=None,
+    origine="autogenerata",
+    storia_episodica=None,
+    motivo_cognitivo=None
+):
     """
     Salva il file .meta.json accanto alla condizione generata.
     """
@@ -702,7 +833,9 @@ def salva_metadati_condizione(nome_condizione, mondo, eventi, stato_robot=None, 
         mondo,
         eventi,
         stato_robot,
-        origine
+        origine,
+        storia_episodica=storia_episodica,
+        motivo_cognitivo=motivo_cognitivo
     )
 
     ok = _scrivi_json(path_file, metadati)
@@ -757,6 +890,9 @@ def memoria_cognitiva_condizioni(limite=8):
         riparazione = dati.get("riparazione", {})
         esempi_positivi = dati.get("esempi_positivi", [])
         esempi_negativi = dati.get("esempi_negativi", [])
+        storia_episodica = dati.get("storia_episodica_origine", {})
+        if not isinstance(storia_episodica, dict):
+            storia_episodica = {}
 
         risultati.append({
             "nome": dati.get("nome", nome_file.replace(".meta.json", "")),
@@ -783,6 +919,17 @@ def memoria_cognitiva_condizioni(limite=8):
             ),
             "numero_esempi_positivi": len(esempi_positivi),
             "numero_esempi_negativi": len(esempi_negativi),
+            "origine_cognitiva": dati.get("origine_cognitiva", ""),
+            "storia_episodica_origine": {
+                "ipotesi": storia_episodica.get("ipotesi", ""),
+                "fiducia_finale": storia_episodica.get("fiducia_finale", 0.0),
+                "conferme": storia_episodica.get("conferme", 0),
+                "smentite": storia_episodica.get("smentite", 0),
+                "motivo_cognitivo_generazione": _testo_breve(
+                    storia_episodica.get("motivo_cognitivo_generazione", ""),
+                    160
+                )
+            },
             "esempi_positivi": _riassumi_esempi(
                 esempi_positivi,
                 limite=2
