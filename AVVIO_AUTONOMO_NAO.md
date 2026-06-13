@@ -134,6 +134,15 @@ Dopo troppi riavvii consecutivi il watchdog si ferma, per evitare loop incontrol
 - `ABILITA_VOCE_COMANDI=1`: abilita i comandi vocali semplici `vai`, `cammina`, `fermati`, `stop`, `stato`.
 - `OPENAI_API_KEY`: abilita decisioni LLM e generazione/riparazione condizioni.
 
+## File di stato runtime
+
+Durante l'esecuzione il sistema crea e mantiene:
+
+- `runtime/heartbeat.txt`: aggiornato dal process `soul.py` per indicare che il sistema e' attivo.
+- `runtime/soul_onboard.log`: log stdout/stderr del processo principale.
+- `behaviors/event_system/world_model_memory.json`: modello persistente del mondo con credenze sullo stato di oggetti e ambienti.
+- `runtime/evidence/`: cartella con evidenze e ipotesi temporanee relative ad anomalie rilevate e osservazioni mirate.
+
 ## Comandi da Choregraphe
 
 `soul.py` legge `AutonomousSystem/Command` da `ALMemory`.

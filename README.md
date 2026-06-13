@@ -28,6 +28,9 @@ Funzioni principali:
 - gestione di ostacoli, urti e pericolo caduta;
 - costruzione di eventi strutturati come `ostacolo_destra`, `carezza_testa`, `volto_ignoto`, `camminando`;
 - estrazione prudente di eventi sconosciuti dal testo sensoriale, con memoria di ricorrenza prima della generazione;
+- modello persistente del mondo che trasforma osservazioni ripetute in credenze stabili su oggetti e ambienti;
+- rilevamento autonomo di anomalie rispetto ai modelli di comportamento atteso;
+- percezione mirata (active perception) per confermare o smentire ipotesi di variazione nel mondo;
 - generazione autonoma di condizioni Python gestita da `behaviors/condition_system`;
 - quarantena, validazione, rifiuto e riparazione delle condizioni generate;
 - memoria persistente in `data/memoria.json`;
@@ -77,10 +80,13 @@ NAOTirocinio/
 |   |   |-- condition_metadata/     # metadati delle condizioni, creati a runtime
 |   |   `-- rejected_metadata/      # metadati delle condizioni rifiutate
 |   |
-|   `-- event_system/
+|   |-- event_system/
 |       |-- event_registry.py               # registro eventi noti/scoperti
 |       |-- event_novelty_memory.py         # memoria ricorrenza eventi sconosciuti
 |       |-- event_novelty_memory.json       # stato persistente delle novita osservate
+|       |-- world_model_memory.py           # modello persistente del mondo, credenze stabili
+|       |-- world_model_memory.json         # stato persistente del world model
+|       |-- active_perception_planner.py    # pianificazione percezione mirata
 |       |-- unknown_condition_validator.py  # validazione trigger sconosciuti
 |       |-- unknown_event_extractor.py      # estrazione eventi candidati
 |       `-- unknown_generation_simulator.py # simulazione prima della generazione reale
