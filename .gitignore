@@ -1,5 +1,6 @@
 .venv/
 foto/
+.idea/
 
 # runtime watchdog
 runtime/
@@ -8,6 +9,8 @@ __pycache__/
 
 # memoria runtime del world model
 behaviors/event_system/world_model_memory.json
+behaviors/event_system/event_novelty_memory.json
+data/memoria.json
 
 # comportamenti generati runtime
 NAOTirocinio/behaviors/generated/*

@@ -82,8 +82,6 @@ NAOTirocinio/
 |   |
 |   |-- event_system/
 |       |-- event_registry.py               # registro eventi noti/scoperti
-|       |-- event_novelty_memory.py         # memoria ricorrenza eventi sconosciuti
-|       |-- event_novelty_memory.json       # stato persistente delle novita osservate
 |       |-- world_model_memory.py           # modello persistente del mondo, credenze stabili
 |       |-- world_model_memory.json         # stato persistente del world model
 |       |-- active_perception_planner.py    # pianificazione percezione mirata
@@ -144,7 +142,7 @@ E' il punto di ingresso dell'autonomia appresa. Riceve `mondo` e `stato_runtime`
 
 Usa cooldown e memoria dell'ultimo mondo generato per evitare duplicati e chiamate LLM troppo ravvicinate.
 
-Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `event_system/unknown_event_extractor.py`. La prima osservazione resta solo in memoria; l'evento diventa candidato alla generazione solo quando supera la soglia di ricorrenza registrata in `event_system/event_novelty_memory.json`.
+Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `event_system/unknown_event_extractor.py`. Le osservazioni vengono poi valutate tramite ipotesi temporanee, world model e memoria delle condizioni, evitando di generare codice su ogni singola novita.
 
 ### Eventi sconosciuti e novita
 
@@ -156,9 +154,7 @@ Il filtro e' volutamente conservativo:
 - non ricrea eventi gia' noti come `carezza_testa`, `volto_ignoto` o `ostacolo_destra`;
 - scarta descrizioni troppo neutre se isolate, ad esempio solo `tavolo` o `sedia`;
 - privilegia parole interessanti come `porta`, `bottiglia`, `telefono`, `fumo`, `acqua`, `grido`;
-- mantiene al massimo tre esempi recenti per ogni novita.
-
-`event_system/event_novelty_memory.py` registra quante volte un evento sconosciuto e' stato visto. Con la soglia attuale (`SOGLIA_OCCORRENZE_GENERAZIONE = 2`), una novita osservata una sola volta viene ricordata ma non genera condizioni; dalla seconda osservazione puo' diventare generabile, se non e' gia' stata marcata come generata.
+- usa memoria episodica temporanea, world model e metadati delle condizioni per evitare duplicati e distinguere novita ricorrenti da osservazioni deboli.
 
 Prima della generazione reale, `event_system/unknown_generation_simulator.py` costruisce una condizione minima simulata e la passa a `event_system/unknown_condition_validator.py`. Solo eventi abbastanza specifici, come `porta_aperta_laboratorio`, vengono ammessi alla fase successiva; eventi generici come `porta` o `rumore` vengono tenuti fuori.
 
@@ -386,6 +382,6 @@ Per debug piu dettagliato:
 
 ## Stato del progetto
 
-Versione documentata: sistema con supervisore autonomo, registro eventi, simulazione degli eventi sconosciuti, memoria delle novita sensoriali, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
+Versione documentata: sistema con supervisore autonomo, registro eventi, simulazione degli eventi sconosciuti, memoria episodica temporanea, world model, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
 
 Ultimo aggiornamento README: 2026-05-22.

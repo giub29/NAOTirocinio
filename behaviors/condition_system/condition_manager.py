@@ -1009,6 +1009,16 @@ def valuta_condizioni_generate(mondo, stato_runtime):
                 _ultima_attivazione_condizione[nome] = adesso
                 _ultima_firma_condizione[nome] = firma_corrente
                 try:
+                    stato_runtime["ultima_condizione_attiva"] = nome.replace(
+                        ".py",
+                        ""
+                    )
+                    stato_runtime["ultima_condizione_attiva_mondo"] = mondo
+                    stato_runtime["ultima_condizione_attiva_tempo"] = adesso
+                except Exception:
+                    pass
+
+                try:
                     registra_attivazione(
                         nome.replace(".py", ""),
                         mondo,

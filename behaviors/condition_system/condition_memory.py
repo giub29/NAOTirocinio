@@ -1062,6 +1062,67 @@ def trova_condizioni_simili(mondo, eventi=None, limite=5):
     return candidati[:limite]
 
 
+def _condizione_memoria_eseguibile(voce):
+    nome = voce.get("nome", "")
+
+    if not nome:
+        return False
+
+    if nome.endswith(".py"):
+        nome = nome[:-3]
+
+    return os.path.exists(
+        os.path.join(GENERATED_DIR, nome + ".py")
+    )
+
+
+def _nomi_condizioni_da_feedback(esito, stato_runtime=None, limite=3):
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    nomi = []
+
+    for chiave in [
+        "ultima_condizione_attiva",
+        "condizione_attiva",
+        "condizione_corrente"
+    ]:
+        valore = stato_runtime.get(chiave)
+        if isinstance(valore, basestring) and valore not in nomi:
+            nomi.append(valore)
+
+    if nomi:
+        return nomi[:limite]
+
+    mondo = esito.get("mondo", "")
+    eventi = {}
+
+    for evento in esito.get("eventi_attivi", []):
+        eventi[evento] = True
+
+    try:
+        simili = trova_condizioni_simili(
+            mondo,
+            eventi,
+            limite=limite
+        )
+    except Exception:
+        simili = []
+
+    for voce in simili:
+        if not _condizione_memoria_eseguibile(voce):
+            continue
+
+        if int(voce.get("punteggio_similarita", 0)) < 8:
+            continue
+
+        nome = voce.get("nome")
+        if nome and nome not in nomi:
+            nomi.append(nome)
+
+    return nomi[:limite]
+
+
 def aggiorna_metadati_condizione(nome_condizione, aggiornamenti):
     """
     Aggiorna parzialmente i metadati di una condizione.
@@ -1166,6 +1227,129 @@ def registra_attivazione(nome_condizione, mondo=None, decisione=None):
     )
 
     return _scrivi_json(path_file, dati)
+
+
+def registra_feedback_osservazione_mirata(
+    esito,
+    stato_runtime=None,
+    limite_condizioni=3
+):
+    """
+    Collega l'esito dell'active perception alla memoria delle condizioni.
+
+    Non modifica il codice Python generato: aggiorna solo i .meta.json.
+    """
+
+    if stato_runtime is None:
+        stato_runtime = {}
+
+    if not isinstance(esito, dict):
+        return []
+
+    if esito.get("tipo") != "esito_osservazione_mirata":
+        return []
+
+    trovato = bool(esito.get("trovato"))
+    tentativo = int(esito.get("tentativo", 1))
+
+    if not trovato and tentativo < 2:
+        return []
+
+    nomi = _nomi_condizioni_da_feedback(
+        esito,
+        stato_runtime=stato_runtime,
+        limite=limite_condizioni
+    )
+
+    aggiornate = []
+
+    for nome_condizione in nomi:
+        if nome_condizione.endswith(".py"):
+            nome_condizione = nome_condizione[:-3]
+
+        path_file = _meta_path(nome_condizione)
+        dati = _leggi_json(path_file)
+
+        if not isinstance(dati, dict):
+            continue
+
+        dati = _assicura_metadati_cognitivi(dati)
+
+        feedback = dati.get("feedback_osservazione_mirata", [])
+        if not isinstance(feedback, list):
+            feedback = []
+
+        voce_feedback = {
+            "tempo": _adesso(),
+            "target": esito.get("target", ""),
+            "trovato": trovato,
+            "tentativo": tentativo,
+            "stato": esito.get("stato", ""),
+            "segnali_trovati": esito.get("segnali_trovati", []),
+            "segnali_mancanti": esito.get("segnali_mancanti", [])
+        }
+
+        feedback.append(voce_feedback)
+        dati["feedback_osservazione_mirata"] = feedback[-8:]
+
+        mondo = _testo_breve(esito.get("mondo", ""))
+
+        if trovato:
+            esempi = dati.get("esempi_positivi", [])
+            if not isinstance(esempi, list):
+                esempi = []
+
+            esempi = _aggiungi_esempio_unico(
+                esempi,
+                {
+                    "tempo": _adesso(),
+                    "mondo": mondo,
+                    "motivo": (
+                        "osservazione mirata confermata: {}"
+                        .format(", ".join(esito.get("segnali_trovati", [])))
+                    ),
+                    "fonte": "osservazione_mirata_confermata",
+                    "target": esito.get("target", ""),
+                    "segnali_trovati": esito.get("segnali_trovati", [])
+                },
+                limite=8
+            )
+            dati["esempi_positivi"] = esempi
+            dati["conferme_osservazione_mirata"] = int(
+                dati.get("conferme_osservazione_mirata", 0)
+            ) + 1
+
+        else:
+            esempi = dati.get("esempi_negativi", [])
+            if not isinstance(esempi, list):
+                esempi = []
+
+            esempi = _aggiungi_esempio_unico(
+                esempi,
+                {
+                    "tempo": _adesso(),
+                    "mondo": mondo,
+                    "motivo": (
+                        "osservazione mirata non confermata dopo {} tentativi"
+                        .format(tentativo)
+                    ),
+                    "fonte": "osservazione_mirata_smentita",
+                    "target": esito.get("target", ""),
+                    "segnali_mancanti": esito.get("segnali_mancanti", [])
+                },
+                limite=8
+            )
+            dati["esempi_negativi"] = esempi
+            dati["smentite_osservazione_mirata"] = int(
+                dati.get("smentite_osservazione_mirata", 0)
+            ) + 1
+
+        dati["aggiornata_il"] = _adesso()
+
+        if _scrivi_json(path_file, dati):
+            aggiornate.append(nome_condizione)
+
+    return aggiornate
 
 
 def registra_errore_condizione(nome_condizione, errore):

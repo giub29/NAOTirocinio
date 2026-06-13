@@ -48,9 +48,13 @@ except Exception:
     esegui_ciclo_agentico = None
 
 try:
-    from behaviors.condition_system.condition_memory import trova_condizioni_simili
+    from behaviors.condition_system.condition_memory import (
+        trova_condizioni_simili,
+        registra_feedback_osservazione_mirata
+    )
 except Exception:
     trova_condizioni_simili = None
+    registra_feedback_osservazione_mirata = None
 
 try:
     from behaviors.event_system.episodic_hypothesis_memory import (
@@ -77,11 +81,32 @@ except Exception:
 try:
     from behaviors.event_system.active_perception_planner import (
         costruisci_decisione_osservazione_mirata,
-        valuta_risposta_osservazione_mirata
+        valuta_risposta_osservazione_mirata,
+        registra_osservazione_mirata_corrente
     )
 except Exception:
     costruisci_decisione_osservazione_mirata = None
     valuta_risposta_osservazione_mirata = None
+    registra_osservazione_mirata_corrente = (
+        lambda stato_runtime, decisione: decisione
+    )
+
+try:
+    from behaviors.agentic_system.goal_intent_memory import (
+        valuta_goal_intent,
+        costruisci_decisione_goal_intent,
+        registra_revisione_piano_corrente,
+        costruisci_decisione_azione_successiva,
+        aggiorna_azione_successiva_da_osservazione
+    )
+except Exception:
+    valuta_goal_intent = None
+    costruisci_decisione_goal_intent = None
+    registra_revisione_piano_corrente = (
+        lambda stato_runtime, decisione: decisione
+    )
+    costruisci_decisione_azione_successiva = None
+    aggiorna_azione_successiva_da_osservazione = None
 
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
@@ -165,52 +190,6 @@ def costruisci_osservazione_mirata_sicura(
         return None
 
 
-def registra_osservazione_mirata_corrente(stato_runtime, decisione):
-    if stato_runtime is None or not isinstance(decisione, dict):
-        return decisione
-
-    piano = None
-    memoria = decisione.get("memoria", [])
-
-    if isinstance(memoria, list):
-        for voce in memoria:
-            if isinstance(voce, dict) and voce.get("tipo") == "osservazione_mirata":
-                piano = dict(voce)
-                break
-
-    if piano is None:
-        return decisione
-
-    piano_precedente = stato_runtime.get("osservazione_mirata_corrente", {})
-    if not isinstance(piano_precedente, dict):
-        piano_precedente = {}
-
-    stesso_target = (
-        piano_precedente.get("target")
-        and piano_precedente.get("target") == piano.get("target")
-    )
-
-    piano["attiva_il"] = piano_precedente.get(
-        "attiva_il",
-        time.strftime("%Y-%m-%d %H:%M:%S")
-    )
-    piano["tentativi"] = (
-        int(piano_precedente.get("tentativi", 0))
-        if stesso_target else 0
-    )
-    piano["stato"] = "attiva"
-    stato_runtime["osservazione_mirata_corrente"] = piano
-
-    storia = stato_runtime.get("osservazioni_mirate_recenti", [])
-    if not isinstance(storia, list):
-        storia = []
-
-    storia.append(piano)
-    stato_runtime["osservazioni_mirate_recenti"] = storia[-5:]
-
-    return decisione
-
-
 def valuta_osservazione_mirata_corrente_sicura(
     mondo,
     firma,
@@ -256,6 +235,18 @@ def valuta_osservazione_mirata_corrente_sicura(
         esito,
         stato_runtime
     )
+    aggiorna_azione_successiva_sicura(
+        esito,
+        stato_runtime
+    )
+    condizioni_aggiornate = registra_feedback_condizioni_sicuro(
+        esito,
+        stato_runtime
+    )
+    if condizioni_aggiornate:
+        stato_runtime["condizioni_feedback_osservazione_mirata"] = (
+            condizioni_aggiornate
+        )
 
     storia = stato_runtime.get("esiti_osservazioni_mirate", [])
     if not isinstance(storia, list):
@@ -307,6 +298,94 @@ def aggiorna_world_model_da_osservazione_mirata_sicura(esito, stato_runtime):
             "[AUTONOMIA] Errore aggiornando world model da osservazione: {}".format(e)
         )
         return None
+
+
+def aggiorna_azione_successiva_sicura(esito, stato_runtime):
+    if aggiorna_azione_successiva_da_osservazione is None:
+        return None
+
+    try:
+        return aggiorna_azione_successiva_da_osservazione(
+            esito,
+            stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore aggiornando azione successiva: {}".format(e)
+        )
+        return None
+
+
+def registra_feedback_condizioni_sicuro(esito, stato_runtime):
+    if registra_feedback_osservazione_mirata is None:
+        return []
+
+    try:
+        return registra_feedback_osservazione_mirata(
+            esito,
+            stato_runtime=stato_runtime
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore aggiornando memoria condizioni da osservazione: {}".format(e)
+        )
+        return []
+
+
+def valuta_goal_intent_sicuro(mondo, firma, stato_runtime, world_model=None):
+    if valuta_goal_intent is None:
+        return {
+            "goal_attivo": False,
+            "motivo": "goal intent memory non disponibile"
+        }
+
+    try:
+        esito = valuta_goal_intent(
+            mondo,
+            firma=firma,
+            stato_runtime=stato_runtime,
+            world_model=world_model
+        )
+
+        if isinstance(esito, dict):
+            stato_runtime["goal_intent"] = esito
+
+        return esito
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore goal/intent reasoning: {}".format(e)
+        )
+        return {
+            "goal_attivo": False,
+            "motivo": "errore goal intent"
+        }
+
+
+def costruisci_decisione_goal_sicura(esito_goal):
+    if costruisci_decisione_goal_intent is None:
+        return None
+
+    try:
+        return costruisci_decisione_goal_intent(esito_goal)
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore decisione goal/intent: {}".format(e)
+        )
+        return None
+
+
+def costruisci_decisione_azione_successiva_sicura(stato_runtime):
+    if costruisci_decisione_azione_successiva is None:
+        return None
+
+    try:
+        return costruisci_decisione_azione_successiva(stato_runtime)
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore costruendo azione successiva: {}".format(e)
+        )
+        return None
+
 
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
@@ -403,6 +482,38 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     except Exception as e:
         logger.warning(
             "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
+        )
+
+    decisione_azione_successiva = (
+        costruisci_decisione_azione_successiva_sicura(
+            stato_runtime
+        )
+    )
+
+    if decisione_azione_successiva is not None:
+        logger.info("[AUTONOMIA] Decisione da azione successiva suggerita")
+        return registra_osservazione_mirata_corrente(
+            stato_runtime,
+            decisione_azione_successiva
+        )
+
+    esito_goal = valuta_goal_intent_sicuro(
+        mondo,
+        firma,
+        stato_runtime,
+        world_model=esito_world_model
+    )
+    decisione_goal = costruisci_decisione_goal_sicura(esito_goal)
+
+    if decisione_goal is not None:
+        logger.info("[AUTONOMIA] Decisione da goal/intent reasoning")
+        registra_revisione_piano_corrente(
+            stato_runtime,
+            decisione_goal
+        )
+        return registra_osservazione_mirata_corrente(
+            stato_runtime,
+            decisione_goal
         )
 
     if stato_runtime.get("forza_generazione_safety", False):

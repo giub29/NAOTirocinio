@@ -60,6 +60,59 @@ def _testo_breve(testo, limite=180):
     return testo[:limite].rstrip() + "..."
 
 
+def registra_osservazione_mirata_corrente(stato_runtime, decisione):
+    """
+    Salva nel runtime il piano di osservazione mirata prodotto da una decisione.
+    """
+
+    if stato_runtime is None or not isinstance(decisione, dict):
+        return decisione
+
+    piano = None
+    memoria = decisione.get("memoria", [])
+
+    if isinstance(memoria, list):
+        for voce in memoria:
+            if (
+                isinstance(voce, dict)
+                and voce.get("tipo") == "osservazione_mirata"
+            ):
+                piano = dict(voce)
+                break
+
+    if piano is None:
+        return decisione
+
+    piano_precedente = stato_runtime.get("osservazione_mirata_corrente", {})
+    if not isinstance(piano_precedente, dict):
+        piano_precedente = {}
+
+    stesso_target = (
+        piano_precedente.get("target")
+        and piano_precedente.get("target") == piano.get("target")
+    )
+
+    piano["attiva_il"] = piano_precedente.get(
+        "attiva_il",
+        _adesso()
+    )
+    piano["tentativi"] = (
+        int(piano_precedente.get("tentativi", 0))
+        if stesso_target else 0
+    )
+    piano["stato"] = "attiva"
+    stato_runtime["osservazione_mirata_corrente"] = piano
+
+    storia = stato_runtime.get("osservazioni_mirate_recenti", [])
+    if not isinstance(storia, list):
+        storia = []
+
+    storia.append(piano)
+    stato_runtime["osservazioni_mirate_recenti"] = storia[-5:]
+
+    return decisione
+
+
 def _credenza_da_world_model(world_model):
     if not isinstance(world_model, dict):
         return {}
