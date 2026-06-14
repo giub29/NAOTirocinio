@@ -1,6 +1,50 @@
 # NAOTirocinio
 
-Sistema autonomo per robot NAO, pensato per esplorazione di laboratorio, interazione sociale, riconoscimento volti, gestione della sicurezza e apprendimento progressivo di nuove condizioni comportamentali tramite LLM.
+Architettura cognitiva autonoma per il robot umanoide NAO, basata su percezione semantica, ragionamento agentico, memoria e generazione dinamica di comportamenti.
+
+## Obiettivo del progetto
+
+Il progetto mira a rendere il robot umanoide **NAO** piu' autonomo e adattivo in scenari di laboratorio, permettendogli di:
+
+- interpretare semanticamente l'ambiente;
+- ragionare su situazioni note e sconosciute;
+- apprendere nuove condizioni comportamentali;
+- adattare il comportamento agli obiettivi correnti;
+- mantenere memoria di eventi, ipotesi e stati del mondo.
+
+## Funzionalita principali
+
+- Percezione semantica dell'ambiente
+- Goal/intent reasoning e subgoal planning
+- Active perception
+- World model persistente
+- Generazione autonoma di condizioni Python tramite LLM
+- Validazione, quarantena e riparazione automatica delle condizioni
+- Navigazione autonoma e gestione safety
+- Bootstrap autonomo e watchdog di esecuzione
+
+## Tecnologie utilizzate
+
+- **Python**
+- **NAOqi SDK**
+- **OpenAI API**
+- **Git/GitHub**
+- Architetture agentiche e sistemi autonomi
+
+## Mio contributo
+
+Durante il tirocinio universitario ho sviluppato e migliorato la pipeline cognitiva del robot, lavorando su:
+
+- ragionamento autonomo;
+- gestione goal/intent;
+- eventi sconosciuti;
+- memoria cognitiva;
+- generazione e validazione dinamica di comportamenti;
+- autonomia del robot in scenari di laboratorio.
+
+## Documentazione tecnica
+
+Il sistema e' pensato per esplorazione di laboratorio, interazione sociale, riconoscimento volti, gestione della sicurezza e apprendimento progressivo di nuove condizioni comportamentali tramite LLM.
 
 Il progetto non si limita a chiedere decisioni al modello: costruisce una rappresentazione strutturata degli eventi, valuta condizioni Python gia' apprese, puo' generarne di nuove in modo controllato, ne conserva i metadati e isola quelle incoerenti o difettose.
 
@@ -406,7 +450,5 @@ Per debug piu dettagliato:
 ## Stato del progetto
 
 Versione documentata: sistema con supervisore autonomo, orchestratore agentico, goal/intent reasoning, subgoal planner, lifecycle del goal con retry, registro eventi, simulazione degli eventi sconosciuti, memoria episodica temporanea, world model, active perception, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
-
-Stato consegna: codice quasi finale; restano da validare test reali su NAO e aggiornamento del documento di tesi in base agli esperimenti.
 
 Ultimo aggiornamento README: 2026-06-14.
