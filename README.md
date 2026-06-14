@@ -31,9 +31,11 @@ Funzioni principali:
 - modello persistente del mondo che trasforma osservazioni ripetute in credenze stabili su oggetti e ambienti;
 - rilevamento autonomo di anomalie rispetto ai modelli di comportamento atteso;
 - percezione mirata (active perception) per confermare o smentire ipotesi di variazione nel mondo;
+- ragionamento goal/intent che valuta gli eventi rispetto all'obiettivo corrente;
+- revisione del piano con subgoal alternativi, lifecycle del goal e retry temporizzato;
 - generazione autonoma di condizioni Python gestita da `behaviors/condition_system`;
 - quarantena, validazione, rifiuto e riparazione delle condizioni generate;
-- memoria persistente in `data/memoria.json`;
+- memoria runtime e metadati persistenti separati per condizioni, ipotesi, world model e goal;
 - heartbeat e integrazione con Choregraphe/NAOqi tramite ALMemory;
 - bootstrap da robot e watchdog lato PC per avvio autonomo.
 
@@ -69,6 +71,10 @@ NAOTirocinio/
 |   |-- safety_behavior.py          # emergenze e ostacoli durante cammino
 |   |-- README_AUTONOMIA.md         # riepilogo del sistema autonomo
 |   |
+|   |-- agentic_system/
+|   |   |-- agentic_orchestrator.py  # ciclo agentico: goal, ipotesi, world model, condizioni
+|   |   `-- goal_intent_memory.py   # goal reasoning, subgoal, lifecycle e retry
+|   |
 |   |-- condition_system/
 |   |   |-- condition_generator.py  # generazione e validazione condizioni
 |   |   |-- condition_manager.py    # caricamento ed esecuzione condizioni
@@ -82,9 +88,11 @@ NAOTirocinio/
 |   |
 |   |-- event_system/
 |       |-- event_registry.py               # registro eventi noti/scoperti
+|       |-- episodic_hypothesis_memory.py   # ipotesi episodiche temporanee
 |       |-- world_model_memory.py           # modello persistente del mondo, credenze stabili
-|       |-- world_model_memory.json         # stato persistente del world model
 |       |-- active_perception_planner.py    # pianificazione percezione mirata
+|       |-- unknown_situation_reasoner.py   # ragionamento su situazioni sconosciute
+|       |-- visual_semantic_interpreter.py  # interpretazione semantica di scene/testi
 |       |-- unknown_condition_validator.py  # validazione trigger sconosciuti
 |       |-- unknown_event_extractor.py      # estrazione eventi candidati
 |       `-- unknown_generation_simulator.py # simulazione prima della generazione reale
@@ -94,8 +102,8 @@ NAOTirocinio/
 |   |-- pc_autostart_server.py      # server HTTP locale per avviare watchdog
 |   `-- autonomous_watchdog.py      # controlla heartbeat e riavvia soul.py
 |
-`-- data/
-    `-- memoria.json                # memoria del robot
+|-- foto/                           # foto acquisite a runtime, non obbligatorie in consegna
+`-- runtime/                        # log/heartbeat/evidenze locali, escludibile dalla zip finale
 ```
 
 ## Componenti
@@ -143,6 +151,30 @@ E' il punto di ingresso dell'autonomia appresa. Riceve `mondo` e `stato_runtime`
 Usa cooldown e memoria dell'ultimo mondo generato per evitare duplicati e chiamate LLM troppo ravvicinate.
 
 Quando il report contiene testo sensoriale nuovo ma non ancora coperto da eventi noti, il supervisore puo' arricchire la firma tramite `event_system/unknown_event_extractor.py`. Le osservazioni vengono poi valutate tramite ipotesi temporanee, world model e memoria delle condizioni, evitando di generare codice su ogni singola novita.
+
+### Ciclo agentico, goal e subgoal
+
+`behaviors/agentic_system/agentic_orchestrator.py` organizza il ciclo cognitivo leggero usato prima della generazione di nuove condizioni. Il ciclo:
+
+1. costruisce la firma della situazione;
+2. aggiorna il world model;
+3. valuta eventuali osservazioni mirate gia' in corso;
+4. controlla se esiste una azione successiva suggerita da un goal;
+5. valuta goal e intenti rispetto alla scena corrente;
+6. prova condizioni generate gia' disponibili;
+7. aggiorna ipotesi temporanee e decide se osservare, memorizzare o generare.
+
+`behaviors/agentic_system/goal_intent_memory.py` collega gli eventi al goal corrente. Se un evento ostacola un obiettivo, per esempio un accesso chiuso mentre il robot cerca di raggiungere una zona, il sistema non genera subito codice: produce una revisione del piano, crea subgoal alternativi e registra una azione successiva.
+
+Il lifecycle del goal e' mantenuto nel runtime tramite:
+
+- `goal_status`, con stati come `attivo`, `completato`, `in_attesa`, `fallito` o `bloccato_temporaneamente`;
+- `subgoal_goal_corrente`, con subgoal pendenti, in corso, completati o falliti;
+- `azione_successiva_suggerita`, usata per trasformare un subgoal in una osservazione mirata concreta;
+- `goal_history`, che conserva gli ultimi cambiamenti di stato;
+- `retry_after` e `retry_after_timestamp`, usati quando un goal deve essere rimandato e riprovato piu' tardi.
+
+Questo rende il comportamento piu' deliberativo: NAO puo' riconoscere che una situazione impatta un obiettivo, cercare alternative, attendere nuove evidenze o chiedere aiuto, invece di reagire solo con una condizione locale.
 
 ### Eventi sconosciuti e novita
 
@@ -331,27 +363,17 @@ Le decisioni devono essere dizionari con lista `azioni`. Azioni principali:
 
 `action_behavior.py` valida numeri, tipi azione e limiti prima di inviare i comandi ai moduli hardware.
 
-## Memoria
+## Memorie
 
-La memoria fisica e' salvata in `data/memoria.json`.
+Il sistema non dipende piu' da un singolo file generale di memoria per descrivere l'autonomia. Le informazioni sono separate per responsabilita':
 
-Struttura tipica:
+- `condition_system/condition_memory.py` e `condition_metadata/`: statistiche, attivazioni, rifiuti, errori e riparazioni delle condizioni generate;
+- `event_system/episodic_hypothesis_memory.py`: ipotesi temporanee su eventi nuovi, prima di decidere se generare una condizione;
+- `event_system/world_model_memory.py`: credenze stabili su entita, stati normali, anomalie e familiarita della scena;
+- `event_system/active_perception_planner.py`: osservazioni mirate avviate per confermare o smentire ipotesi;
+- `agentic_system/goal_intent_memory.py`: stato del goal, revisioni del piano, subgoal alternativi, retry e storico dei cambiamenti.
 
-```json
-{
-  "ricordi_recenti": [
-    {
-      "timestamp": "2026-05-18 15:30:00",
-      "contenuto": "NAO ha salutato una persona nota."
-    }
-  ],
-  "fatti_importanti": {
-    "nome_utente": "Marco"
-  }
-}
-```
-
-Le decisioni LLM possono aggiungere elementi a `memoria`; `soul.py` mantiene al massimo gli ultimi 20 ricordi recenti.
+Le decisioni possono comunque restituire una lista `memoria`, ma nel ciclo attuale questa viene usata soprattutto come traccia strutturata della decisione e come ponte verso le memorie specializzate. I log e gli heartbeat di esecuzione sono invece in `runtime/` e non sono necessari nella zip finale, salvo voler consegnare evidenze operative.
 
 ## Logging e debug
 
@@ -379,9 +401,12 @@ Per debug piu dettagliato:
 - I file in `behaviors/condition_system/rejected_conditions` sono utili per capire cosa e' stato scartato.
 - Le cartelle runtime/quarantena/rejected possono essere create automaticamente.
 - L'avvio autonomo dipende dagli IP configurati tramite `NAO_IP`, `NAO_ROBOT_IP` e `PC_IP` in `scripts/nao_autonomous_bootstrap.py`.
+- Per la consegna zip escludere `.git/`, `.idea/`, `runtime/`, cache Python e file locali generati durante i test.
 
 ## Stato del progetto
 
-Versione documentata: sistema con supervisore autonomo, registro eventi, simulazione degli eventi sconosciuti, memoria episodica temporanea, world model, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
+Versione documentata: sistema con supervisore autonomo, orchestratore agentico, goal/intent reasoning, subgoal planner, lifecycle del goal con retry, registro eventi, simulazione degli eventi sconosciuti, memoria episodica temporanea, world model, active perception, condizioni generate, navigazione laboratorio, riparazione condizioni, comandi vocali opzionali e bootstrap/watchdog.
 
-Ultimo aggiornamento README: 2026-05-22.
+Stato consegna: codice quasi finale; restano da validare test reali su NAO e aggiornamento del documento di tesi in base agli esperimenti.
+
+Ultimo aggiornamento README: 2026-06-14.
