@@ -35,6 +35,38 @@ def _copia_ipotesi(ipotesi):
     return aggiornata
 
 
+def _evento_strutturato_puo_generare(evento):
+    if not isinstance(evento, dict):
+        return False
+
+    categoria = _testo(evento.get("categoria"))
+    if categoria in ["", "neutra", "ambiguita"]:
+        return False
+
+    eventi_core = evento.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        return False
+
+    eventi_core = [
+        e for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ]
+    if len(eventi_core) == 0:
+        return False
+
+    ragionamento = evento.get("ragionamento_unknown", {})
+    if isinstance(ragionamento, dict) and ragionamento.get("evento") in [
+        None,
+        False,
+        "",
+        [],
+        {}
+    ]:
+        return False
+
+    return True
+
+
 def _esito(
     ha_ipotesi,
     stato,
@@ -104,12 +136,13 @@ def valuta_ipotesi_da_evento_strutturato(
 
         genera = (
             (rilevanza >= 0.6 or confidenza >= 0.6)
-            and len(eventi_core_nuovi) > 0
-            and categoria_nuova != "ambiguita"
+            and _evento_strutturato_puo_generare(nuovo_evento_strutturato)
         )
         motivo = "ipotesi strutturata confermata"
         if genera:
             motivo = "ipotesi strutturata confermata e rilevante"
+        elif categoria_nuova in ["", "neutra"] or len(eventi_core_nuovi) == 0:
+            motivo = "ipotesi strutturata confermata ma non generativa"
 
         return _esito(
             True,

@@ -151,41 +151,9 @@ def ragiona_situazione_sconosciuta(testo):
             "azione_cognitiva": "ignora"
         })
 
-    # 1. Situazioni che influenzano movimento/accesso
-    if _contiene(testo, [
-        "chius", "blocc", "ostru", "impedis",
-        "non accessibile", "non posso passare",
-        "davanti al passaggio", "davanti al percorso",
-        "in mezzo al percorso", "sul percorso",
-        "ostacolo", "ingombro"
-    ]):
-        return _arricchisci_strutturato({
-            "significativa": True,
-            "genera_condizione": True,
-            "tipo": "spaziale_safety",
-            "evento": "accesso_o_percorso_limitato",
-            "ipotesi": "qualcosa potrebbe limitare il movimento o l'accesso",
-            "azione_cognitiva": "prudenza"
-        })
-
-    # 2. Situazioni anomale o danneggiate
-    if _contiene(testo, [
-        "rotto", "rotta", "danneggiato", "danneggiata",
-        "crepa", "rovinato", "anomalo", "strano",
-        "fuori posto", "caduto", "caduta"
-    ]):
-        return _arricchisci_strutturato({
-            "significativa": True,
-            "genera_condizione": True,
-            "tipo": "anomalia",
-            "evento": "elemento_ambientale_anomalo",
-            "ipotesi": "un elemento dell'ambiente sembra anomalo o fuori posto",
-            "azione_cognitiva": "osserva_con_prudenza"
-        })
-
-    # 3. Significato funzionale di contenuti visivi leggibili.
-    # Prima dei casi "incerti", cosi' un testo operativo letto davvero
-    # non viene degradato a semplice ambiguita' visiva.
+    # 1. Significato funzionale di contenuti visivi leggibili.
+    # Deve venire prima di accesso/anomalia: un cartello operativo
+    # non e' un'anomalia solo perche' e' su un contenitore o una parete.
     if interpreta_contenuto_visivo is not None:
         try:
             interpretazione_visiva = interpreta_contenuto_visivo(testo)
@@ -222,6 +190,60 @@ def ragiona_situazione_sconosciuta(testo):
                 ),
                 "azione_cognitiva": azione_visiva
             })
+
+        if isinstance(interpretazione_visiva, dict):
+            categoria_visiva = interpretazione_visiva.get("categoria")
+            azione_visiva = interpretazione_visiva.get("azione_cognitiva")
+
+            if (
+                categoria_visiva == "contenuto_visivo_incerto"
+                or azione_visiva == "osserva_meglio"
+            ):
+                return _arricchisci_strutturato({
+                    "significativa": False,
+                    "genera_condizione": False,
+                    "tipo": "contenuto_visivo_incerto",
+                    "evento": None,
+                    "ipotesi": interpretazione_visiva.get(
+                        "significato",
+                        "il contenuto informativo non e' leggibile o disponibile"
+                    ),
+                    "azione_cognitiva": azione_visiva or "osserva_meglio"
+                })
+
+    # 2. Situazioni che influenzano movimento/accesso
+    if _contiene(testo, [
+        "chius", "blocc", "ostru", "impedis",
+        "non accessibile", "non posso passare",
+        "davanti al passaggio", "davanti al percorso",
+        "in mezzo al percorso", "sul percorso",
+        "ostacolo", "ingombro"
+    ]):
+        return _arricchisci_strutturato({
+            "significativa": True,
+            "genera_condizione": True,
+            "tipo": "spaziale_safety",
+            "evento": "accesso_o_percorso_limitato",
+            "ipotesi": "qualcosa potrebbe limitare il movimento o l'accesso",
+            "azione_cognitiva": "prudenza"
+        })
+
+    # 3. Situazioni anomale o danneggiate.
+    # Cartelli, documenti, contenitori o armadietti non sono anomalie:
+    # qui servono segnali espliciti di danno, rottura o fuori posto.
+    if _contiene(testo, [
+        "rotto", "rotta", "danneggiato", "danneggiata",
+        "crepa", "rovinato", "anomalo", "strano",
+        "fuori posto", "caduto", "caduta"
+    ]):
+        return _arricchisci_strutturato({
+            "significativa": True,
+            "genera_condizione": True,
+            "tipo": "anomalia",
+            "evento": "elemento_ambientale_anomalo",
+            "ipotesi": "un elemento dell'ambiente sembra anomalo o fuori posto",
+            "azione_cognitiva": "osserva_con_prudenza"
+        })
 
     # 4. Informazione visiva / testo / contenuti osservabili.
     # Gerarchia:
@@ -265,11 +287,15 @@ def ragiona_situazione_sconosciuta(testo):
         "non e chiara",
         "non e chiaro",
         "senza testo leggibile",
+        "nessun testo leggibile",
         "senza informazioni chiare",
         "senza contenuti informativi",
         "monitor spento",
         "schermo spento",
         "schermo nero",
+        "display spento",
+        "nessun elemento leggibile",
+        "non ci sono elementi leggibili",
         "parte illeggibili",
         "in parte illeggibili",
         "non possibile discernere",
@@ -284,11 +310,18 @@ def ragiona_situazione_sconosciuta(testo):
     assenza_informazione = [
         "nessun testo visibile",
         "nessuna informazione leggibile",
+        "nessun testo leggibile",
+        "nessun elemento leggibile",
+        "non ci sono elementi leggibili",
         "non ci sono testi",
         "non ci sono contenuti",
         "non ci sono documenti",
         "non ci sono schermi",
         "non ci sono monitor",
+        "non ci sono documenti testi monitor utili",
+        "non ci sono documenti utili",
+        "non ci sono testi utili",
+        "non ci sono monitor utili",
         "non sono visibili schermi",
         "non e presente alcun testo",
         "non e presente testo",
@@ -320,6 +353,18 @@ def ragiona_situazione_sconosciuta(testo):
     ha_non_chiaro = _contiene(testo, segnali_non_chiari)
     ha_assenza = _contiene(testo, assenza_informazione)
     ha_contenuto_chiaro = _contiene(testo, contenuto_chiaro)
+
+    # La negazione/inattivita' del contenuto informativo vince sui trigger
+    # come "monitor", "testo", "documenti" o "schermo".
+    if ha_assenza:
+        return _arricchisci_strutturato({
+            "significativa": False,
+            "genera_condizione": False,
+            "tipo": "contenuto_visivo_incerto",
+            "evento": None,
+            "ipotesi": "non c'e' informazione visiva utile o leggibile",
+            "azione_cognitiva": "ignora"
+        })
 
     # Caso più importante per la nuova fase:
     # c'è qualcosa che potrebbe contenere informazione, ma non è leggibile.

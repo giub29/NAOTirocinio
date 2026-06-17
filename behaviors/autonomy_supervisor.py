@@ -226,6 +226,37 @@ def evento_strutturato_va_ricostruito(evento_strutturato, mondo):
     )
 
 
+def evento_strutturato_puo_generare_da_ipotesi(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return False
+
+    categoria = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    if categoria in ["", "neutra", "ambiguita"]:
+        return False
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        return False
+
+    eventi_core = filtra_eventi_helper([
+        e for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ])
+    if len(eventi_core) == 0:
+        return False
+
+    ragionamento = evento_strutturato.get("ragionamento_unknown", {})
+    if (
+        isinstance(ragionamento, dict)
+        and ragionamento.get("evento") in [None, False, "", [], {}]
+    ):
+        return False
+
+    return True
+
+
 def salva_ipotesi_temporanea_da_decisione(stato_runtime, decisione):
     if stato_runtime is None or not isinstance(decisione, dict):
         return None
@@ -315,9 +346,14 @@ def valuta_ipotesi_strutturata_sicura(stato_runtime, evento_strutturato, mondo):
         )
         return valutazione
 
+    evento_generativo = evento_strutturato_puo_generare_da_ipotesi(
+        evento_strutturato
+    )
+
     if (
         valutazione.get("stato") == "confermata"
         and valutazione.get("genera_condizione") is True
+        and evento_generativo
     ):
         stato_runtime["forza_generazione_da_ipotesi_strutturata"] = True
         stato_runtime["motivo_generazione_ipotesi_strutturata"] = (
@@ -326,6 +362,9 @@ def valuta_ipotesi_strutturata_sicura(stato_runtime, evento_strutturato, mondo):
                 "ipotesi strutturata confermata"
             )
         )
+    else:
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
 
     return valutazione
 
@@ -752,6 +791,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         stato_runtime.get("evento_strutturato", {}),
         mondo
     )
+
+    if (
+        stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False)
+        and not evento_strutturato_puo_generare_da_ipotesi(
+            stato_runtime.get("evento_strutturato", {})
+        )
+    ):
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
 
     if stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False):
         motivo_ipotesi_strutturata = stato_runtime.get(
@@ -1472,12 +1520,6 @@ def situazione_merita_generazione(mondo, stato_runtime):
     firma = costruisci_firma_situazione(mondo, stato_runtime)
     logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
 
-    if stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False):
-        return True, stato_runtime.get(
-            "motivo_generazione_ipotesi_strutturata",
-            "ipotesi strutturata confermata"
-        )
-
     if firma["mondo_vuoto"]:
         return False, "mondo vuoto"
 
@@ -1518,6 +1560,17 @@ def situazione_merita_generazione(mondo, stato_runtime):
         eventi_core = []
 
     eventi_core = filtra_eventi_helper(eventi_core)
+
+    if stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False):
+        if evento_strutturato_puo_generare_da_ipotesi(evento_strutturato):
+            return True, stato_runtime.get(
+                "motivo_generazione_ipotesi_strutturata",
+                "ipotesi strutturata confermata"
+            )
+
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+        return False, "ipotesi strutturata non generativa"
 
     gia_coperta, motivo_memoria, condizioni_simili = (
         _generazione_gia_coperta_da_memoria(

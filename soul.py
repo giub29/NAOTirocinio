@@ -144,6 +144,8 @@ def _carica_openai_api_key_locale():
 CHIAVE_PRIVATA = _carica_openai_api_key_locale()
 
 TEMPO_INERZIA_INIZIATIVA = 20
+TEMPO_IDLE_ROUTING = 10
+COOLDOWN_ROUTING_IDLE = TEMPO_INERZIA_INIZIATIVA
 LUNGHEZZA_MAX_RICORDI = 20
 VELOCITA_CAMMINO = 0.3
 
@@ -243,6 +245,10 @@ stato_runtime = {
     "ultimo_volto_ignoto_rilevato": False,
     "ultimo_volto_ignoto_tempo": 0,
     "ultimo_evento_reale_tempo": 0,
+    "ultima_route_idle_tempo": 0,
+    "routing_corrente": "",
+    "routing_idle_attivo": False,
+    "abilita_generazione_idle": False,
     "ultima_osservazione_mirata_tempo": 0,
     "conteggio_osservazioni_mirate": 0,
     "ultima_firma_osservazione_mirata": ""
@@ -785,6 +791,61 @@ def _gestisci_iniziativa_robot(corpo, voce, motivo="inerzia"):
         u"VEDO: {}.".format(descrizione)
     )
 
+def _puo_attivare_routine_idle(corpo, adesso, ultimo_evento_tempo, messaggio_corrente):
+    """
+    Decide se il ciclo puo' usare la routine idle.
+    La routine e' solo percettiva: NAO resta fermo e delega alla pipeline
+    esistente la decisione se osservare meglio o generare condizioni.
+    """
+    if corpo.sta_camminando():
+        return False
+
+    if stato_runtime.get("in_pattugliamento", False):
+        return False
+
+    if stato_runtime.get("controllo_manuale", False):
+        return False
+
+    if messaggio_corrente:
+        return False
+
+    if utente_sta_scrivendo:
+        return False
+
+    if adesso - ultimo_evento_tempo < TEMPO_IDLE_ROUTING:
+        return False
+
+    ultima_route = stato_runtime.get("ultima_route_idle_tempo", 0)
+    if adesso - ultima_route < COOLDOWN_ROUTING_IDLE:
+        return False
+
+    return True
+
+def _attiva_routine_idle_ambiente(corpo, voce, motivo="inerzia"):
+    """
+    Route idle controllata:
+    1. osserva l'ambiente da fermo;
+    2. costruisce un report percettivo;
+    3. marca il runtime, cosi' il supervisore puo' generare condizioni
+       solo se la situazione lo merita davvero.
+    """
+    adesso = time.time()
+
+    stato_runtime["ultima_route_idle_tempo"] = adesso
+    stato_runtime["ultima_curiosita_inerzia_tempo"] = adesso
+    stato_runtime["routing_corrente"] = "idle_esplorazione_ambiente"
+    stato_runtime["routing_idle_attivo"] = True
+    stato_runtime["abilita_generazione_idle"] = True
+
+    mondo_idle = _gestisci_iniziativa_robot(
+        corpo,
+        voce,
+        motivo=motivo
+    )
+
+    stato_runtime["ultimo_mondo_idle"] = mondo_idle
+    return mondo_idle
+
 def _decisione_richiede_osservazione_mirata(decisione):
     try:
         memoria = decisione.get("memoria", [])
@@ -794,7 +855,7 @@ def _decisione_richiede_osservazione_mirata(decisione):
                 continue
 
             if (
-                item.get("tipo") == "curiosita_autonoma"
+                item.get("tipo") in ["curiosita_autonoma", "evento_strutturato"]
                 and item.get("azione") == "osserva_meglio"
             ):
                 return True
@@ -1635,27 +1696,22 @@ def main():
             ]
 
             if mondo_neutro:
-                tempo_di_inerzia = time.time() - ultimo_evento_tempo
-                ultima_curiosita = stato_runtime.get("ultima_curiosita_inerzia_tempo", 0)
                 adesso = time.time()
 
-                tempo_da_ultima_curiosita = adesso - ultima_curiosita
-
-                if (
-                    not corpo.sta_camminando() and
-                    not stato_runtime.get("in_pattugliamento", False) and
-                    messaggio_utente == "" and
-                    tempo_di_inerzia >= 10 and
-                    tempo_da_ultima_curiosita >= 20
+                if _puo_attivare_routine_idle(
+                    corpo,
+                    adesso,
+                    ultimo_evento_tempo,
+                    messaggio_utente
                 ):
+                    tempo_di_inerzia = adesso - ultimo_evento_tempo
+
                     logger.info(
-                        u"[SOUL] Avvio curiosita autonoma per inerzia: "
+                        u"[SOUL][ROUTING_IDLE] esplora/osserva ambiente: "
                         u"silenzio da {:.1f}s".format(tempo_di_inerzia)
                     )
 
-                    stato_runtime["ultima_curiosita_inerzia_tempo"] = adesso
-
-                    mondo = _gestisci_iniziativa_robot(
+                    mondo = _attiva_routine_idle_ambiente(
                         corpo,
                         voce,
                         motivo="inerzia"
