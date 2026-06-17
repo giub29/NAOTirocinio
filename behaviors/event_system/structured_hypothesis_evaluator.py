@@ -55,13 +55,11 @@ def _evento_strutturato_puo_generare(evento):
         return False
 
     ragionamento = evento.get("ragionamento_unknown", {})
-    if isinstance(ragionamento, dict) and ragionamento.get("evento") in [
-        None,
-        False,
-        "",
-        [],
-        {}
-    ]:
+    if (
+        isinstance(ragionamento, dict)
+        and "evento" in ragionamento
+        and ragionamento.get("evento") in [None, False, "", [], {}]
+    ):
         return False
 
     return True

@@ -250,6 +250,7 @@ def evento_strutturato_puo_generare_da_ipotesi(evento_strutturato):
     ragionamento = evento_strutturato.get("ragionamento_unknown", {})
     if (
         isinstance(ragionamento, dict)
+        and "evento" in ragionamento
         and ragionamento.get("evento") in [None, False, "", [], {}]
     ):
         return False
