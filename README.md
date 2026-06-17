@@ -320,6 +320,14 @@ Variabile richiesta:
 OPENAI_API_KEY=...
 ```
 
+Per avvio onboard autonomo senza export manuale, sul NAO si puo' creare:
+
+```bash
+/data/home/nao/NAOTirocinio/config/openai_api_key.txt
+```
+
+Il file deve contenere solo la chiave OpenAI reale. E' ignorato da Git e viene letto automaticamente da `soul.py` e `start_nao_autonomo.py`.
+
 Modelli attualmente usati nel codice:
 
 - `gpt-4o-mini` per decisioni dell'anima;

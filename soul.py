@@ -107,7 +107,41 @@ logger = logging.getLogger(__name__)
 
 
 IP_ROBOT = os.environ.get("NAO_IP", "172.16.165.86")
-CHIAVE_PRIVATA = os.getenv("OPENAI_API_KEY")
+
+
+def _carica_openai_api_key_locale():
+    """
+    Carica la chiave OpenAI da ambiente o da file locale privato.
+    Il file serve per avvio autonomo onboard senza export manuale.
+    """
+    chiave = os.getenv("OPENAI_API_KEY")
+    if chiave and chiave.strip():
+        return chiave.strip()
+
+    percorsi = [
+        os.path.join(os.path.dirname(__file__), "config", "openai_api_key.txt"),
+        os.path.join(os.path.dirname(__file__), "openai_api_key.txt")
+    ]
+
+    for percorso in percorsi:
+        try:
+            if not os.path.exists(percorso):
+                continue
+
+            with open(percorso, "r") as f:
+                chiave = f.read().strip()
+
+            if chiave:
+                os.environ["OPENAI_API_KEY"] = chiave
+                return chiave
+
+        except Exception as e:
+            logger.warning(u"[LLM][SOUL] Errore lettura API key locale: {}".format(e))
+
+    return ""
+
+
+CHIAVE_PRIVATA = _carica_openai_api_key_locale()
 
 TEMPO_INERZIA_INIZIATIVA = 20
 LUNGHEZZA_MAX_RICORDI = 20
@@ -127,6 +161,13 @@ MAX_OSSERVAZIONI_MIRATE = 2
 COOLDOWN_OSSERVAZIONE_MIRATA = 25
 HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
 HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
+
+
+def _api_key_presente():
+    try:
+        return bool(str(CHIAVE_PRIVATA or "").strip())
+    except Exception:
+        return False
 
 LOCK_FILE = os.path.join(HEARTBEAT_DIR, "soul.lock")
 
@@ -934,6 +975,9 @@ def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, 
     stato_runtime["memoria"] = memoria_fisica
     stato_runtime["stato_robot"] = stato_robot
     stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
+    logger.info(u"[LLM][SOUL] stato_runtime openai_api_key presente: {}".format(
+        _api_key_presente()
+    ))
     stato_runtime["abilita_generazione_eventi_sconosciuti"] = True
     stato_runtime["evento_composto"] = evento_composto
     stato_runtime["forza_generazione_safety"] = forza_safety
@@ -1092,6 +1136,9 @@ def main():
 
     try:
         logger.info(u"Connessione al robot: {}".format(IP_ROBOT))
+        logger.info(u"[LLM][SOUL] OPENAI_API_KEY presente all'avvio: {}".format(
+            _api_key_presente()
+        ))
 
         logger.info(u"[BOOT] Creo NaoBody")
         corpo = NaoBody(IP_ROBOT)

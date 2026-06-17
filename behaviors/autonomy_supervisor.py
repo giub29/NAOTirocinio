@@ -29,6 +29,27 @@ except Exception:
     estrai_eventi_sconosciuti = None
 
 try:
+    from behaviors.event_system.structured_event import (
+        costruisci_evento_strutturato as costruisci_evento_strutturato_layer
+    )
+except Exception:
+    costruisci_evento_strutturato_layer = None
+
+try:
+    from behaviors.event_system.structured_event_policy import (
+        decidi_da_evento_strutturato
+    )
+except Exception:
+    decidi_da_evento_strutturato = None
+
+try:
+    from behaviors.event_system.structured_hypothesis_evaluator import (
+        valuta_ipotesi_da_evento_strutturato
+    )
+except Exception:
+    valuta_ipotesi_da_evento_strutturato = None
+
+try:
     from behaviors.event_system.event_registry import arricchisci_eventi_registro
 except Exception:
     arricchisci_eventi_registro = None
@@ -133,6 +154,154 @@ def filtra_eventi_helper(eventi):
         e for e in eventi
         if str(e).lower().strip() not in EVENTI_HELPER_NON_GENERATIVI
     ]
+
+
+def integra_eventi_sconosciuti_in_evento_strutturato(
+    evento_strutturato,
+    eventi_sconosciuti
+):
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    if not isinstance(eventi_sconosciuti, list):
+        eventi_sconosciuti = []
+
+    tipo_attuale = str(evento_strutturato.get("tipo", "") or "").lower()
+    if tipo_attuale in ["", "generico", "neutra"]:
+        evento_strutturato["tipo"] = "unknown"
+
+    categoria_attuale = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    if categoria_attuale in ["", "neutra"]:
+        evento_strutturato["categoria"] = "sconosciuta"
+
+    origine_attuale = str(
+        evento_strutturato.get("origine", "") or ""
+    ).lower()
+    if origine_attuale in ["", "report"]:
+        evento_strutturato["origine"] = "scoperta"
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_uniti = []
+    for evento in eventi_core + eventi_sconosciuti:
+        if evento in [None, False, "", [], {}]:
+            continue
+
+        if evento not in eventi_uniti:
+            eventi_uniti.append(evento)
+
+    evento_strutturato["eventi_core"] = eventi_uniti
+    evento_strutturato["evento_composto"] = len(eventi_uniti) >= 2
+
+    return evento_strutturato
+
+
+def salva_ipotesi_temporanea_da_decisione(stato_runtime, decisione):
+    if stato_runtime is None or not isinstance(decisione, dict):
+        return None
+
+    ipotesi = decisione.get("ipotesi_temporanea")
+    if not isinstance(ipotesi, dict):
+        return None
+
+    stato_runtime["ipotesi_temporanea"] = ipotesi
+
+    recenti = stato_runtime.get("ipotesi_temporanee_recenti", [])
+    if not isinstance(recenti, list):
+        recenti = []
+
+    recenti.append(ipotesi)
+    stato_runtime["ipotesi_temporanee_recenti"] = recenti[-5:]
+
+    return ipotesi
+
+
+def archivia_ipotesi_strutturata(stato_runtime, esito, motivo=None):
+    if stato_runtime is None:
+        return None
+
+    ipotesi = stato_runtime.get("ipotesi_temporanea")
+    if not isinstance(ipotesi, dict):
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+        return None
+
+    archiviata = dict(ipotesi)
+    archiviata["esito_finale"] = esito
+    archiviata["motivo_finale"] = motivo
+    archiviata["chiusa"] = True
+
+    archivio = stato_runtime.get("ipotesi_strutturate_archiviate", [])
+    if not isinstance(archivio, list):
+        archivio = []
+
+    archivio.append(archiviata)
+    stato_runtime["ipotesi_strutturate_archiviate"] = archivio[-10:]
+
+    stato_runtime.pop("ipotesi_temporanea", None)
+    stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+    stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+
+    return archiviata
+
+
+def valuta_ipotesi_strutturata_sicura(stato_runtime, evento_strutturato, mondo):
+    if stato_runtime is None:
+        return None
+
+    ipotesi = stato_runtime.get("ipotesi_temporanea")
+    if not isinstance(ipotesi, dict):
+        return None
+
+    if valuta_ipotesi_da_evento_strutturato is None:
+        return None
+
+    try:
+        valutazione = valuta_ipotesi_da_evento_strutturato(
+            ipotesi,
+            evento_strutturato,
+            nuovo_mondo=mondo
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore valutando ipotesi strutturata: {}".format(e)
+        )
+        return None
+
+    if not isinstance(valutazione, dict):
+        return None
+
+    stato_runtime["valutazione_ipotesi_strutturata"] = valutazione
+
+    ipotesi_aggiornata = valutazione.get("ipotesi")
+    if isinstance(ipotesi_aggiornata, dict):
+        stato_runtime["ipotesi_temporanea"] = ipotesi_aggiornata
+
+    if valutazione.get("stato") in ["smentita", "scaduta"]:
+        archivia_ipotesi_strutturata(
+            stato_runtime,
+            valutazione.get("stato"),
+            valutazione.get("motivo")
+        )
+        return valutazione
+
+    if (
+        valutazione.get("stato") == "confermata"
+        and valutazione.get("genera_condizione") is True
+    ):
+        stato_runtime["forza_generazione_da_ipotesi_strutturata"] = True
+        stato_runtime["motivo_generazione_ipotesi_strutturata"] = (
+            valutazione.get(
+                "motivo",
+                "ipotesi strutturata confermata"
+            )
+        )
+
+    return valutazione
 
 
 def aggiorna_world_model_sicuro(mondo, firma, stato_runtime):
@@ -404,6 +573,29 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     logger.info("[AUTONOMIA] Supervisore attivo")
 
+    try:
+        evento_strutturato = stato_runtime.get("evento_strutturato", {})
+        if (
+            costruisci_evento_strutturato_layer is not None
+            and not isinstance(evento_strutturato, dict)
+        ):
+            evento_strutturato = {}
+
+        if (
+            costruisci_evento_strutturato_layer is not None
+            and not evento_strutturato
+        ):
+            evento_strutturato = costruisci_evento_strutturato_layer(
+                mondo,
+                stato_runtime
+            )
+            stato_runtime["evento_strutturato"] = evento_strutturato
+
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore costruendo evento strutturato: {}".format(e)
+        )
+
     if stato_runtime.get("usa_agentic_orchestrator", False):
         if esegui_ciclo_agentico is not None:
             logger.info("[AUTONOMIA] Uso orchestratore agentico")
@@ -446,12 +638,12 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         eventi_sconosciuti = filtra_eventi_helper(eventi_sconosciuti)
 
         if eventi_sconosciuti:
-            stato_runtime["evento_strutturato"] = {
-                "tipo": "unknown",
-                "categoria": "sconosciuta",
-                "origine": "scoperta",
-                "eventi_core": eventi_sconosciuti
-            }
+            stato_runtime["evento_strutturato"] = (
+                integra_eventi_sconosciuti_in_evento_strutturato(
+                    stato_runtime.get("evento_strutturato", {}),
+                    eventi_sconosciuti
+                )
+            )
 
     except Exception as e:
         logger.warning(
@@ -482,6 +674,78 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     except Exception as e:
         logger.warning(
             "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
+        )
+
+    valutazione_ipotesi_strutturata = valuta_ipotesi_strutturata_sicura(
+        stato_runtime,
+        stato_runtime.get("evento_strutturato", {}),
+        mondo
+    )
+
+    if stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False):
+        motivo_ipotesi_strutturata = stato_runtime.get(
+            "motivo_generazione_ipotesi_strutturata",
+            "ipotesi strutturata confermata"
+        )
+        nuova_decisione = prova_generazione_autonoma(
+            mondo,
+            stato_runtime,
+            motivo_ipotesi_strutturata
+        )
+        archivia_ipotesi_strutturata(
+            stato_runtime,
+            "generata" if nuova_decisione is not None else "generazione_fallita",
+            motivo_ipotesi_strutturata
+        )
+
+        if nuova_decisione is not None:
+            logger.info(
+                "[AUTONOMIA] Decisione ottenuta da ipotesi strutturata"
+            )
+            return nuova_decisione
+
+    try:
+        valutazione_strutturata = stato_runtime.get(
+            "valutazione_ipotesi_strutturata",
+            {}
+        )
+        if not isinstance(valutazione_strutturata, dict):
+            valutazione_strutturata = {}
+
+        if (
+            decidi_da_evento_strutturato is not None
+            and not stato_runtime.get(
+                "forza_generazione_da_ipotesi_strutturata",
+                False
+            )
+            and valutazione_strutturata.get("stato") not in [
+                "confermata",
+                "smentita",
+                "scaduta"
+            ]
+        ):
+            decisione_evento_strutturato = (
+                decidi_da_evento_strutturato(
+                    stato_runtime.get("evento_strutturato", {}),
+                    mondo=mondo,
+                    stato_runtime=stato_runtime
+                )
+            )
+
+            if decisione_evento_strutturato is not None:
+                logger.info("[AUTONOMIA] Decisione da evento strutturato")
+                salva_ipotesi_temporanea_da_decisione(
+                    stato_runtime,
+                    decisione_evento_strutturato
+                )
+                return registra_osservazione_mirata_corrente(
+                    stato_runtime,
+                    decisione_evento_strutturato
+                )
+
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA] Errore policy evento strutturato: {}".format(e)
         )
 
     decisione_azione_successiva = (
@@ -624,11 +888,22 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         ))
 
         if deve_generare:
+            generazione_da_ipotesi_strutturata = stato_runtime.get(
+                "forza_generazione_da_ipotesi_strutturata",
+                False
+            )
             nuova_decisione = prova_generazione_autonoma(
                 mondo,
                 stato_runtime,
                 "evento composto prioritario: {}".format(motivo)
             )
+
+            if generazione_da_ipotesi_strutturata:
+                archivia_ipotesi_strutturata(
+                    stato_runtime,
+                    "generata" if nuova_decisione is not None else "generazione_fallita",
+                    motivo
+                )
 
             if nuova_decisione is not None:
                 logger.info("[AUTONOMIA] Decisione ottenuta dopo generazione autonoma composta")
@@ -839,7 +1114,18 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     )
 
     if deve_generare:
+        generazione_da_ipotesi_strutturata = stato_runtime.get(
+            "forza_generazione_da_ipotesi_strutturata",
+            False
+        )
         nuova_decisione = prova_generazione_autonoma(mondo, stato_runtime, motivo)
+
+        if generazione_da_ipotesi_strutturata:
+            archivia_ipotesi_strutturata(
+                stato_runtime,
+                "generata" if nuova_decisione is not None else "generazione_fallita",
+                motivo
+            )
 
         if nuova_decisione is not None:
             logger.info("[AUTONOMIA] Decisione ottenuta dopo generazione autonoma")
@@ -1114,6 +1400,12 @@ def situazione_merita_generazione(mondo, stato_runtime):
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
     logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
+
+    if stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False):
+        return True, stato_runtime.get(
+            "motivo_generazione_ipotesi_strutturata",
+            "ipotesi strutturata confermata"
+        )
 
     if firma["mondo_vuoto"]:
         return False, "mondo vuoto"
@@ -1670,6 +1962,12 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
             chiave_privata = (
                 stato_runtime.get("openai_api_key")
                 or os.environ.get("OPENAI_API_KEY")
+            )
+            logger.info(
+                "[AUTONOMIA][LLM] API key presente per generator: {} | fonte={}".format(
+                    bool(str(chiave_privata or "").strip()),
+                    "runtime" if stato_runtime.get("openai_api_key") else "env"
+                )
             )
 
             path_nuova_condizione = condition_generator.genera_condizione_autonoma(

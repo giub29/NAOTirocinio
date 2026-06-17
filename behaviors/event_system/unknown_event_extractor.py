@@ -73,6 +73,13 @@ def _evento(nome, priorita, motivo):
     }
 
 
+def _evento_con_struttura(nome, priorita, motivo, struttura=None):
+    evento = _evento(nome, priorita, motivo)
+    if isinstance(struttura, dict):
+        evento["evento_strutturato"] = struttura
+    return evento
+
+
 def estrai_eventi_sconosciuti(testo):
     """
     Estrae eventi unknown da situazioni comportamentalmente utili.
@@ -213,10 +220,11 @@ def estrai_eventi_sconosciuti(testo):
 
         if evento:
             return [
-                _evento(
+                _evento_con_struttura(
                     evento,
                     "alta" if ragionamento.get("tipo") == "spaziale_safety" else "media",
-                    ragionamento.get("ipotesi", "situazione sconosciuta significativa")
+                    ragionamento.get("ipotesi", "situazione sconosciuta significativa"),
+                    ragionamento.get("evento_strutturato")
                 )
             ]
 

@@ -9,12 +9,36 @@ except NameError:
 
 LLM_NON_DISPONIBILE = False
 LLM_NON_DISPONIBILE_LOGGATO = False
+OPENAI_CHAT_COMPLETIONS_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL_VISION = "gpt-4o-mini"
+OPENAI_MODEL_DECISIONE = "gpt-4o-mini"
+
+
+def _key_presente(chiave_privata):
+    try:
+        return bool(str(chiave_privata or "").strip())
+    except Exception:
+        return False
+
+
+def _log_richiesta_llm(area, chiave_privata, endpoint, modello):
+    print(u"[LLM][{}] API key presente: {}".format(area, _key_presente(chiave_privata)))
+    print(u"[LLM][{}] endpoint usato: {}".format(area, endpoint))
+    print(u"[LLM][{}] modello usato: {}".format(area, modello))
+
+
+def _log_richiesta_inviata(area):
+    print(u"[LLM][{}] richiesta inviata".format(area))
+
+
+def _log_fallback(area, motivo):
+    print(u"[LLM][{}] fallback attivato: {}".format(area, motivo))
 
 
 def _llm_disponibile(chiave_privata):
     global LLM_NON_DISPONIBILE_LOGGATO
 
-    if LLM_NON_DISPONIBILE or not chiave_privata:
+    if LLM_NON_DISPONIBILE or not _key_presente(chiave_privata):
         if not LLM_NON_DISPONIBILE_LOGGATO:
             print(u"[LLM] LLM non disponibile: chiave OpenAI assente o invalida")
             LLM_NON_DISPONIBILE_LOGGATO = True
@@ -33,7 +57,15 @@ def _marca_llm_non_disponibile(dati=None):
     except Exception:
         testo = unicode(dati or "")
 
-    if "invalid_api_key" in testo or "Incorrect API key" in testo or "401" in testo:
+    testo_lower = testo.lower()
+
+    if (
+        "invalid_api_key" in testo_lower or
+        "incorrect api key" in testo_lower or
+        "you didn't provide an api key" in testo_lower or
+        "you did not provide an api key" in testo_lower or
+        "401" in testo_lower
+    ):
         LLM_NON_DISPONIBILE = True
         if not LLM_NON_DISPONIBILE_LOGGATO:
             print(u"[LLM] LLM non disponibile: chiave OpenAI assente o invalida")
@@ -44,7 +76,16 @@ def _marca_llm_non_disponibile(dati=None):
 
 
 def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
+    area = "VISIONE_IMMAGINE"
+    _log_richiesta_llm(
+        area,
+        chiave_privata,
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        OPENAI_MODEL_VISION
+    )
+
     if not _llm_disponibile(chiave_privata):
+        _log_fallback(area, "LLM non disponibile prima della richiesta")
         return u"un ambiente familiare"
 
     try:
@@ -74,7 +115,7 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
             )
 
         payload = {
-            "model": "gpt-4o-mini",
+            "model": OPENAI_MODEL_VISION,
             "messages": [{
                 "role": "user",
                 "content": [
@@ -85,8 +126,9 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
             "max_tokens": 80
         }
 
+        _log_richiesta_inviata(area)
         res = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            OPENAI_CHAT_COMPLETIONS_ENDPOINT,
             headers=headers,
             json=payload,
             timeout=10
@@ -96,16 +138,19 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
 
         if "choices" not in dati:
             if _marca_llm_non_disponibile(dati):
+                _log_fallback(area, "API key assente o invalida")
                 return u"un ambiente familiare"
             print(u"[ERRORE ANALISI IMMAGINE HTTP {}]: {}".format(
                 res.status_code,
                 dati
             ))
+            _log_fallback(area, "risposta HTTP senza choices")
             return u"un ambiente familiare"
 
         return dati['choices'][0]['message']['content']
 
-    except:
+    except Exception as e:
+        _log_fallback(area, "eccezione: {}".format(e))
         return u"un ambiente familiare"
 
 def analizza_testo_visivo(img_b64, chiave_privata):
@@ -115,7 +160,16 @@ def analizza_testo_visivo(img_b64, chiave_privata):
 
     Non inventa: se non legge chiaramente, restituisce TESTO_NON_LEGGIBILE.
     """
+    area = "OCR_VISIVO"
+    _log_richiesta_llm(
+        area,
+        chiave_privata,
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        OPENAI_MODEL_VISION
+    )
+
     if not _llm_disponibile(chiave_privata):
+        _log_fallback(area, "LLM non disponibile prima della richiesta")
         return u"TESTO_NON_LEGGIBILE"
 
     try:
@@ -135,7 +189,7 @@ def analizza_testo_visivo(img_b64, chiave_privata):
         )
 
         payload = {
-            "model": "gpt-4o-mini",
+            "model": OPENAI_MODEL_VISION,
             "messages": [{
                 "role": "user",
                 "content": [
@@ -147,8 +201,9 @@ def analizza_testo_visivo(img_b64, chiave_privata):
             "temperature": 0.0
         }
 
+        _log_richiesta_inviata(area)
         res = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            OPENAI_CHAT_COMPLETIONS_ENDPOINT,
             headers=headers,
             json=payload,
             timeout=12
@@ -158,17 +213,20 @@ def analizza_testo_visivo(img_b64, chiave_privata):
 
         if "choices" not in dati:
             if _marca_llm_non_disponibile(dati):
+                _log_fallback(area, "API key assente o invalida")
                 return u"TESTO_NON_LEGGIBILE"
             print(u"[ERRORE TESTO VISIVO HTTP {}]: {}".format(
                 res.status_code,
                 dati
             ))
+            _log_fallback(area, "risposta HTTP senza choices")
             return u"TESTO_NON_LEGGIBILE"
 
         return dati['choices'][0]['message']['content'].strip()
 
     except Exception as e:
         print(u"[ERRORE LETTURA TESTO VISIVO]: " + str(e))
+        _log_fallback(area, "eccezione: {}".format(e))
         return u"TESTO_NON_LEGGIBILE"
 
 def estrai_json(testo):
@@ -191,10 +249,19 @@ def estrai_json(testo):
 
 
 def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
+    area = "DECISIONE_ANIMA"
+    _log_richiesta_llm(
+        area,
+        chiave_privata,
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        OPENAI_MODEL_DECISIONE
+    )
+
     if not _llm_disponibile(chiave_privata):
+        _log_fallback(area, "LLM non disponibile prima della richiesta")
         return {"azioni": []}
 
-    url = "https://api.openai.com/v1/chat/completions"
+    url = OPENAI_CHAT_COMPLETIONS_ENDPOINT
 
     headers = {
         "Content-Type": "application/json",
@@ -275,16 +342,19 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
     }
 
     try:
+        _log_richiesta_inviata(area)
         res = requests.post(url, headers=headers, data=json.dumps(payload), timeout=5)
         dati = res.json()
 
         if "choices" not in dati:
             if _marca_llm_non_disponibile(dati):
+                _log_fallback(area, "API key assente o invalida")
                 return {"azioni": []}
             print(u"[ERRORE LLM HTTP {}]: {}".format(
                 res.status_code,
                 dati
             ))
+            _log_fallback(area, "risposta HTTP senza choices")
             return {"azioni": []}
 
         risposta = dati['choices'][0]['message']['content'].strip()
@@ -292,4 +362,5 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
 
     except Exception as e:
         print(u"[ERRORE LLM]: " + str(e))
+        _log_fallback(area, "eccezione: {}".format(e))
         return {"azioni": []}

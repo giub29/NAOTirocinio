@@ -69,12 +69,47 @@ if not logger.handlers:
 
 LLM_NON_DISPONIBILE = False
 LLM_NON_DISPONIBILE_LOGGATO = False
+OPENAI_CHAT_COMPLETIONS_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL_GENERATORE = "gpt-4o-mini"
+
+
+def _key_presente(chiave_privata):
+    try:
+        return bool(str(chiave_privata or "").strip())
+    except Exception:
+        return False
+
+
+def _log_richiesta_llm(area, chiave_privata, endpoint, modello):
+    logger.info(u"[GENERATOR][{}] API key presente: {}".format(
+        area,
+        _key_presente(chiave_privata)
+    ))
+    logger.info(u"[GENERATOR][{}] endpoint usato: {}".format(
+        area,
+        endpoint
+    ))
+    logger.info(u"[GENERATOR][{}] modello usato: {}".format(
+        area,
+        modello
+    ))
+
+
+def _log_richiesta_inviata(area):
+    logger.info(u"[GENERATOR][{}] richiesta inviata".format(area))
+
+
+def _log_fallback(area, motivo):
+    logger.warning(u"[GENERATOR][{}] fallback attivato: {}".format(
+        area,
+        motivo
+    ))
 
 
 def _llm_disponibile(chiave_privata):
     global LLM_NON_DISPONIBILE_LOGGATO
 
-    if LLM_NON_DISPONIBILE or not chiave_privata:
+    if LLM_NON_DISPONIBILE or not _key_presente(chiave_privata):
         if not LLM_NON_DISPONIBILE_LOGGATO:
             logger.warning(u"[GENERATOR] LLM non disponibile: chiave OpenAI assente o invalida")
             LLM_NON_DISPONIBILE_LOGGATO = True
@@ -92,6 +127,8 @@ def _risposta_indica_api_key_invalida(testo):
     return (
         "invalid_api_key" in testo or
         "incorrect api key" in testo or
+        "you didn't provide an api key" in testo or
+        "you did not provide an api key" in testo or
         "401" in testo
     )
 
@@ -1489,7 +1526,16 @@ def _chiama_llm_codice(
     eventi_sconosciuti=None,
     storia_episodica=None
 ):
+    area = "GENERAZIONE_CODICE"
+    _log_richiesta_llm(
+        area,
+        chiave_privata,
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        OPENAI_MODEL_GENERATORE
+    )
+
     if not _llm_disponibile(chiave_privata):
+        _log_fallback(area, "LLM non disponibile prima della richiesta")
         raise Exception("LLM non disponibile")
 
     prompt = _costruisci_prompt(
@@ -1501,7 +1547,7 @@ def _chiama_llm_codice(
     )
 
     payload = {
-        "model": "gpt-4o-mini",
+        "model": OPENAI_MODEL_GENERATORE,
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": mondo}
@@ -1515,8 +1561,9 @@ def _chiama_llm_codice(
         "Authorization": "Bearer " + chiave_privata
     }
 
+    _log_richiesta_inviata(area)
     res = requests.post(
-        "https://api.openai.com/v1/chat/completions",
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
         headers=headers,
         data=json.dumps(payload),
         timeout=10
@@ -1524,7 +1571,9 @@ def _chiama_llm_codice(
 
     if res.status_code != 200:
         if _marca_llm_non_disponibile(res.text):
+            _log_fallback(area, "API key assente o invalida")
             raise Exception("LLM non disponibile")
+        _log_fallback(area, "HTTP {}".format(res.status_code))
         raise Exception("Errore HTTP LLM: {}".format(res.text))
 
     return res.json()["choices"][0]["message"]["content"]
@@ -1537,7 +1586,16 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     Poi, solo se serve, chiede al supervisore LLM.
     """
 
+    area = "VALUTAZIONE_GENERAZIONE"
+    _log_richiesta_llm(
+        area,
+        chiave_privata,
+        OPENAI_CHAT_COMPLETIONS_ENDPOINT,
+        OPENAI_MODEL_GENERATORE
+    )
+
     if not _llm_disponibile(chiave_privata):
+        _log_fallback(area, "LLM non disponibile prima della richiesta")
         return False
 
     try:
@@ -1725,7 +1783,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     )
 
     payload = {
-        "model": "gpt-4o-mini",
+        "model": OPENAI_MODEL_GENERATORE,
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": mondo}
@@ -1740,8 +1798,9 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     }
 
     try:
+        _log_richiesta_inviata(area)
         res = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            OPENAI_CHAT_COMPLETIONS_ENDPOINT,
             headers=headers,
             data=json.dumps(payload),
             timeout=8
@@ -1749,8 +1808,10 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
 
         if res.status_code != 200:
             if _marca_llm_non_disponibile(res.text):
+                _log_fallback(area, "API key assente o invalida")
                 return False
             logger.warning(u"[GENERATOR] Errore HTTP valutazione: {}".format(res.text))
+            _log_fallback(area, "HTTP {}".format(res.status_code))
             return False
 
         risposta = res.json()["choices"][0]["message"]["content"].strip()

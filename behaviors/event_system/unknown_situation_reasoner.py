@@ -22,6 +22,55 @@ def _contiene(testo, parole):
     return any(p in testo for p in parole)
 
 
+def _categoria_stato(evento, tipo):
+    evento = (evento or "").lower()
+    tipo = (tipo or "").lower()
+
+    if evento in ["accesso_non_disponibile", "accesso_o_percorso_limitato"]:
+        return "accesso", "non_disponibile"
+
+    if evento == "accesso_disponibile":
+        return "accesso", "disponibile"
+
+    if evento in ["oggetto_in_zona_rilevante", "percorso_potenzialmente_ostruito"]:
+        return "ostacolo_spazio", "potenzialmente_ostruito"
+
+    if evento in ["elemento_ambientale_anomalo", "elemento_fuori_posto"]:
+        return "anomalia", "anomalo"
+
+    if tipo in [
+        "informazione_visiva_incerta",
+        "supporto_informativo_potenziale",
+        "ambiguita_visiva"
+    ]:
+        return "ambiguita", "incerto"
+
+    if evento in ["informazione_operativa", "contenuto_informativo_rilevante"]:
+        return "informazione", "rilevante"
+
+    return "neutra", "osservato"
+
+
+def _arricchisci_strutturato(esito):
+    evento = esito.get("evento")
+    tipo = esito.get("tipo")
+    categoria, stato = _categoria_stato(evento, tipo)
+    significativa = bool(esito.get("significativa", False))
+
+    esito["evento_strutturato"] = {
+        "origine": "visione",
+        "categoria": categoria,
+        "stato": stato,
+        "rilevanza": 0.75 if significativa else 0.2,
+        "azione_cognitiva": esito.get("azione_cognitiva", "ignora"),
+        "genera_condizione": bool(esito.get("genera_condizione", False)),
+        "confidenza": 0.7 if significativa else 0.4,
+        "eventi_core": [evento] if evento else []
+    }
+
+    return esito
+
+
 def ragiona_situazione_sconosciuta(testo):
     """
     Ragionatore cognitivo per osservazioni sconosciute.
@@ -51,7 +100,7 @@ def ragiona_situazione_sconosciuta(testo):
         any(z in testo for z in zone_rilevanti)
         and any(p in testo for p in indicatori_prossimita)
     ):
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": False,
             "tipo": "zona_rilevante",
@@ -60,7 +109,7 @@ def ragiona_situazione_sconosciuta(testo):
                 "un elemento si trova vicino a una zona funzionalmente rilevante"
             ),
             "azione_cognitiva": "osserva_con_prudenza"
-        }
+        })
 
     indicatori_ambiguita = [
         "sfocato", "sfocata",
@@ -70,7 +119,7 @@ def ragiona_situazione_sconosciuta(testo):
     ]
 
     if any(x in testo for x in indicatori_ambiguita):
-        return {
+        return _arricchisci_strutturato({
             "significativa": False,
             "genera_condizione": False,
             "tipo": "ambiguita_visiva",
@@ -79,17 +128,17 @@ def ragiona_situazione_sconosciuta(testo):
                 "la scena osservata non e' ancora abbastanza chiara"
             ),
             "azione_cognitiva": "osserva_meglio"
-        }
+        })
 
     if not testo:
-        return {
+        return _arricchisci_strutturato({
             "significativa": False,
             "genera_condizione": False,
             "tipo": "vuoto",
             "evento": None,
             "ipotesi": None,
             "azione_cognitiva": "ignora"
-        }
+        })
 
     # 1. Situazioni che influenzano movimento/accesso
     if _contiene(testo, [
@@ -99,14 +148,14 @@ def ragiona_situazione_sconosciuta(testo):
         "in mezzo al percorso", "sul percorso",
         "ostacolo", "ingombro"
     ]):
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": True,
             "tipo": "spaziale_safety",
             "evento": "accesso_o_percorso_limitato",
             "ipotesi": "qualcosa potrebbe limitare il movimento o l'accesso",
             "azione_cognitiva": "prudenza"
-        }
+        })
 
     # 2. Situazioni anomale o danneggiate
     if _contiene(testo, [
@@ -114,14 +163,14 @@ def ragiona_situazione_sconosciuta(testo):
         "crepa", "rovinato", "anomalo", "strano",
         "fuori posto", "caduto", "caduta"
     ]):
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": True,
             "tipo": "anomalia",
             "evento": "elemento_ambientale_anomalo",
             "ipotesi": "un elemento dell'ambiente sembra anomalo o fuori posto",
             "azione_cognitiva": "osserva_con_prudenza"
-        }
+        })
 
     # 3. Informazione visiva / testo / contenuti osservabili.
     # Gerarchia:
@@ -219,48 +268,48 @@ def ragiona_situazione_sconosciuta(testo):
     # Caso più importante per la nuova fase:
     # c'è qualcosa che potrebbe contenere informazione, ma non è leggibile.
     if ha_supporto and ha_non_chiaro:
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": False,
             "tipo": "informazione_visiva_incerta",
             "evento": None,
             "ipotesi": "vedo un possibile contenuto informativo, ma non e' abbastanza chiaro",
             "azione_cognitiva": "osserva_meglio"
-        }
+        })
 
     # Se c'è contenuto chiaramente leggibile, allora può diventare condizione unknown.
     if ha_contenuto_chiaro:
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": True,
             "tipo": "informazione_visiva",
             "evento": "contenuto_informativo_rilevante",
             "ipotesi": "c'e' informazione visiva utile osservabile",
             "azione_cognitiva": "approfondisci_osservazione"
-        }
+        })
 
     # Se viene detto esplicitamente che non c'è nulla di utile, non generare.
     if ha_assenza and not ha_supporto:
-        return {
+        return _arricchisci_strutturato({
             "significativa": False,
             "genera_condizione": False,
             "tipo": "descrizione_generica",
             "evento": None,
             "ipotesi": "non c'e' informazione visiva utile",
             "azione_cognitiva": "curiosita_leggera"
-        }
+        })
 
     # Supporto informativo presente, ma senza contenuto chiaro:
     # non genero ancora, chiedo osservazione mirata.
     if ha_supporto:
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": False,
             "tipo": "supporto_informativo_potenziale",
             "evento": None,
             "ipotesi": "vedo un supporto che potrebbe contenere informazioni utili",
             "azione_cognitiva": "osserva_meglio"
-        }
+        })
     
     # 4. Oggetto/elemento generico interessante ma senza stato utile
     # Qui NON generiamo condizione: solo curiosità.
@@ -268,21 +317,21 @@ def ragiona_situazione_sconosciuta(testo):
         "oggetto", "elemento", "dispositivo", "strumento",
         "macchina", "contenitore", "struttura", "apparecchio"
     ]):
-        return {
+        return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": False,
             "tipo": "curiosita_esplorativa",
             "evento": None,
             "ipotesi": "vedo un elemento potenzialmente interessante, ma non so ancora se influenza il comportamento",
             "azione_cognitiva": "osserva_meglio"
-        }
+        })
 
     # 5. Descrizione ambientale normale
-    return {
+    return _arricchisci_strutturato({
         "significativa": False,
         "genera_condizione": False,
         "tipo": "descrizione_generica",
         "evento": None,
         "ipotesi": "descrizione ambientale senza implicazioni comportamentali",
         "azione_cognitiva": "curiosita_leggera"
-    }
+    })

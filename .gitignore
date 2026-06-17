@@ -2,6 +2,10 @@
 foto/
 .idea/
 
+# credenziali locali sul robot/PC, mai versionare
+config/openai_api_key.txt
+config/*.secret
+
 # runtime watchdog
 runtime/
 *.pyc
@@ -36,3 +40,6 @@ behaviors/condition_system/quarantine_metadata/*
 
 !behaviors/condition_system/rejected_metadata/.gitkeep
 !behaviors/condition_system/quarantine_metadata/.gitkeep
+
+config/openai_api_key.example.txt
+tests/*
