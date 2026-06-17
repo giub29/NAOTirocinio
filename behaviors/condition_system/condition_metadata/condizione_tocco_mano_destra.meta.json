@@ -1,203 +1,241 @@
 {
-  "aggiornata_il": "2026-05-21 23:01:56",
+  "aggiornata_il": "2026-06-17 11:53:42", 
   "attivazioni_recenti": [
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": -0.5,
+            "tipo": "guarda", 
+            "x": -0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ciao! Cosa stai facendo?",
+            "testo": "Ciao! Cosa stai facendo?", 
             "tipo": "parla"
-          },
+          }, 
           {
             "tipo": "fermati"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "esplorare l'interazione",
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.",
-      "tempo": "2026-05-12 11:49:51"
-    },
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green",
-            "tipo": "occhi"
-          },
-          {
-            "tipo": "guarda",
-            "x": -0.5,
-            "y": -0.2
-          },
-          {
-            "testo": "Ciao! Cosa stai facendo?",
-            "tipo": "parla"
-          },
-          {
-            "tipo": "fermati"
-          }
-        ],
-        "memoria": [],
-        "obiettivo": "esplorare l'interazione",
-        "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. Evento recente: C'è qualcosa a sinistra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. Evento recente: C'è qualcosa a sinistra. Evento recente: Sento un tocco su entrambe le mani. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-12 12:36:56"
-    },
+    }, 
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": -0.5,
+            "tipo": "guarda", 
+            "x": -0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ciao! Cosa stai facendo?",
+            "testo": "Ciao! Cosa stai facendo?", 
             "tipo": "parla"
-          },
+          }, 
           {
             "tipo": "fermati"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "esplorare l'interazione",
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
       "tempo": "2026-05-14 13:09:43"
-    },
+    }, 
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": -0.5,
+            "tipo": "guarda", 
+            "x": -0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ciao! Cosa stai facendo?",
+            "testo": "Ciao! Cosa stai facendo?", 
             "tipo": "parla"
-          },
+          }, 
           {
             "tipo": "fermati"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "esplorare l'interazione",
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano destra e contemporaneamente vedo un volto ignoto. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Sento un tocco sulla mano destra e contemporaneamente vedo un volto ignoto. SONO FERMO.", 
       "tempo": "2026-05-21 22:58:16"
-    },
+    }, 
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": -0.5,
+            "tipo": "guarda", 
+            "x": -0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ciao! Cosa stai facendo?",
+            "testo": "Ciao! Cosa stai facendo?", 
             "tipo": "parla"
-          },
+          }, 
           {
             "tipo": "fermati"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "esplorare l'interazione",
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano destra e contemporaneamente vedo un volto ignoto. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Sento un tocco sulla mano destra e contemporaneamente vedo un volto ignoto. SONO FERMO.", 
       "tempo": "2026-05-21 23:01:56"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano destra.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:23:02"
     }
-  ],
-  "creata_il": "2026-05-12 11:49:51",
+  ], 
+  "azione_cognitiva_origine": "risposta_sociale_controllata", 
+  "categoria_cognitiva": "sociale", 
+  "contesto_semantico": "categoria=sociale; azione_cognitiva=risposta_sociale_controllata; eventi=mano_destra, fermo", 
+  "creata_il": "2026-05-12 11:49:51", 
+  "esempi_negativi": [], 
+  "esempi_positivi": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": -0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano destra.", 
+            "tipo": "parla"
+          }, 
+          {
+            "tipo": "fermati"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "esplorare l'interazione", 
+        "stato_interno": "curioso"
+      }, 
+      "fonte": "attivazione_reale", 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:23:02"
+    }
+  ], 
   "eventi_attivi_origine": [
-    "mano_destra",
+    "mano_destra", 
     "fermo"
-  ],
+  ], 
   "eventi_completi_origine": {
-    "camminando": false,
-    "carezza_testa": false,
-    "entrambe_mani": false,
-    "entrambi_piedi": false,
-    "fermo": true,
-    "mano_destra": true,
-    "mano_sinistra": false,
-    "ostacolo_destra": false,
-    "ostacolo_frontale": false,
-    "ostacolo_sinistra": false,
-    "pericolo": false,
-    "piede_destro": false,
-    "piede_sinistro": false,
-    "urto": false,
-    "urto_piedi": false,
-    "volto_ignoto": false,
+    "camminando": false, 
+    "carezza_testa": false, 
+    "entrambe_mani": false, 
+    "entrambi_piedi": false, 
+    "fermo": true, 
+    "mano_destra": true, 
+    "mano_sinistra": false, 
+    "ostacolo_destra": false, 
+    "ostacolo_frontale": false, 
+    "ostacolo_sinistra": false, 
+    "pericolo": false, 
+    "piede_destro": false, 
+    "piede_sinistro": false, 
+    "urto": false, 
+    "urto_piedi": false, 
+    "volto_ignoto": false, 
     "volto_riconosciuto": false
-  },
-  "file_python": "condizione_tocco_mano_destra.py",
-  "mondo_origine": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.",
-  "nome": "condizione_tocco_mano_destra",
+  }, 
+  "feedback_osservazione_mirata": [], 
+  "file_python": "condizione_tocco_mano_destra.py", 
+  "mondo_origine": "REPORT: C'è qualcosa a sinistra. Evento recente: Sento un tocco sulla mano destra. INTERAZIONE_UTENTE. SONO FERMO.", 
+  "motivo_generazione": "interazione sociale o tattile riconosciuta come riutilizzabile", 
+  "nome": "condizione_tocco_mano_destra", 
   "note": [
-    "Condizione generata autonomamente da NAO.",
-    "Il file Python contiene la logica eseguibile.",
+    "Condizione generata autonomamente da NAO.", 
+    "Il file Python contiene la logica eseguibile.", 
     "Questo JSON contiene la memoria e la tracciabilità della condizione."
-  ],
-  "origine": "autogenerata_llm",
+  ], 
+  "numero_riparazioni": 0, 
+  "origine": "autogenerata_llm", 
   "riparazione": {
-    "fallimenti": 0,
-    "successi": 0,
-    "tentativi": 0,
-    "ultimo_esito": "",
+    "fallimenti": 0, 
+    "successi": 0, 
+    "tentativi": 0, 
+    "ultimo_esito": "", 
     "ultimo_motivo": ""
-  },
+  }, 
+  "smentite_osservazione_mirata": 0, 
   "statistiche": {
-    "attivazioni": 5,
-    "errori_runtime": 0,
-    "rifiuti": 0,
-    "ultima_attivazione": "2026-05-21 23:01:56",
+    "attivazioni": 6, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-06-17 11:23:02", 
     "ultimo_errore": ""
-  },
-  "stato": "promossa",
+  }, 
+  "stato": "promossa", 
   "stato_robot_origine": {
-    "energia": 100,
-    "livello_allerta": 1,
-    "modalita": "osservazione",
-    "obiettivo_corrente": "evitare ostacolo",
-    "persona_attuale": null,
-    "sta_camminando": false,
-    "ultimo_evento": "ostacolo rilevato",
+    "energia": 100, 
+    "livello_allerta": 1, 
+    "modalita": "osservazione", 
+    "obiettivo_corrente": "evitare ostacolo", 
+    "persona_attuale": null, 
+    "sta_camminando": false, 
+    "ultimo_evento": "ostacolo rilevato", 
     "umore": "prudente"
-  },
+  }, 
   "validazione": {
-    "modulo": "ok",
-    "semantica": "ok",
+    "modulo": "ok", 
+    "semantica": "ok", 
     "struttura": "ok"
   }
 }

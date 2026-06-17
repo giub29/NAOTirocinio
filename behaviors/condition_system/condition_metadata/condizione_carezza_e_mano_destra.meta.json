@@ -1,5 +1,5 @@
 {
-  "aggiornata_il": "2026-05-12 12:37:31", 
+  "aggiornata_il": "2026-06-17 00:00:00", 
   "attivazioni_recenti": [
     {
       "decisione": {
@@ -30,10 +30,22 @@
       "tempo": "2026-05-12 12:37:31"
     }
   ], 
+  "azione_cognitiva_origine": "risposta_sociale_controllata", 
+  "categoria_cognitiva": "sociale", 
+  "contesto_semantico": "categoria=sociale; azione_cognitiva=risposta_sociale_controllata; eventi=mano_destra", 
   "creata_il": "2026-05-12 12:37:31", 
+  "esempi_negativi": [], 
+  "esempi_positivi": [], 
+  "eventi_attivi_origine": [
+    "mano_destra"
+  ], 
+  "feedback_osservazione_mirata": [], 
   "file_python": "condizione_carezza_e_mano_destra.py", 
+  "motivo_generazione": "interazione sociale o tattile riconosciuta come riutilizzabile", 
   "nome": "condizione_carezza_e_mano_destra", 
+  "numero_riparazioni": 0, 
   "origine": "sconosciuta", 
+  "smentite_osservazione_mirata": 0, 
   "statistiche": {
     "attivazioni": 1, 
     "errori_runtime": 0, 

@@ -329,6 +329,10 @@ def _thread_input_utente():
                 messaggio_utente = "status"
                 input_ricevuto = True
             
+            elif comando == "START":
+                messaggio_utente = "vai"
+                input_ricevuto = True
+
             elif comando == "VAI":
                 messaggio_utente = "vai"
                 input_ricevuto = True
@@ -580,6 +584,33 @@ def _valuta_interazione_reale(mondo):
         u"ostacolo a destra" in testo or
         u"ostacolo a sinistra" in testo
     )
+
+
+def _ha_evento_sociale_tattile_prioritario(mondo, stato_runtime):
+    try:
+        eventi = stato_runtime.get("eventi_reali", {})
+    except Exception:
+        eventi = {}
+
+    if isinstance(eventi, dict) and (
+        eventi.get("mano_destra", False) or
+        eventi.get("mano_sinistra", False) or
+        eventi.get("entrambe_mani", False) or
+        eventi.get("carezza_testa", False)
+    ):
+        return True
+
+    try:
+        testo = mondo.lower()
+    except Exception:
+        return False
+
+    return (
+        u"sento un tocco sulla mano" in testo or
+        u"sento un tocco su entrambe le mani" in testo or
+        (u"carezza" in testo and u"testa" in testo)
+    )
+
 
 def _mondo_ha_eventi_multipli(mondo):
     """
@@ -1860,6 +1891,60 @@ def main():
                     mondo,
                     evento_composto=evento_composto
                 )
+
+                if _ha_evento_sociale_tattile_prioritario(mondo, stato_runtime):
+                    stato_runtime["eventi"] = dict(
+                        stato_runtime.get("eventi_reali", {})
+                    )
+
+                    decisione_sociale = valuta_condizioni_generate(
+                        mondo,
+                        stato_runtime
+                    )
+
+                    if decisione_sociale:
+                        logger.info(
+                            u"[SOUL] Evento sociale/tattile prioritario: rispondo prima del goal"
+                        )
+                        decisione_sociale = valida_decisione(
+                            decisione_sociale,
+                            mondo
+                        )
+
+                        mantieni_pattugliamento = stato_runtime.get(
+                            "in_pattugliamento",
+                            False
+                        )
+                        stato_runtime["mantieni_pattugliamento"] = (
+                            mantieni_pattugliamento
+                        )
+
+                        try:
+                            esegui_decisione(
+                                decisione_sociale,
+                                corpo,
+                                voce,
+                                vista,
+                                sistema,
+                                stato_runtime,
+                                aggiorna_memoria_callback=aggiorna_memoria_da_decisione
+                            )
+                        finally:
+                            stato_runtime["mantieni_pattugliamento"] = False
+
+                        ultima_decisione = decisione_sociale
+                        ultimo_evento_tempo = time.time()
+
+                        if mantieni_pattugliamento:
+                            stato_runtime["in_pattugliamento"] = True
+                            _riprendi_cammino_automatico(
+                                corpo,
+                                ultima_decisione
+                            )
+
+                        stato_precedente = mondo
+                        time.sleep(0.1)
+                        continue
 
                 if stato_runtime.get("missione_laboratorio", False):
                     if gestisci_navigazione_laboratorio(

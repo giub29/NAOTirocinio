@@ -1,185 +1,245 @@
 {
-  "aggiornata_il": "2026-05-26 20:46:22",
+  "aggiornata_il": "2026-06-17 00:00:00", 
   "attivazioni_recenti": [
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": 0.5,
+            "tipo": "guarda", 
+            "x": 0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
             "tipo": "parla"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
-      "tempo": "2026-05-26 20:32:47"
-    },
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green",
-            "tipo": "occhi"
-          },
-          {
-            "tipo": "guarda",
-            "x": 0.5,
-            "y": -0.2
-          },
-          {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
-            "tipo": "parla"
-          }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
-        "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
-      "tempo": "2026-05-26 20:35:48"
-    },
-    {
-      "decisione": {
-        "azioni": [
-          {
-            "colore": "green",
-            "tipo": "occhi"
-          },
-          {
-            "tipo": "guarda",
-            "x": 0.5,
-            "y": -0.2
-          },
-          {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
-            "tipo": "parla"
-          }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
-        "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.", 
       "tempo": "2026-05-26 20:39:27"
-    },
+    }, 
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": 0.5,
+            "tipo": "guarda", 
+            "x": 0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
             "tipo": "parla"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.", 
       "tempo": "2026-05-26 20:39:42"
-    },
+    }, 
     {
       "decisione": {
         "azioni": [
           {
-            "colore": "green",
+            "colore": "green", 
             "tipo": "occhi"
-          },
+          }, 
           {
-            "tipo": "guarda",
-            "x": 0.5,
+            "tipo": "guarda", 
+            "x": 0.5, 
             "y": -0.2
-          },
+          }, 
           {
-            "testo": "Ho sentito un tocco sulla mano sinistra.",
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
             "tipo": "parla"
           }
-        ],
-        "memoria": [],
-        "obiettivo": "rispondere al tocco",
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
         "stato_interno": "curioso"
-      },
-      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
+      }, 
+      "mondo": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.", 
       "tempo": "2026-05-26 20:46:22"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Sento un colpo o un rumore singolo. Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:35:52"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
+        "stato_interno": "curioso"
+      }, 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:36:21"
     }
-  ],
-  "creata_il": "2026-05-26 20:24:23",
+  ], 
+  "azione_cognitiva_origine": "risposta_sociale_controllata", 
+  "categoria_cognitiva": "sociale", 
+  "contesto_semantico": "categoria=sociale; azione_cognitiva=risposta_sociale_controllata; eventi=mano_sinistra, fermo", 
+  "creata_il": "2026-05-26 20:24:23", 
+  "esempi_negativi": [], 
+  "esempi_positivi": [
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
+        "stato_interno": "curioso"
+      }, 
+      "fonte": "attivazione_reale", 
+      "mondo": "REPORT: Sento un colpo o un rumore singolo. Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:35:52"
+    }, 
+    {
+      "decisione": {
+        "azioni": [
+          {
+            "colore": "green", 
+            "tipo": "occhi"
+          }, 
+          {
+            "tipo": "guarda", 
+            "x": 0.5, 
+            "y": -0.2
+          }, 
+          {
+            "testo": "Ho sentito un tocco sulla mano sinistra.", 
+            "tipo": "parla"
+          }
+        ], 
+        "memoria": [], 
+        "obiettivo": "rispondere al tocco", 
+        "stato_interno": "curioso"
+      }, 
+      "fonte": "attivazione_reale", 
+      "mondo": "REPORT: Evento recente: Sento un tocco sulla mano sinistra. INTERAZIONE_UTENTE. SONO FERMO.", 
+      "tempo": "2026-06-17 11:36:21"
+    }
+  ], 
   "eventi_attivi_origine": [
-    "mano_sinistra",
+    "mano_sinistra", 
     "fermo"
-  ],
+  ], 
   "eventi_completi_origine": {
-    "batteria_bassa": false,
-    "batteria_critica": false,
-    "batteria_percentuale": null,
-    "battiti_mani": false,
-    "camminando": false,
-    "carezza_testa": false,
-    "entrambe_mani": false,
-    "entrambi_piedi": false,
-    "fermo": true,
-    "mano_destra": false,
-    "mano_sinistra": true,
-    "ostacolo_destra": false,
-    "ostacolo_frontale": false,
-    "ostacolo_sinistra": false,
-    "pericolo": false,
-    "piede_destro": false,
-    "piede_sinistro": false,
-    "rumore_improvviso": false,
-    "rumore_singolo": false,
-    "urto": false,
-    "urto_piedi": false,
-    "volto_ignoto": false,
+    "batteria_bassa": false, 
+    "batteria_critica": false, 
+    "batteria_percentuale": null, 
+    "battiti_mani": false, 
+    "camminando": false, 
+    "carezza_testa": false, 
+    "entrambe_mani": false, 
+    "entrambi_piedi": false, 
+    "fermo": true, 
+    "mano_destra": false, 
+    "mano_sinistra": true, 
+    "ostacolo_destra": false, 
+    "ostacolo_frontale": false, 
+    "ostacolo_sinistra": false, 
+    "pericolo": false, 
+    "piede_destro": false, 
+    "piede_sinistro": false, 
+    "rumore_improvviso": false, 
+    "rumore_singolo": false, 
+    "urto": false, 
+    "urto_piedi": false, 
+    "volto_ignoto": false, 
     "volto_riconosciuto": false
-  },
-  "file_python": "condizione_tocco_mano_sinistra.py",
-  "mondo_origine": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.",
-  "nome": "condizione_tocco_mano_sinistra",
+  }, 
+  "feedback_osservazione_mirata": [], 
+  "file_python": "condizione_tocco_mano_sinistra.py", 
+  "mondo_origine": "REPORT: Sento un tocco sulla mano sinistra. SONO FERMO.", 
+  "motivo_generazione": "interazione sociale o tattile riconosciuta come riutilizzabile", 
+  "nome": "condizione_tocco_mano_sinistra", 
   "note": [
-    "Condizione generata autonomamente da NAO.",
-    "Il file Python contiene la logica eseguibile.",
+    "Condizione generata autonomamente da NAO.", 
+    "Il file Python contiene la logica eseguibile.", 
     "Questo JSON contiene la memoria e la tracciabilità della condizione."
-  ],
-  "origine": "autogenerata_llm",
+  ], 
+  "numero_riparazioni": 0, 
+  "origine": "autogenerata_llm", 
   "riparazione": {
-    "fallimenti": 0,
-    "successi": 0,
-    "tentativi": 0,
-    "ultimo_esito": "",
+    "fallimenti": 0, 
+    "successi": 0, 
+    "tentativi": 0, 
+    "ultimo_esito": "", 
     "ultimo_motivo": ""
-  },
+  }, 
+  "smentite_osservazione_mirata": 0, 
   "statistiche": {
-    "attivazioni": 6,
-    "errori_runtime": 0,
-    "rifiuti": 0,
-    "ultima_attivazione": "2026-05-26 20:46:22",
+    "attivazioni": 8, 
+    "errori_runtime": 0, 
+    "rifiuti": 0, 
+    "ultima_attivazione": "2026-06-17 11:36:21", 
     "ultimo_errore": ""
-  },
-  "stato": "promossa",
-  "stato_robot_origine": {},
+  }, 
+  "stato": "promossa", 
+  "stato_robot_origine": {}, 
   "validazione": {
-    "modulo": "ok",
-    "semantica": "ok",
+    "modulo": "ok", 
+    "semantica": "ok", 
     "struttura": "ok"
   }
 }

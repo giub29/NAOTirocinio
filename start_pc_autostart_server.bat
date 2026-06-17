@@ -7,6 +7,8 @@ echo SERVER AUTOSTART NAO
 echo ============================================
 
 set NAO_AUTONOMOUS_LIFE=1
+set CHOREGRAPHE_BOOT=1
+set SKIP_AUTONOMOUS_LIFE_CONFIG=1
 set NAO_PYTHON=C:\Python27\python.exe
 set NAO_ROBOT_IP=172.16.165.86
 set NAO_ROBOT_PORT=9559

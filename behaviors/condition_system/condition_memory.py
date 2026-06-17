@@ -423,6 +423,64 @@ def _azione_cognitiva_da_categoria(categoria, eventi_attivi):
     return "curiosita_controllata"
 
 
+def _condizione_sociale_o_tattile(dati):
+    categoria = str(dati.get("categoria_cognitiva", "")).lower()
+    azione = str(dati.get("azione_cognitiva_origine", "")).lower()
+    eventi_attivi = _eventi_da_metadati(dati)
+
+    if categoria == "sociale" or "sociale" in azione:
+        return True
+
+    return _contiene_evento(eventi_attivi, [
+        "carezza_testa",
+        "mano_sinistra",
+        "mano_destra",
+        "entrambe_mani",
+        "volto_ignoto",
+        "volto_riconosciuto"
+    ])
+
+
+def _target_osservazione_sociale_o_tattile(esito):
+    def _come_testo(valore):
+        if isinstance(valore, basestring):
+            return valore
+        try:
+            return unicode(valore)
+        except Exception:
+            return u""
+
+    testo = u" ".join([
+        _come_testo(esito.get("target", "") or ""),
+        _come_testo(esito.get("stato", "") or ""),
+        _come_testo(esito.get("mondo", "") or ""),
+        u" ".join([_come_testo(x) for x in esito.get("segnali_trovati", []) or []]),
+        u" ".join([_come_testo(x) for x in esito.get("segnali_mancanti", []) or []])
+    ]).lower()
+
+    return any(x in testo for x in [
+        "mano destra",
+        "mano sinistra",
+        "entrambe le mani",
+        "carezza",
+        "testa",
+        "volto",
+        "sociale",
+        "tocco"
+    ])
+
+
+def _feedback_mirato_pertinente_per_condizione(dati, esito):
+    """
+    Le osservazioni mirate su goal deliberativi aggiornano ipotesi e world model.
+    Non devono diventare esempi negativi per condizioni sociali/tattili.
+    """
+    if not _condizione_sociale_o_tattile(dati):
+        return True
+
+    return _target_osservazione_sociale_o_tattile(esito)
+
+
 def _motivo_generazione(categoria, eventi_attivi):
 
     motivi = {
@@ -1275,6 +1333,14 @@ def registra_feedback_osservazione_mirata(
 
         dati = _assicura_metadati_cognitivi(dati)
 
+        if not _feedback_mirato_pertinente_per_condizione(dati, esito):
+            logger.info(
+                u"[CONDIZIONI] Feedback osservazione mirata non pertinente ignorato per {}".format(
+                    nome_condizione
+                )
+            )
+            continue
+
         feedback = dati.get("feedback_osservazione_mirata", [])
         if not isinstance(feedback, list):
             feedback = []
@@ -1491,6 +1557,15 @@ def valuta_affidabilita_condizione(nome_condizione):
     rifiuti = statistiche.get("rifiuti", 0)
     esempi_positivi = dati.get("esempi_positivi", [])
     esempi_negativi = dati.get("esempi_negativi", [])
+    if _condizione_sociale_o_tattile(dati):
+        esempi_negativi = [
+            e for e in esempi_negativi
+            if not (
+                isinstance(e, dict) and
+                e.get("fonte") == "osservazione_mirata_smentita" and
+                not _target_osservazione_sociale_o_tattile(e)
+            )
+        ]
     numero_positivi = len(esempi_positivi)
     numero_negativi = len(esempi_negativi)
 

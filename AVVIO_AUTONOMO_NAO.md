@@ -150,6 +150,7 @@ Durante l'esecuzione il sistema crea e mantiene:
 Comandi gestiti:
 
 - `STOP`: ferma subito il cammino.
+- `START`: avvia il pattugliamento, come `VAI`.
 - `STATUS`: fa rispondere il robot con lo stato.
 - `SAY_HELLO`: invia un saluto.
 - `VAI`: avvia il pattugliamento.

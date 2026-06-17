@@ -186,7 +186,7 @@ Eventi gestiti:
 
 E' il punto di ingresso dell'autonomia appresa. Riceve `mondo` e `stato_runtime`, costruisce una firma della situazione e decide se:
 
-- usare una condizione gia' generata;
+- usare una condizione gia' generata;c
 - dare priorita a una situazione composta;
 - generare una nuova condizione;
 - forzare una generazione legata alla safety;

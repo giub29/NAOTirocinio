@@ -2,8 +2,51 @@
 import requests
 import json
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
+LLM_NON_DISPONIBILE = False
+LLM_NON_DISPONIBILE_LOGGATO = False
+
+
+def _llm_disponibile(chiave_privata):
+    global LLM_NON_DISPONIBILE_LOGGATO
+
+    if LLM_NON_DISPONIBILE or not chiave_privata:
+        if not LLM_NON_DISPONIBILE_LOGGATO:
+            print(u"[LLM] LLM non disponibile: chiave OpenAI assente o invalida")
+            LLM_NON_DISPONIBILE_LOGGATO = True
+        return False
+
+    return True
+
+
+def _marca_llm_non_disponibile(dati=None):
+    global LLM_NON_DISPONIBILE
+    global LLM_NON_DISPONIBILE_LOGGATO
+
+    testo = u""
+    try:
+        testo = json.dumps(dati or {})
+    except Exception:
+        testo = unicode(dati or "")
+
+    if "invalid_api_key" in testo or "Incorrect API key" in testo or "401" in testo:
+        LLM_NON_DISPONIBILE = True
+        if not LLM_NON_DISPONIBILE_LOGGATO:
+            print(u"[LLM] LLM non disponibile: chiave OpenAI assente o invalida")
+            LLM_NON_DISPONIBILE_LOGGATO = True
+        return True
+
+    return False
+
 
 def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
+    if not _llm_disponibile(chiave_privata):
+        return u"un ambiente familiare"
+
     try:
         headers = {
             "Content-Type": "application/json",
@@ -52,6 +95,8 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
         dati = res.json()
 
         if "choices" not in dati:
+            if _marca_llm_non_disponibile(dati):
+                return u"un ambiente familiare"
             print(u"[ERRORE ANALISI IMMAGINE HTTP {}]: {}".format(
                 res.status_code,
                 dati
@@ -70,6 +115,9 @@ def analizza_testo_visivo(img_b64, chiave_privata):
 
     Non inventa: se non legge chiaramente, restituisce TESTO_NON_LEGGIBILE.
     """
+    if not _llm_disponibile(chiave_privata):
+        return u"TESTO_NON_LEGGIBILE"
+
     try:
         headers = {
             "Content-Type": "application/json",
@@ -109,6 +157,8 @@ def analizza_testo_visivo(img_b64, chiave_privata):
         dati = res.json()
 
         if "choices" not in dati:
+            if _marca_llm_non_disponibile(dati):
+                return u"TESTO_NON_LEGGIBILE"
             print(u"[ERRORE TESTO VISIVO HTTP {}]: {}".format(
                 res.status_code,
                 dati
@@ -141,6 +191,9 @@ def estrai_json(testo):
 
 
 def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
+    if not _llm_disponibile(chiave_privata):
+        return {"azioni": []}
+
     url = "https://api.openai.com/v1/chat/completions"
 
     headers = {
@@ -226,6 +279,8 @@ def genera_decisione_anima(contesto, dati_memoria, stato_robot, chiave_privata):
         dati = res.json()
 
         if "choices" not in dati:
+            if _marca_llm_non_disponibile(dati):
+                return {"azioni": []}
             print(u"[ERRORE LLM HTTP {}]: {}".format(
                 res.status_code,
                 dati

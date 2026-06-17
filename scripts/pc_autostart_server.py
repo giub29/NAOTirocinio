@@ -16,12 +16,47 @@ except ImportError:
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 WATCHDOG_PATH = os.path.join(PROJECT_ROOT, "scripts", "autonomous_watchdog.py")
+RUNTIME_DIR = os.path.join(PROJECT_ROOT, "runtime")
+SERVER_LOG_PATH = os.path.join(RUNTIME_DIR, "pc_autostart_server.log")
 
 ROBOT_IP = os.environ.get("NAO_ROBOT_IP", "172.16.165.86")
 ROBOT_PORT = int(os.environ.get("NAO_ROBOT_PORT", "9559"))
 
 WATCHDOG_PROCESS = None
 LOCK = threading.Lock()
+
+
+def prepara_output_senza_console():
+    try:
+        if not os.path.exists(RUNTIME_DIR):
+            os.makedirs(RUNTIME_DIR)
+
+        needs_redirect = (
+            os.path.basename(sys.executable).lower().startswith("pythonw") or
+            sys.stdout is None or
+            sys.stderr is None or
+            getattr(sys.stdout, "closed", False) or
+            getattr(sys.stderr, "closed", False)
+        )
+
+        if needs_redirect:
+            log_file = open(SERVER_LOG_PATH, "a", 0)
+            sys.stdout = log_file
+            sys.stderr = log_file
+    except Exception:
+        pass
+
+
+def ambiente_watchdog():
+    env = os.environ.copy()
+    env.setdefault("NAO_AUTONOMOUS_LIFE", "1")
+    env.setdefault("CHOREGRAPHE_BOOT", "1")
+    env.setdefault("SKIP_AUTONOMOUS_LIFE_CONFIG", "1")
+    env.setdefault("NAO_ROBOT_IP", ROBOT_IP)
+    env.setdefault("NAO_ROBOT_PORT", str(ROBOT_PORT))
+    env.setdefault("NAO_IP", ROBOT_IP)
+    env.setdefault("NAO_PYTHON", sys.executable)
+    return env
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -107,7 +142,8 @@ class AutostartHandler(BaseHTTPRequestHandler):
 
                     WATCHDOG_PROCESS = subprocess.Popen(
                         [python_exe, WATCHDOG_PATH],
-                        cwd=PROJECT_ROOT
+                        cwd=PROJECT_ROOT,
+                        env=ambiente_watchdog()
                     )
 
                     self._send(200, "WATCHDOG_STARTED")
@@ -121,6 +157,8 @@ class AutostartHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    prepara_output_senza_console()
+
     host = "0.0.0.0"
     port = 8765
 

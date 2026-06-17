@@ -67,6 +67,49 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
+LLM_NON_DISPONIBILE = False
+LLM_NON_DISPONIBILE_LOGGATO = False
+
+
+def _llm_disponibile(chiave_privata):
+    global LLM_NON_DISPONIBILE_LOGGATO
+
+    if LLM_NON_DISPONIBILE or not chiave_privata:
+        if not LLM_NON_DISPONIBILE_LOGGATO:
+            logger.warning(u"[GENERATOR] LLM non disponibile: chiave OpenAI assente o invalida")
+            LLM_NON_DISPONIBILE_LOGGATO = True
+        return False
+
+    return True
+
+
+def _risposta_indica_api_key_invalida(testo):
+    try:
+        testo = unicode(testo or "").lower()
+    except Exception:
+        testo = ""
+
+    return (
+        "invalid_api_key" in testo or
+        "incorrect api key" in testo or
+        "401" in testo
+    )
+
+
+def _marca_llm_non_disponibile(testo):
+    global LLM_NON_DISPONIBILE
+    global LLM_NON_DISPONIBILE_LOGGATO
+
+    if not _risposta_indica_api_key_invalida(testo):
+        return False
+
+    LLM_NON_DISPONIBILE = True
+    if not LLM_NON_DISPONIBILE_LOGGATO:
+        logger.warning(u"[GENERATOR] LLM non disponibile: chiave OpenAI assente o invalida")
+        LLM_NON_DISPONIBILE_LOGGATO = True
+
+    return True
+
 BASE_DIR = os.path.dirname(__file__)
 
 QUARANTINE_DIR = os.path.join(BASE_DIR, "quarantine_conditions")
@@ -1446,6 +1489,9 @@ def _chiama_llm_codice(
     eventi_sconosciuti=None,
     storia_episodica=None
 ):
+    if not _llm_disponibile(chiave_privata):
+        raise Exception("LLM non disponibile")
+
     prompt = _costruisci_prompt(
         mondo,
         dati_memoria,
@@ -1477,6 +1523,8 @@ def _chiama_llm_codice(
     )
 
     if res.status_code != 200:
+        if _marca_llm_non_disponibile(res.text):
+            raise Exception("LLM non disponibile")
         raise Exception("Errore HTTP LLM: {}".format(res.text))
 
     return res.json()["choices"][0]["message"]["content"]
@@ -1489,8 +1537,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
     Poi, solo se serve, chiede al supervisore LLM.
     """
 
-    if not chiave_privata:
-        logger.warning(u"[GENERATOR] OPENAI_API_KEY assente. Non posso valutare generazione.")
+    if not _llm_disponibile(chiave_privata):
         return False
 
     try:
@@ -1701,6 +1748,8 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
         )
 
         if res.status_code != 200:
+            if _marca_llm_non_disponibile(res.text):
+                return False
             logger.warning(u"[GENERATOR] Errore HTTP valutazione: {}".format(res.text))
             return False
 
@@ -1983,8 +2032,7 @@ def genera_condizione_autonoma(
 ):
     _assicura_cartelle()
 
-    if not chiave_privata:
-        logger.warning(u"[GENERATOR] OPENAI_API_KEY assente. Non genero condizioni.")
+    if not _llm_disponibile(chiave_privata):
         return None
 
     try:
