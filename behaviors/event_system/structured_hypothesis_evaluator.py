@@ -77,6 +77,9 @@ def valuta_ipotesi_da_evento_strutturato(
     categoria_nuova = _testo(nuovo_evento_strutturato.get("categoria"))
     stato_nuovo = _testo(nuovo_evento_strutturato.get("stato"))
     azione_nuova = _testo(nuovo_evento_strutturato.get("azione_cognitiva"))
+    eventi_core_nuovi = nuovo_evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core_nuovi, list):
+        eventi_core_nuovi = []
 
     rilevanza = _numero(
         nuovo_evento_strutturato.get(
@@ -99,7 +102,11 @@ def valuta_ipotesi_da_evento_strutturato(
         aggiornata["ultima_categoria"] = categoria_nuova
         aggiornata["ultimo_stato"] = stato_nuovo
 
-        genera = rilevanza >= 0.6 or confidenza >= 0.6
+        genera = (
+            (rilevanza >= 0.6 or confidenza >= 0.6)
+            and len(eventi_core_nuovi) > 0
+            and categoria_nuova != "ambiguita"
+        )
         motivo = "ipotesi strutturata confermata"
         if genera:
             motivo = "ipotesi strutturata confermata e rilevante"

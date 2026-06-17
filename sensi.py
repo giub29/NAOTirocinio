@@ -3,6 +3,121 @@ from naoqi import ALProxy
 import time
 import threading
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
+
+TESTI_VISIVI_NON_UTILI = [
+    "NESSUN_TESTO_VISIBILE",
+    "TESTO_NON_LEGGIBILE",
+    "CODICE_NON_LEGGIBILE",
+    "",
+    None
+]
+
+
+def _testo_lower(valore):
+    try:
+        if isinstance(valore, unicode):
+            return valore.lower()
+        return unicode(valore or "").lower()
+    except:
+        return u""
+
+
+def _contiene(testo, parole):
+    for parola in parole:
+        if parola in testo:
+            return True
+    return False
+
+
+def descrivi_percezione_visiva(descrizione, testo_visivo=None):
+    """
+    Arricchisce la descrizione visiva con una frase sensoriale utile.
+
+    Non decide cosa fare e non genera condizioni: produce solo un report piu'
+    semanticamente leggibile per la pipeline cognitiva.
+    """
+    descrizione = descrizione or u""
+    testo_visivo = testo_visivo or u""
+
+    testo_descrizione = _testo_lower(descrizione)
+    testo_ocr = _testo_lower(testo_visivo).strip()
+
+    testo_leggibile = (
+        testo_visivo not in TESTI_VISIVI_NON_UTILI
+        and testo_ocr not in [
+            "nessun_testo_visibile",
+            "testo_non_leggibile",
+            "codice_non_leggibile"
+        ]
+    )
+
+    segnala_testo_non_letto = testo_ocr in [
+        "testo_non_leggibile",
+        "codice_non_leggibile"
+    ]
+
+    indicatori_testo = [
+        "testo", "scritta", "scritte", "etichetta", "etichette",
+        "parole", "lettere", "codice", "istruzioni", "avviso",
+        "messaggio", "segni", "scritte non leggibili",
+        "dettagli visivi marcati", "superfici"
+    ]
+    supporti_contenitore = [
+        "contenitore", "scatola", "barattolo", "flacone",
+        "bottiglia", "pacco", "confezione", "cassetta"
+    ]
+    supporti_schermo = [
+        "monitor", "schermo", "display", "computer", "terminale"
+    ]
+    supporti_documento = [
+        "foglio", "documento", "cartello", "lavagna", "quaderno",
+        "libro", "pagina"
+    ]
+
+    vede_supporto_testuale = (
+        _contiene(testo_descrizione, indicatori_testo)
+        or _contiene(testo_descrizione, supporti_contenitore)
+        or _contiene(testo_descrizione, supporti_schermo)
+        or _contiene(testo_descrizione, supporti_documento)
+    )
+
+    if not testo_leggibile and not (
+        segnala_testo_non_letto and vede_supporto_testuale
+    ):
+        return descrizione
+
+    if _contiene(testo_descrizione, supporti_contenitore):
+        oggetto = u"un contenitore"
+    elif _contiene(testo_descrizione, supporti_schermo):
+        oggetto = u"uno schermo o monitor"
+    elif _contiene(testo_descrizione, supporti_documento):
+        oggetto = u"un supporto scritto"
+    elif _contiene(testo_descrizione, [
+        "segni", "scritte non leggibili",
+        "dettagli visivi marcati", "superfici"
+    ]):
+        oggetto = u"un possibile supporto visivo"
+    else:
+        oggetto = u"un elemento"
+
+    frase = (
+        u" Vedo {} con possibili segni o scritte non leggibili. "
+        u"Potrebbe contenere informazioni operative."
+    ).format(oggetto)
+
+    if frase.strip() not in descrizione:
+        descrizione += frase
+
+    if testo_leggibile and u"TESTO_VISIBILE:" not in descrizione:
+        descrizione += u" TESTO_VISIBILE: {}".format(testo_visivo)
+
+    return descrizione
+
 
 class NaoSenses:
     def __init__(self, ip, port=9559):

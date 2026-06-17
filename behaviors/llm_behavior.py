@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 import requests
 import json
+import base64
+import math
+
+try:
+    from io import BytesIO
+except Exception:
+    BytesIO = None
 
 try:
     unicode
@@ -33,6 +40,116 @@ def _log_richiesta_inviata(area):
 
 def _log_fallback(area, motivo):
     print(u"[LLM][{}] fallback attivato: {}".format(area, motivo))
+
+
+def _descrizione_fallback_sicura():
+    return (
+        u"Vedo una scena acquisita dalla camera, ma l'analisi visiva LLM "
+        u"non e' disponibile."
+    )
+
+
+def _apri_immagine_locale(img_b64=None, percorso_img=None):
+    try:
+        from PIL import Image
+    except Exception:
+        return None
+
+    try:
+        if percorso_img:
+            return Image.open(percorso_img)
+
+        if img_b64 and BytesIO is not None:
+            dati = base64.b64decode(img_b64)
+            return Image.open(BytesIO(dati))
+    except Exception:
+        return None
+
+    return None
+
+
+def _statistiche_grigio(img):
+    grigio = img.convert("L")
+    grigio.thumbnail((96, 72))
+    larghezza, altezza = grigio.size
+    pixel = list(grigio.getdata())
+
+    if not pixel:
+        return {
+            "larghezza": larghezza,
+            "altezza": altezza,
+            "luminosita": 0.0,
+            "contrasto": 0.0,
+            "bordi": 0.0
+        }
+
+    totale = float(len(pixel))
+    luminosita = sum(pixel) / totale
+    varianza = sum((p - luminosita) ** 2 for p in pixel) / totale
+    contrasto = math.sqrt(varianza)
+
+    variazioni = []
+    for y in range(1, altezza):
+        riga = y * larghezza
+        riga_precedente = (y - 1) * larghezza
+        for x in range(1, larghezza):
+            p = pixel[riga + x]
+            diff_x = abs(p - pixel[riga + x - 1])
+            diff_y = abs(p - pixel[riga_precedente + x])
+            variazioni.append(max(diff_x, diff_y))
+
+    if variazioni:
+        bordi = sum(1 for v in variazioni if v >= 32) / float(len(variazioni))
+    else:
+        bordi = 0.0
+
+    return {
+        "larghezza": larghezza,
+        "altezza": altezza,
+        "luminosita": luminosita,
+        "contrasto": contrasto,
+        "bordi": bordi
+    }
+
+
+def descrivi_immagine_fallback_locale(img_b64=None, percorso_img=None):
+    """
+    Fallback visivo locale e prudente, senza LLM e senza OCR obbligatorio.
+    """
+    img = _apri_immagine_locale(
+        img_b64=img_b64,
+        percorso_img=percorso_img
+    )
+
+    if img is None:
+        return _descrizione_fallback_sicura()
+
+    try:
+        stats = _statistiche_grigio(img)
+    except Exception:
+        return _descrizione_fallback_sicura()
+
+    luminosita = stats.get("luminosita", 0.0)
+    contrasto = stats.get("contrasto", 0.0)
+    bordi = stats.get("bordi", 0.0)
+
+    if luminosita < 35:
+        return (
+            u"Vedo una scena poco illuminata; non riesco a distinguere "
+            u"bene gli oggetti senza analisi visiva LLM."
+        )
+
+    if contrasto >= 45 or bordi >= 0.18:
+        return (
+            u"Vedo una scena con dettagli visivi marcati e possibili "
+            u"superfici o oggetti. Potrebbero esserci segni o scritte "
+            u"non leggibili localmente."
+        )
+
+    return (
+        u"Vedo una scena acquisita dalla camera, ma non distinguo "
+        u"elementi rilevanti senza analisi visiva LLM."
+    )
 
 
 def _llm_disponibile(chiave_privata):
@@ -86,7 +203,8 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
 
     if not _llm_disponibile(chiave_privata):
         _log_fallback(area, "LLM non disponibile prima della richiesta")
-        return u"un ambiente familiare"
+        _log_fallback(area, "uso fallback visivo locale")
+        return descrivi_immagine_fallback_locale(img_b64=img_b64)
 
     try:
         headers = {
@@ -139,19 +257,22 @@ def analizza_immagine(img_b64, chiave_privata, contesto="ostacolo"):
         if "choices" not in dati:
             if _marca_llm_non_disponibile(dati):
                 _log_fallback(area, "API key assente o invalida")
-                return u"un ambiente familiare"
+                _log_fallback(area, "uso fallback visivo locale")
+                return descrivi_immagine_fallback_locale(img_b64=img_b64)
             print(u"[ERRORE ANALISI IMMAGINE HTTP {}]: {}".format(
                 res.status_code,
                 dati
             ))
             _log_fallback(area, "risposta HTTP senza choices")
-            return u"un ambiente familiare"
+            _log_fallback(area, "uso fallback visivo locale")
+            return descrivi_immagine_fallback_locale(img_b64=img_b64)
 
         return dati['choices'][0]['message']['content']
 
     except Exception as e:
         _log_fallback(area, "eccezione: {}".format(e))
-        return u"un ambiente familiare"
+        _log_fallback(area, "uso fallback visivo locale")
+        return descrivi_immagine_fallback_locale(img_b64=img_b64)
 
 def analizza_testo_visivo(img_b64, chiave_privata):
     """

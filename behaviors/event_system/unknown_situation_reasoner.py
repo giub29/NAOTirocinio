@@ -4,6 +4,13 @@ from __future__ import unicode_literals
 import re
 import unicodedata
 
+try:
+    from behaviors.event_system.visual_semantic_interpreter import (
+        interpreta_contenuto_visivo
+    )
+except Exception:
+    interpreta_contenuto_visivo = None
+
 
 def _normalizza(testo):
     if not testo:
@@ -41,8 +48,12 @@ def _categoria_stato(evento, tipo):
     if tipo in [
         "informazione_visiva_incerta",
         "supporto_informativo_potenziale",
-        "ambiguita_visiva"
+        "ambiguita_visiva",
+        "contenuto_testuale_incerto"
     ]:
+        return "ambiguita", "incerto"
+
+    if evento == "contenuto_testuale_da_approfondire":
         return "ambiguita", "incerto"
 
     if evento in ["informazione_operativa", "contenuto_informativo_rilevante"]:
@@ -172,7 +183,47 @@ def ragiona_situazione_sconosciuta(testo):
             "azione_cognitiva": "osserva_con_prudenza"
         })
 
-    # 3. Informazione visiva / testo / contenuti osservabili.
+    # 3. Significato funzionale di contenuti visivi leggibili.
+    # Prima dei casi "incerti", cosi' un testo operativo letto davvero
+    # non viene degradato a semplice ambiguita' visiva.
+    if interpreta_contenuto_visivo is not None:
+        try:
+            interpretazione_visiva = interpreta_contenuto_visivo(testo)
+        except Exception:
+            interpretazione_visiva = {}
+
+        if (
+            isinstance(interpretazione_visiva, dict)
+            and interpretazione_visiva.get("evento")
+        ):
+            evento_visivo = interpretazione_visiva.get("evento")
+            azione_visiva = interpretazione_visiva.get(
+                "azione_cognitiva",
+                "osserva_e_memorizza"
+            )
+            return _arricchisci_strutturato({
+                "significativa": interpretazione_visiva.get(
+                    "rilevanza"
+                ) in ["media", "alta"],
+                "genera_condizione": bool(
+                    interpretazione_visiva.get(
+                        "genera_condizione",
+                        False
+                    )
+                ),
+                "tipo": interpretazione_visiva.get(
+                    "categoria",
+                    "informazione_visiva"
+                ),
+                "evento": evento_visivo,
+                "ipotesi": interpretazione_visiva.get(
+                    "significato",
+                    "contenuto visivo funzionalmente rilevante"
+                ),
+                "azione_cognitiva": azione_visiva
+            })
+
+    # 4. Informazione visiva / testo / contenuti osservabili.
     # Gerarchia:
     # - contenuto chiaramente leggibile/importante -> genera condizione
     # - supporto informativo presente ma non leggibile -> osserva_meglio
@@ -183,7 +234,9 @@ def ragiona_situazione_sconosciuta(testo):
         "lavagna", "foglio", "fogli", "documento",
         "documenti", "cartello", "scritta", "scritte",
         "testo", "codice", "file", "programma",
-        "interfaccia", "finestra", "terminale"
+        "interfaccia", "finestra", "terminale",
+        "segni", "superfici", "dettagli visivi marcati",
+        "supporto visivo"
     ]
 
     segnali_non_chiari = [
@@ -222,7 +275,10 @@ def ragiona_situazione_sconosciuta(testo):
         "non possibile discernere",
         "non e possibile discernere",
         "testo scritto",
-        "testo sulla lavagna"
+        "testo sulla lavagna",
+        "scritte non leggibili",
+        "non leggibili localmente",
+        "segni o scritte"
     ]
 
     assenza_informazione = [
@@ -311,7 +367,7 @@ def ragiona_situazione_sconosciuta(testo):
             "azione_cognitiva": "osserva_meglio"
         })
     
-    # 4. Oggetto/elemento generico interessante ma senza stato utile
+    # 5. Oggetto/elemento generico interessante ma senza stato utile
     # Qui NON generiamo condizione: solo curiosità.
     if _contiene(testo, [
         "oggetto", "elemento", "dispositivo", "strumento",
@@ -326,7 +382,7 @@ def ragiona_situazione_sconosciuta(testo):
             "azione_cognitiva": "osserva_meglio"
         })
 
-    # 5. Descrizione ambientale normale
+    # 6. Descrizione ambientale normale
     return _arricchisci_strutturato({
         "significativa": False,
         "genera_condizione": False,

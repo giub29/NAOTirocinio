@@ -179,6 +179,7 @@ def interpreta_contenuto_visivo(testo_osservato):
     if _contiene(testo, [
         "conferisci qui",
         "conferire",
+        "conferisci",
         "inserire",
         "inserisci",
         "mettere",
@@ -188,8 +189,14 @@ def interpreta_contenuto_visivo(testo_osservato):
         "usare",
         "premere",
         "premi",
+        "spingere",
+        "spingi",
+        "tirare",
+        "tira",
         "seguire",
         "istruzioni",
+        "uscita",
+        "uscire",
         "indica cosa",
         "cosa conferire",
         "materiali accettabili"
@@ -200,7 +207,7 @@ def interpreta_contenuto_visivo(testo_osservato):
             "significato": "il contenuto osservato fornisce indicazioni utili per agire o usare qualcosa",
             "rilevanza": "alta",
             "genera_condizione": True,
-            "azione_cognitiva": "interpreta_e_memorizza"
+            "azione_cognitiva": "osserva_e_memorizza"
         }
 
     # 4. CONTENUTO INFORMATIVO RILEVANTE: digitale, cartaceo, ambientale.

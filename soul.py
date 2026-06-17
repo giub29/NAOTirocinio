@@ -29,7 +29,7 @@ from modules.vision_perception import NaoVision
 from modules.voice_interaction import NaoVoice
 from modules.system_manager import NaoSystem
 from modules.hardware_control import NaoBody
-from sensi import NaoSenses
+from sensi import NaoSenses, descrivi_percezione_visiva
 
 from core.memory_manager import carica_memoria, salva_memoria
 from core.robot_state import crea_stato_robot, aggiorna_stato_robot
@@ -762,15 +762,10 @@ def _gestisci_iniziativa_robot(corpo, voce, motivo="inerzia"):
             CHIAVE_PRIVATA
         )
 
-        if testo_visivo not in [
-            "NESSUN_TESTO_VISIBILE",
-            "TESTO_NON_LEGGIBILE",
-            "CODICE_NON_LEGGIBILE"
-        ]:
-            descrizione += (
-                u" TESTO_VISIBILE: {}"
-                .format(testo_visivo)
-            )
+        descrizione = descrivi_percezione_visiva(
+            descrizione,
+            testo_visivo
+        )
 
     else:
         descrizione = (
@@ -899,12 +894,10 @@ def _gestisci_osservazione_mirata(corpo, voce, mondo_origine):
             CHIAVE_PRIVATA
         )
 
-        if testo_visivo not in [
-            "NESSUN_TESTO_VISIBILE",
-            "TESTO_NON_LEGGIBILE",
-            "CODICE_NON_LEGGIBILE"
-        ]:
-            descrizione += u" TESTO_VISIBILE: {}".format(testo_visivo)
+        descrizione = descrivi_percezione_visiva(
+            descrizione,
+            testo_visivo
+        )
     else:
         descrizione = (
             u"non riesco a vedere chiaramente l'ambiente "

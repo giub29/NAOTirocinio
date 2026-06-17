@@ -20,6 +20,7 @@ import logging
 import traceback
 import time
 import os
+import inspect
 
 try:
     from behaviors.event_system.unknown_event_extractor import (
@@ -198,6 +199,31 @@ def integra_eventi_sconosciuti_in_evento_strutturato(
     evento_strutturato["evento_composto"] = len(eventi_uniti) >= 2
 
     return evento_strutturato
+
+
+def evento_strutturato_va_ricostruito(evento_strutturato, mondo):
+    if not isinstance(evento_strutturato, dict):
+        return True
+
+    if not evento_strutturato:
+        return True
+
+    testo_originale = evento_strutturato.get("testo_originale")
+    if testo_originale and mondo and testo_originale != mondo:
+        return True
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+    eventi_core = evento_strutturato.get("eventi_core", [])
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    return (
+        categoria in ["", "neutra"]
+        and tipo in ["", "generico", "neutra"]
+        and len(eventi_core) == 0
+    )
 
 
 def salva_ipotesi_temporanea_da_decisione(stato_runtime, decisione):
@@ -556,6 +582,54 @@ def costruisci_decisione_azione_successiva_sicura(stato_runtime):
         return None
 
 
+def _generatore_supporta_storia_episodica(funzione_generatore):
+    try:
+        if hasattr(inspect, "getfullargspec"):
+            specifica = inspect.getfullargspec(funzione_generatore)
+            argomenti = specifica.args
+            keywords = specifica.varkw
+        else:
+            specifica = inspect.getargspec(funzione_generatore)
+            argomenti = specifica.args
+            keywords = specifica.keywords
+
+        if "storia_episodica" in argomenti:
+            return True
+        if keywords is not None:
+            return True
+        return False
+    except Exception:
+        return True
+
+
+def chiama_genera_condizione_autonoma_sicura(
+    funzione_generatore,
+    mondo,
+    dati_memoria,
+    stato_robot,
+    chiave_privata,
+    storia_episodica=None
+):
+    if _generatore_supporta_storia_episodica(funzione_generatore):
+        return funzione_generatore(
+            mondo,
+            dati_memoria,
+            stato_robot,
+            chiave_privata,
+            storia_episodica=storia_episodica
+        )
+
+    logger.warning(
+        "[AUTONOMIA] Generator senza parametro storia_episodica: uso chiamata legacy"
+    )
+    return funzione_generatore(
+        mondo,
+        dati_memoria,
+        stato_robot,
+        chiave_privata
+    )
+
+
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
     Punto unico di ingresso per l'autonomia.
@@ -577,13 +651,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         evento_strutturato = stato_runtime.get("evento_strutturato", {})
         if (
             costruisci_evento_strutturato_layer is not None
-            and not isinstance(evento_strutturato, dict)
-        ):
-            evento_strutturato = {}
-
-        if (
-            costruisci_evento_strutturato_layer is not None
-            and not evento_strutturato
+            and evento_strutturato_va_ricostruito(
+                evento_strutturato,
+                mondo
+            )
         ):
             evento_strutturato = costruisci_evento_strutturato_layer(
                 mondo,
@@ -1970,7 +2041,8 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 )
             )
 
-            path_nuova_condizione = condition_generator.genera_condizione_autonoma(
+            path_nuova_condizione = chiama_genera_condizione_autonoma_sicura(
+                condition_generator.genera_condizione_autonoma,
                 mondo,
                 dati_memoria,
                 stato_robot,

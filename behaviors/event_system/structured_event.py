@@ -192,8 +192,12 @@ def _categoria_da_ragionamento(ragionamento):
     if tipo in [
         "informazione_visiva_incerta",
         "supporto_informativo_potenziale",
-        "ambiguita_visiva"
+        "ambiguita_visiva",
+        "contenuto_testuale_incerto"
     ]:
+        return "ambiguita", "incerto"
+
+    if evento == "contenuto_testuale_da_approfondire":
         return "ambiguita", "incerto"
 
     if evento in [
@@ -222,14 +226,20 @@ def _applica_ragionamento(evento, mondo):
     genera = bool(ragionamento.get("genera_condizione", False))
     azione = ragionamento.get("azione_cognitiva") or "ignora"
     nome_evento = ragionamento.get("evento")
+    rilevanza = 0.75 if significativa else 0.2
+    confidenza = 0.7 if significativa else 0.4
+
+    if categoria == "ambiguita" or str(azione).lower() == "osserva_meglio":
+        rilevanza = max(rilevanza, 0.7)
+        confidenza = max(confidenza, 0.6)
 
     evento.update({
         "categoria": categoria,
         "stato": stato,
-        "rilevanza": 0.75 if significativa else 0.2,
+        "rilevanza": rilevanza,
         "azione_cognitiva": azione,
         "genera_condizione": genera,
-        "confidenza": 0.7 if significativa else 0.4,
+        "confidenza": confidenza,
         "tipo": nome_evento or ragionamento.get("tipo", "generico"),
         "ragionamento_unknown": ragionamento
     })
