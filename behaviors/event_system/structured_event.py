@@ -3,6 +3,14 @@ from __future__ import unicode_literals
 
 import re
 import unicodedata
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def _diag(label, valore):
+    return None
 
 try:
     basestring
@@ -206,6 +214,15 @@ def _categoria_da_ragionamento(ragionamento):
     ] or tipo == "informazione_visiva":
         return "informazione", "rilevante"
 
+    if evento == "supporto_informativo_non_disponibile":
+        return "supporto_informativo", "non_disponibile"
+
+    if evento == "supporto_informativo_potenziale":
+        return "supporto_informativo", "potenziale"
+
+    if evento == "ambiente_didattico_probabile":
+        return "contesto_ambientale", "didattico_probabile"
+
     return "neutra", "osservato"
 
 
@@ -258,6 +275,9 @@ def costruisci_evento_strutturato(mondo, eventi_grezzi=None):
     Non sostituisce la pipeline string-based: aggiunge una vista stabile che
     puo' essere salvata in stato_runtime["evento_strutturato"].
     """
+    _diag("input_mondo", mondo)
+    _diag("input_eventi_grezzi", eventi_grezzi)
+
     eventi = _eventi_booleani(eventi_grezzi)
     evento = _base_evento(mondo, eventi)
 
@@ -272,4 +292,5 @@ def costruisci_evento_strutturato(mondo, eventi_grezzi=None):
     if evento.get("camminando") and len(eventi_core) >= 1:
         evento["evento_composto"] = True
 
+    _diag("output", evento)
     return evento

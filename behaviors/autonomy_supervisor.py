@@ -147,6 +147,10 @@ EVENTI_HELPER_NON_GENERATIVI = [
 ]
 
 
+def _diag_pipeline(label, valore):
+    return None
+
+
 def filtra_eventi_helper(eventi):
     if not isinstance(eventi, list):
         return []
@@ -686,6 +690,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         stato_runtime = {}
 
     logger.info("[AUTONOMIA] Supervisore attivo")
+    _diag_pipeline("gestisci_autonomia.input_mondo", mondo)
+    _diag_pipeline(
+        "gestisci_autonomia.runtime_evento_strutturato_pre",
+        stato_runtime.get("evento_strutturato", {})
+    )
 
     try:
         evento_strutturato = stato_runtime.get("evento_strutturato", {})
@@ -701,6 +710,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 stato_runtime
             )
             stato_runtime["evento_strutturato"] = evento_strutturato
+        _diag_pipeline(
+            "gestisci_autonomia.runtime_evento_strutturato_post",
+            stato_runtime.get("evento_strutturato", {})
+        )
 
     except Exception as e:
         logger.warning(
@@ -1741,10 +1754,15 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     if stato_runtime is None:
         stato_runtime = {}
 
+    _diag_pipeline("costruisci_firma.input_mondo", mondo)
+
     testo = (mondo or "").strip().lower()
     eventi = dict(stato_runtime.get("eventi", {}))
     eventi_reali = dict(stato_runtime.get("eventi_reali", {}))
     evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    _diag_pipeline("costruisci_firma.input_eventi", eventi)
+    _diag_pipeline("costruisci_firma.input_eventi_reali", eventi_reali)
+    _diag_pipeline("costruisci_firma.input_evento_strutturato", evento_strutturato)
 
     if not isinstance(evento_strutturato, dict):
         evento_strutturato = {}
@@ -1771,6 +1789,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
             mondo_unknown = _pulisci_mondo_per_unknown(
                 mondo
             )
+            _diag_pipeline("costruisci_firma.mondo_unknown", mondo_unknown)
 
         if mondo_unknown:
             # Reasoner semantico generalista
@@ -1784,6 +1803,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                         mondo_unknown
                     )
                 )
+                _diag_pipeline("costruisci_firma.reasoner_output", ragionamento)
 
                 if (
                     isinstance(ragionamento, dict)
@@ -1804,6 +1824,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
                     mondo_unknown
                 )
             )
+            _diag_pipeline("costruisci_firma.extractor_output", eventi_unknown)
 
             for ev in eventi_unknown:
 
@@ -2018,7 +2039,7 @@ def costruisci_firma_situazione(mondo, stato_runtime):
     except Exception:
         eventi_descritti = {}
 
-    return {
+    firma = {
         "testo": testo,
         "eventi": eventi,
         "eventi_attivi": eventi_attivi,
@@ -2033,6 +2054,9 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         "eventi_core": eventi_core,
         "gia_tentata": gia_tentata
     }
+
+    _diag_pipeline("costruisci_firma.output", firma)
+    return firma
     
 
 def prova_generazione_autonoma(mondo, stato_runtime, motivo):

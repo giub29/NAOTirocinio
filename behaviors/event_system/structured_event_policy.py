@@ -119,6 +119,7 @@ def decidi_da_evento_strutturato(
         return None
 
     categoria = _testo(evento_strutturato.get("categoria"))
+    stato = _testo(evento_strutturato.get("stato"))
     origine = _testo(evento_strutturato.get("origine"))
     azione_cognitiva = _testo(evento_strutturato.get("azione_cognitiva"))
     gravita = _testo(evento_strutturato.get("gravita"))
@@ -132,6 +133,31 @@ def decidi_da_evento_strutturato(
 
     if _evento_noto_non_generativo(categoria, origine):
         return None
+
+    if (
+        categoria == "supporto_informativo"
+        and stato == "non_disponibile"
+    ):
+        return None
+
+    if (
+        categoria == "supporto_informativo"
+        and stato == "potenziale"
+    ):
+        return _costruisci_decisione(
+            evento_strutturato,
+            "curioso",
+            "capire meglio un supporto informativo potenziale",
+            "osserva_meglio"
+        )
+
+    if categoria == "contesto_ambientale":
+        return _costruisci_decisione(
+            evento_strutturato,
+            "curioso",
+            "comprendere meglio il contesto funzionale dell'ambiente",
+            "osserva_meglio"
+        )
 
     if categoria == "ambiguita" or azione_cognitiva == "osserva_meglio":
         return _costruisci_decisione(

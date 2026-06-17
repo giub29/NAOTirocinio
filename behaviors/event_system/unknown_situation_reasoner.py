@@ -3,6 +3,14 @@ from __future__ import unicode_literals
 
 import re
 import unicodedata
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def _diag(label, valore):
+    return None
 
 try:
     from behaviors.event_system.visual_semantic_interpreter import (
@@ -59,6 +67,15 @@ def _categoria_stato(evento, tipo):
     if evento in ["informazione_operativa", "contenuto_informativo_rilevante"]:
         return "informazione", "rilevante"
 
+    if evento == "supporto_informativo_non_disponibile":
+        return "supporto_informativo", "non_disponibile"
+
+    if evento == "supporto_informativo_potenziale":
+        return "supporto_informativo", "potenziale"
+
+    if evento == "ambiente_didattico_probabile":
+        return "contesto_ambientale", "didattico_probabile"
+
     return "neutra", "osservato"
 
 
@@ -79,6 +96,7 @@ def _arricchisci_strutturato(esito):
         "eventi_core": [evento] if evento else []
     }
 
+    _diag("output", esito)
     return esito
 
 
@@ -96,7 +114,9 @@ def ragiona_situazione_sconosciuta(testo):
     - necessita' di seconda osservazione
     """
 
+    _diag("input_originale", testo)
     testo = _normalizza(testo)
+    _diag("input_normalizzato", testo)
     zone_rilevanti = [
         "porta", "ingresso", "uscita",
         "corridoio", "passaggio", "accesso", "entrata"
@@ -120,25 +140,6 @@ def ragiona_situazione_sconosciuta(testo):
                 "un elemento si trova vicino a una zona funzionalmente rilevante"
             ),
             "azione_cognitiva": "osserva_con_prudenza"
-        })
-
-    indicatori_ambiguita = [
-        "sfocato", "sfocata",
-        "lontano", "lontana",
-        "confuso", "confusa",
-        "non leggibile"
-    ]
-
-    if any(x in testo for x in indicatori_ambiguita):
-        return _arricchisci_strutturato({
-            "significativa": False,
-            "genera_condizione": False,
-            "tipo": "ambiguita_visiva",
-            "evento": None,
-            "ipotesi": (
-                "la scena osservata non e' ancora abbastanza chiara"
-            ),
-            "azione_cognitiva": "osserva_meglio"
         })
 
     if not testo:
@@ -210,6 +211,25 @@ def ragiona_situazione_sconosciuta(testo):
                     ),
                     "azione_cognitiva": azione_visiva or "osserva_meglio"
                 })
+
+    indicatori_ambiguita = [
+        "sfocato", "sfocata",
+        "lontano", "lontana",
+        "confuso", "confusa",
+        "non leggibile"
+    ]
+
+    if any(x in testo for x in indicatori_ambiguita):
+        return _arricchisci_strutturato({
+            "significativa": False,
+            "genera_condizione": False,
+            "tipo": "ambiguita_visiva",
+            "evento": None,
+            "ipotesi": (
+                "la scena osservata non e' ancora abbastanza chiara"
+            ),
+            "azione_cognitiva": "osserva_meglio"
+        })
 
     # 2. Situazioni che influenzano movimento/accesso
     if _contiene(testo, [

@@ -3,6 +3,20 @@ from __future__ import unicode_literals
 
 import re
 import unicodedata
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def _diag(label, valore):
+    return None
+
+
+def _ritorna(eventi, fase):
+    _diag("output_{}".format(fase), eventi)
+    return eventi
+
 try:
     from behaviors.event_system.visual_semantic_interpreter import (
         interpreta_contenuto_visivo
@@ -88,10 +102,12 @@ def estrai_eventi_sconosciuti(testo):
     Solo dopo usa il reasoner generico e le regole spaziali/safety.
     """
 
+    _diag("input_originale", testo)
     testo = _normalizza(testo)
+    _diag("input_normalizzato", testo)
 
     if not testo:
-        return []
+        return _ritorna([], "testo_vuoto")
 
     eventi = []
 
@@ -112,7 +128,7 @@ def estrai_eventi_sconosciuti(testo):
             "corridoio", "entrata", "uscita", "varco"
         ])
     ):
-        return [
+        return _ritorna([
             {
                 "nome": "oggetto_in_zona_rilevante",
                 "categoria": "sconosciuta",
@@ -121,7 +137,7 @@ def estrai_eventi_sconosciuti(testo):
                 "priorita": "media",
                 "origine": "unknown_autonomo"
             }
-        ]
+        ], "oggetto_zona_rilevante")
     
     # 0. Regole semantiche specifiche ad alta priorita'.
     # Devono venire PRIMA dell'interprete visuale generico,
@@ -130,7 +146,7 @@ def estrai_eventi_sconosciuti(testo):
     if _contiene(testo, ["porta", "varco", "ingresso", "uscita"]):
 
         if _contiene(testo, ["davanti", "vicino", "accanto", "in mezzo", "sul"]):
-            return [
+            return _ritorna([
                 {
                     "nome": "oggetto_in_zona_rilevante",
                     "categoria": "sconosciuta",
@@ -139,10 +155,10 @@ def estrai_eventi_sconosciuti(testo):
                     "priorita": "media",
                     "origine": "unknown_autonomo"
                 }
-            ]
+            ], "porta_vicino")
 
         if _contiene(testo, ["chius", "serrata", "bloccata", "bloccato"]):
-            return [
+            return _ritorna([
                 {
                     "nome": "accesso_non_disponibile",
                     "categoria": "sconosciuta",
@@ -151,10 +167,10 @@ def estrai_eventi_sconosciuti(testo):
                     "priorita": "alta",
                     "origine": "unknown_autonomo"
                 }
-            ]
+            ], "porta_chiusa")
 
         if _contiene(testo, ["apert", "spalancata", "socchiusa"]):
-            return [
+            return _ritorna([
                 {
                     "nome": "accesso_disponibile",
                     "categoria": "sconosciuta",
@@ -163,7 +179,7 @@ def estrai_eventi_sconosciuti(testo):
                     "priorita": "media",
                     "origine": "unknown_autonomo"
                 }
-            ]
+            ], "porta_aperta")
         
     # Contenuto presente ma non ancora interpretabile:
     # non deve diventare memoria o informazione operativa.
@@ -179,13 +195,14 @@ def estrai_eventi_sconosciuti(testo):
     ]
 
     if any(x in testo for x in indicatori_non_leggibile):
-        return []
+        return _ritorna([], "non_leggibile")
 
     # 1. Interprete semantico visuale:
     # deve venire PRIMA del filtro "descrizione generica",
     # altrimenti testi utili su oggetti/pareti/contenitori vengono ignorati.
     if interpreta_contenuto_visivo is not None:
         interpretazione = interpreta_contenuto_visivo(testo)
+        _diag("visual_semantic_output", interpretazione)
 
         if interpretazione.get("genera_condizione", False):
             nome_evento = interpretazione.get("evento")
@@ -203,30 +220,31 @@ def estrai_eventi_sconosciuti(testo):
                 })
 
     if eventi:
-        return eventi
+        return _ritorna(eventi, "visual_semantic")
 
     # 2. Ora posso scartare descrizioni davvero generiche.
     if _solo_descrizione_generica(testo):
-        return []
+        return _ritorna([], "descrizione_generica")
 
     # 3. Reasoner generale: fallback.
     if ragiona_situazione_sconosciuta is not None:
         ragionamento = ragiona_situazione_sconosciuta(testo)
+        _diag("reasoner_output", ragionamento)
 
         if not ragionamento.get("genera_condizione", False):
-            return []
+            return _ritorna([], "reasoner_non_generativo")
 
         evento = ragionamento.get("evento")
 
         if evento:
-            return [
+            return _ritorna([
                 _evento_con_struttura(
                     evento,
                     "alta" if ragionamento.get("tipo") == "spaziale_safety" else "media",
                     ragionamento.get("ipotesi", "situazione sconosciuta significativa"),
                     ragionamento.get("evento_strutturato")
                 )
-            ]
+            ], "reasoner_generativo")
 
     # 4. Regole simboliche residuali.
     if _contiene(testo, [
@@ -332,4 +350,4 @@ def estrai_eventi_sconosciuti(testo):
             puliti.append(ev)
             visti.add(nome)
 
-    return puliti
+    return _ritorna(puliti, "regole_residuali")
