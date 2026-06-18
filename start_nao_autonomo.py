@@ -35,6 +35,7 @@ def carica_openai_api_key_locale():
 
 os.environ.setdefault("NAO_AUTONOMOUS_LIFE", "1")
 os.environ.setdefault("CHOREGRAPHE_BOOT", "1")
+os.environ.setdefault("SKIP_AUTONOMOUS_LIFE_CONFIG", "1")
 carica_openai_api_key_locale()
 
 # Se gira direttamente su NAO, il robot parla con se stesso

@@ -377,8 +377,11 @@ def _thread_input_utente():
                 input_ricevuto = True
             
             elif comando == "START":
-                messaggio_utente = "vai"
-                input_ricevuto = True
+                logger.info(
+                    u"[SOUL] START ricevuto: sistema autonomo gia' attivo"
+                )
+                messaggio_utente = ""
+                input_ricevuto = False
 
             elif comando == "VAI":
                 messaggio_utente = "vai"

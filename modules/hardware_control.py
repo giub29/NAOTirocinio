@@ -5,6 +5,9 @@ import io
 import base64
 from PIL import Image
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FOTO_DIR = os.path.join(PROJECT_ROOT, "foto")
+
 
 class NaoBody:
     def __init__(self, ip, port=9559):
@@ -120,7 +123,7 @@ class NaoBody:
                 img_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
                 if nome_file:
-                    cartella = "foto"
+                    cartella = FOTO_DIR
 
                     if not os.path.exists(cartella):
                         os.makedirs(cartella)
@@ -128,7 +131,11 @@ class NaoBody:
                     percorso_completo = os.path.join(cartella, nome_file)
                     im.save(percorso_completo)
 
-                    print("--- FOTO ARCHIVIATA IN: {} ---".format(percorso_completo))
+                    print(
+                        "--- FOTO ARCHIVIATA IN: {} ---".format(
+                            percorso_completo
+                        )
+                    )
 
                 return img_b64
 

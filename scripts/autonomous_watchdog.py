@@ -25,11 +25,13 @@ HEARTBEAT_FILE = os.path.join(RUNTIME_DIR, "heartbeat.txt")
 SOUL_LOCK_FILE = os.path.join(RUNTIME_DIR, "soul.lock")
 WATCHDOG_LOCK_FILE = os.path.join(RUNTIME_DIR, "watchdog.lock")
 
-TIMEOUT_HEARTBEAT = 180
-CONTROLLO_INTERVALLO = 3
-MAX_RIAVVII_CONSECUTIVI = 8
-PAUSA_RIAVVIO_BASE = 10
-PAUSA_RIAVVIO_MAX = 60
+TIMEOUT_HEARTBEAT = int(os.environ.get("WATCHDOG_TIMEOUT_HEARTBEAT", "180"))
+CONTROLLO_INTERVALLO = int(os.environ.get("WATCHDOG_CONTROLLO_INTERVALLO", "3"))
+MAX_RIAVVII_CONSECUTIVI = int(
+    os.environ.get("WATCHDOG_MAX_RIAVVII_CONSECUTIVI", "0")
+)
+PAUSA_RIAVVIO_BASE = int(os.environ.get("WATCHDOG_PAUSA_RIAVVIO_BASE", "10"))
+PAUSA_RIAVVIO_MAX = int(os.environ.get("WATCHDOG_PAUSA_RIAVVIO_MAX", "60"))
 
 processo = None
 STOP = False
@@ -295,7 +297,10 @@ def main():
                 "Riavvio numero {}".format(riavvii)
             )
 
-            if riavvii >= MAX_RIAVVII_CONSECUTIVI:
+            if (
+                MAX_RIAVVII_CONSECUTIVI > 0
+                and riavvii >= MAX_RIAVVII_CONSECUTIVI
+            ):
 
                 logger.error(
                     "Troppi riavvii consecutivi. "

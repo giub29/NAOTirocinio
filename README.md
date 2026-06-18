@@ -81,7 +81,7 @@ Funzioni principali:
 - quarantena, validazione, rifiuto e riparazione delle condizioni generate;
 - memoria runtime e metadati persistenti separati per condizioni, ipotesi, world model e goal;
 - heartbeat e integrazione con Choregraphe/NAOqi tramite ALMemory;
-- bootstrap da robot e watchdog lato PC per avvio autonomo.
+- bootstrap e watchdog onboard per avvio autonomo senza PC.
 
 ## Struttura
 
@@ -92,7 +92,7 @@ NAOTirocinio/
 |-- start_nao_autonomo.py           # helper avvio diretto multipiattaforma
 |-- start_nao_autonomo.bat          # helper Windows per avvio watchdog
 |-- start_nao_autonomo.sh           # helper Linux/NAO per avvio diretto
-|-- start_pc_autostart_server.bat   # avvio server autostart PC
+|-- start_pc_autostart_server.bat   # fallback/debug server PC opzionale
 |-- AVVIO_AUTONOMO_NAO.md           # note operative per bootstrap autonomo
 |
 |-- core/
@@ -143,7 +143,7 @@ NAOTirocinio/
 |
 |-- scripts/
 |   |-- nao_autonomous_bootstrap.py # script da eseguire sul NAO
-|   |-- pc_autostart_server.py      # server HTTP locale per avviare watchdog
+|   |-- pc_autostart_server.py      # fallback/debug HTTP da PC
 |   `-- autonomous_watchdog.py      # controlla heartbeat e riavvia soul.py
 |
 |-- foto/                           # foto acquisite a runtime, non obbligatorie in consegna
@@ -349,7 +349,7 @@ python soul.py
 Prima dell'avvio verificare:
 
 - IP del robot in `soul.py` (`IP_ROBOT`);
-- rete tra PC e NAO;
+- WiFi del robot, con accesso internet se si usano funzioni LLM;
 - SDK NAOqi disponibile nell'ambiente Python usato;
 - `NAO_AUTONOMOUS_LIFE=1` e `SKIP_AUTONOMOUS_LIFE_CONFIG=1` nel ramo attuale, dove la configurazione diretta di `NaoSystem` e' saltata;
 - `OPENAI_API_KEY`, se si vogliono usare decisioni LLM e generazione condizioni.
@@ -358,10 +358,9 @@ Prima dell'avvio verificare:
 
 Componenti coinvolti:
 
-- `scripts/nao_autonomous_bootstrap.py`: gira sul robot, scrive stato in ALMemory e chiama il PC;
-- `scripts/pc_autostart_server.py`: espone endpoint locali `/ping`, `/robot`, `/status` e `/start`;
-- `scripts/autonomous_watchdog.py`: avvia `soul.py`, controlla `runtime/heartbeat.txt`, scrive `runtime/soul_onboard.log` e riavvia il processo se si blocca;
-- `start_pc_autostart_server.bat`: helper per avviare il server PC.
+- `scripts/nao_autonomous_bootstrap.py`: gira sul robot, scrive stato in ALMemory e avvia il watchdog locale;
+- `scripts/autonomous_watchdog.py`: avvia `soul.py` onboard, controlla `runtime/heartbeat.txt`, scrive `runtime/soul_onboard.log` e riavvia il processo se si blocca;
+- `scripts/pc_autostart_server.py` e `start_pc_autostart_server.bat`: fallback/debug da PC, non necessari per l'avvio autonomo reale.
 
 Per i dettagli operativi consultare `AVVIO_AUTONOMO_NAO.md`.
 
@@ -452,7 +451,7 @@ Per debug piu dettagliato:
 - Non modificare a mano `behaviors/condition_system/generated_conditions` senza controllare anche i relativi metadati.
 - I file in `behaviors/condition_system/rejected_conditions` sono utili per capire cosa e' stato scartato.
 - Le cartelle runtime/quarantena/rejected possono essere create automaticamente.
-- L'avvio autonomo dipende dagli IP configurati tramite `NAO_IP`, `NAO_ROBOT_IP` e `PC_IP` in `scripts/nao_autonomous_bootstrap.py`.
+- L'avvio autonomo reale e' onboard: `scripts/nao_autonomous_bootstrap.py` imposta `NAO_IP=127.0.0.1` e non richiede un PC acceso.
 - Per la consegna zip escludere `.git/`, `.idea/`, `runtime/`, cache Python e file locali generati durante i test.
 
 ## Stato del progetto
