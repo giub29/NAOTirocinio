@@ -91,6 +91,8 @@ def _ha_negazione_informativa(testo):
         "non e presente testo",
         "non e presente alcun testo",
         "senza testo leggibile",
+        "senza testo",
+        "senza informazioni",
         "senza informazioni chiare",
         "senza contenuti informativi"
     ])
@@ -122,12 +124,182 @@ def _ha_testo_incerto(testo):
         "scritte non leggibili",
         "non sufficientemente chiaro",
         "non abbastanza chiaro",
+        "non leggo",
+        "non leggo testo",
         "non chiaro",
         "non chiara",
         "sfocato",
         "sfocata",
         "illeggibile"
     ])
+
+
+def _blocco_testo_visibile(testo):
+    marker = "testo visibile"
+    posizione = testo.find(marker)
+    while posizione >= 0:
+        prima = testo[max(0, posizione - 24):posizione]
+        dopo = testo[posizione + len(marker):].strip()
+
+        prima_pulita = prima.strip()
+        if (
+            _contiene(prima, [
+            "nessun", "nessuna", "senza", "non c e", "non ce"
+            ])
+            or prima_pulita.endswith("ne")
+            or " ne " in prima
+        ):
+            posizione = testo.find(marker, posizione + len(marker))
+            continue
+
+        if not dopo:
+            posizione = testo.find(marker, posizione + len(marker))
+            continue
+
+        inizio = dopo[:90]
+        if _contiene(inizio, [
+            "nessun testo", "nessuna informazione",
+            "nessun elemento", "non e presente",
+            "non ci sono"
+        ]):
+            posizione = testo.find(marker, posizione + len(marker))
+            continue
+
+        parole_vuote = [
+            "e", "o", "ma", "report", "ocr", "sono", "fermo",
+            "nessun", "nessuna", "informazione", "leggibile",
+            "visibile"
+        ]
+        parole = [
+            p for p in dopo.split()[:12]
+            if p not in parole_vuote and len(p) > 1
+        ]
+        if parole:
+            return dopo
+
+        posizione = testo.find(marker, posizione + len(marker))
+
+    return u""
+
+
+def _ha_testo_leggibile(testo):
+    if _blocco_testo_visibile(testo):
+        return True
+
+    if _ha_negazione_informativa(testo) or _ha_testo_incerto(testo):
+        return False
+
+    return _contiene(testo, [
+        "testo leggibile",
+        "testo visibile",
+        "scritta leggibile",
+        "scritta visibile",
+        "scritte leggibili",
+        "parole leggibili",
+        "parole visibili",
+        "contenuto leggibile",
+        "informazione leggibile",
+        "informazioni leggibili",
+        "documento leggibile",
+        "messaggio visibile",
+        "si legge",
+        "leggo"
+    ])
+
+
+def _ha_funzione_operativa_testuale(testo):
+    if not _ha_testo_leggibile(testo):
+        return False
+
+    return _ha_indicatori_operativi(testo)
+
+
+def _ha_indicatori_operativi(testo):
+    indicatori_azione = [
+        "vietato", "obbligo", "obbligatorio", "attenzione",
+        "pericolo", "riservato", "accesso vietato",
+        "solo personale", "non entrare", "non usare",
+        "non toccare", "non conferire",
+        "istruzioni", "procedura", "procedere",
+        "seguire", "usa", "usare", "utilizzare",
+        "premere", "premi", "spingere", "spingi",
+        "tirare", "tira", "inserire", "inserisci",
+        "mettere", "metti", "depositare", "deposita",
+        "conferire", "conferisci", "conferimento",
+        "differenzia", "differenziata", "differenziare",
+        "materiali", "accettabili", "consentiti",
+        "ammessi", "non ammessi", "destinato a",
+        "destinazione", "raccolta", "elenco", "avviso",
+        "fogli", "fotocopie", "quaderni"
+    ]
+
+    return _contiene(testo, indicatori_azione)
+
+
+def _testo_visibile_operativo(testo):
+    blocco = _blocco_testo_visibile(testo)
+    if not blocco:
+        return False
+
+    # Se l'OCR espone un blocco leggibile, quel contenuto deve prevalere
+    # su frasi precedenti tipo "scritte non leggibili".
+    return _ha_indicatori_operativi(blocco)
+
+
+def _ha_contesto_accesso(testo):
+    return _contiene(testo, [
+        "porta", "ingresso", "uscita", "accesso",
+        "entrata", "varco", "passaggio", "percorso",
+        "corridoio"
+    ])
+
+
+def _ha_funzione_oggetto_chiara(testo):
+    oggetti_funzione = [
+        "oggetto", "elemento", "dispositivo", "strumento",
+        "macchina", "apparecchio", "contenitore", "scatola",
+        "pacco", "cartone", "pulsante", "leva", "maniglia",
+        "etichetta", "etichette", "simbolo", "simboli"
+    ]
+
+    funzione_chiara = [
+        "funzione chiara", "funzione evidente", "serve per",
+        "usato per", "usata per", "destinato a", "destinata a",
+        "ha la funzione", "per avviare", "per aprire",
+        "per chiudere", "per controllare", "per raccogliere",
+        "per contenere", "per segnalare", "per guidare"
+    ]
+
+    return _contiene(testo, oggetti_funzione) and _contiene(
+        testo,
+        funzione_chiara
+    )
+
+
+def _ha_oggetto_funzione_incerta(testo):
+    if _ha_testo_leggibile(testo):
+        return False
+
+    oggetti_funzione = [
+        "oggetto", "elemento", "dispositivo", "strumento",
+        "macchina", "apparecchio", "contenitore", "scatola",
+        "pacco", "cartone", "pulsante", "leva", "maniglia"
+    ]
+
+    segnali_funzione_possibile = [
+        "etichetta", "etichette", "simbolo", "simboli",
+        "meccanismo", "parti", "comando", "controllo",
+        "chiuso", "chiusa", "sigillato", "sigillata",
+        "non capisco la funzione", "funzione non chiara",
+        "non so a cosa serve", "non e chiaro a cosa serve",
+        "non leggibile", "non leggibili", "illeggibile"
+    ]
+
+    return _contiene(testo, oggetti_funzione) and _contiene(
+        testo,
+        segnali_funzione_possibile
+    )
+
 
 def _oggetto_in_zona_rilevante(testo):
     testo = testo.lower()
@@ -171,6 +343,7 @@ def interpreta_contenuto_visivo(testo_osservato):
     - vincolo_comportamentale
     - accesso_non_disponibile / accesso_disponibile
     - contenuto_informativo_rilevante
+    - oggetto_funzione_sconosciuta
     - contenuto_testuale_da_approfondire
     """
 
@@ -194,6 +367,36 @@ def interpreta_contenuto_visivo(testo_osservato):
     if not testo:
         return _ritorna(risultato_base)
 
+    if _testo_visibile_operativo(testo):
+        return _ritorna({
+            "categoria": "informazione",
+            "evento": "informazione_operativa",
+            "significato": "il blocco TESTO_VISIBILE contiene indicazioni pratiche utili per agire",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "osserva_e_memorizza"
+        })
+
+    if _blocco_testo_visibile(testo):
+        return _ritorna({
+            "categoria": "informazione",
+            "evento": "contenuto_informativo_rilevante",
+            "significato": "il blocco TESTO_VISIBILE contiene testo leggibile utile per comprendere il contesto",
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "interpreta_contenuto"
+        })
+
+    if _ha_assenza_totale_informativa(testo):
+        return _ritorna({
+            "categoria": "supporto_informativo",
+            "evento": "supporto_informativo_non_disponibile",
+            "significato": "la scena non contiene contenuti informativi leggibili o disponibili",
+            "rilevanza": "bassa",
+            "genera_condizione": False,
+            "azione_cognitiva": "ignora"
+        })
+
     # Semantica funzionale prima del testo: se vedo un supporto spento,
     # non e' "contenuto rilevante", ma informazione non disponibile.
     if _ha_supporto_informativo(testo) and _ha_inattivita_supporto(testo):
@@ -209,11 +412,8 @@ def interpreta_contenuto_visivo(testo_osservato):
     if (
         _ha_supporto_informativo(testo)
         and (
-            _ha_assenza_totale_informativa(testo)
-            or (
-                _ha_dispositivo_informativo(testo)
-                and _ha_negazione_informativa(testo)
-            )
+            _ha_dispositivo_informativo(testo)
+            and _ha_negazione_informativa(testo)
         )
     ):
         return _ritorna({
@@ -235,7 +435,11 @@ def interpreta_contenuto_visivo(testo_osservato):
         and not _ha_negazione_informativa(testo)
     )
 
-    if _ha_supporto_didattico(testo) and not ha_contenuto_chiaro_senza_negazione:
+    if (
+        _ha_supporto_didattico(testo)
+        and not ha_contenuto_chiaro_senza_negazione
+        and not _ha_testo_leggibile(testo)
+    ):
         return _ritorna({
             "categoria": "contesto_ambientale",
             "evento": "ambiente_didattico_probabile",
@@ -255,7 +459,52 @@ def interpreta_contenuto_visivo(testo_osservato):
             "azione_cognitiva": "osserva_meglio"
         })
 
-    # 1. VINCOLI COMPORTAMENTALI / LIMITI ALL'AZIONE
+    if _ha_oggetto_funzione_incerta(testo):
+        return _ritorna({
+            "categoria": "oggetto_funzione",
+            "evento": "oggetto_funzione_sconosciuta",
+            "significato": "un elemento sembra avere una funzione, ma non e' ancora chiaro come usarlo o interpretarlo",
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "osserva_meglio"
+        })
+
+    # 1. TESTO LEGGIBILE CHE LIMITA ACCESSO/PASSAGGIO.
+    if (
+        _ha_testo_leggibile(testo)
+        and _contiene(testo, [
+            "vietato entrare",
+            "accesso vietato",
+            "non entrare",
+            "ingresso vietato",
+            "accesso riservato",
+            "solo personale"
+        ])
+    ):
+        return _ritorna({
+            "categoria": "accesso",
+            "evento": "accesso_non_disponibile",
+            "significato": "il contenuto leggibile indica che l'accesso e' limitato o non disponibile",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "usa_informazione"
+        })
+
+    # 2. TESTO LEGGIBILE CON FUNZIONE PRATICA.
+    # Non dipende dall'oggetto osservato: conta che il contenuto dica
+    # cosa fare, cosa evitare, come usare qualcosa o quali materiali/azioni
+    # sono ammessi.
+    if _ha_funzione_operativa_testuale(testo):
+        return _ritorna({
+            "categoria": "informazione",
+            "evento": "informazione_operativa",
+            "significato": "il contenuto leggibile fornisce indicazioni pratiche utili per agire",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "osserva_e_memorizza"
+        })
+
+    # 3. VINCOLI COMPORTAMENTALI / LIMITI ALL'AZIONE
     if _contiene(testo, [
         "vietato",
         "non entrare",
@@ -280,8 +529,8 @@ def interpreta_contenuto_visivo(testo_osservato):
             "azione_cognitiva": "rispetta_vincolo"
         })
 
-    # 2. STATO FUNZIONALE DI ACCESSO / PASSAGGIO
-    if _contiene(testo, [
+    # 4. STATO FUNZIONALE DI ACCESSO / PASSAGGIO
+    if _ha_contesto_accesso(testo) and _contiene(testo, [
         "chiuso",
         "chiusa",
         "bloccato",
@@ -300,7 +549,7 @@ def interpreta_contenuto_visivo(testo_osservato):
             "azione_cognitiva": "valuta_accesso"
         })
 
-    if _contiene(testo, [
+    if _ha_contesto_accesso(testo) and _contiene(testo, [
         "aperto",
         "aperta",
         "accessibile",
@@ -316,7 +565,17 @@ def interpreta_contenuto_visivo(testo_osservato):
             "azione_cognitiva": "valuta_esplorazione"
         })
 
-    # 3. INFORMAZIONE OPERATIVA: indica come usare un oggetto/spazio/interfaccia.
+    if _ha_funzione_oggetto_chiara(testo):
+        return _ritorna({
+            "categoria": "oggetto_funzione",
+            "evento": "oggetto_funzione_sconosciuta",
+            "significato": "la funzione di un elemento osservato e' diventata utile per decisioni future",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "memorizza_funzione"
+        })
+
+    # 5. INFORMAZIONE OPERATIVA: indica come usare un oggetto/spazio/interfaccia.
     if _contiene(testo, [
         "conferisci qui",
         "conferire",
@@ -354,7 +613,7 @@ def interpreta_contenuto_visivo(testo_osservato):
         "materiali accettabili"
     ]):
         return _ritorna({
-            "categoria": "informazione_operativa",
+            "categoria": "informazione",
             "evento": "informazione_operativa",
             "significato": "il contenuto osservato fornisce indicazioni utili per agire o usare qualcosa",
             "rilevanza": "alta",
@@ -362,7 +621,7 @@ def interpreta_contenuto_visivo(testo_osservato):
             "azione_cognitiva": "osserva_e_memorizza"
         })
 
-    # 4. CONTENUTO INFORMATIVO RILEVANTE: digitale, cartaceo, ambientale.
+    # 6. CONTENUTO INFORMATIVO RILEVANTE: digitale, cartaceo, ambientale.
     if (
         _contiene(testo, [
             "monitor", "schermo", "display", "computer",
@@ -370,6 +629,7 @@ def interpreta_contenuto_visivo(testo_osservato):
             "avviso", "locandina", "foglio appeso",
             "documento appeso", "parete", "muro", "bacheca"
         ])
+        and not _ha_negazione_informativa(testo)
         and
         _contiene(testo, [
             "codice", "programma", "file", "errore",
@@ -378,32 +638,41 @@ def interpreta_contenuto_visivo(testo_osservato):
             "contenuto leggibile"
         ])
     ):
+        genera_contenuto_digitale = _contiene(testo, [
+            "codice", "programma", "file", "errore", "terminale"
+        ])
         return _ritorna({
             "categoria": "contenuto_informativo",
             "evento": "contenuto_informativo_rilevante",
             "significato": "il contenuto osservato contiene informazioni potenzialmente utili per comprendere l'ambiente",
             "rilevanza": "media",
-            "genera_condizione": True,
+            "genera_condizione": genera_contenuto_digitale,
             "azione_cognitiva": "analizza_o_memorizza"
         })
 
-    # 5. TESTO LEGGIBILE MA FUNZIONE ANCORA INCERTA
-    if _contiene(testo, [
-        "testo leggibile",
-        "testi visibili",
-        "testo visibile",
-        "scritta",
-        "scritte",
-        "parole",
-        "testo_visibile"
-    ]):
+    # 7. TESTO LEGGIBILE MA NON CHIARAMENTE OPERATIVO.
+    if (
+        not _ha_testo_incerto(testo)
+        and (
+            _ha_testo_leggibile(testo)
+            or _contiene(testo, [
+                "testo leggibile",
+                "testi visibili",
+                "testo visibile",
+                "scritta",
+                "scritte",
+                "parole",
+                "testo_visibile"
+            ])
+        )
+    ):
         return _ritorna({
-            "categoria": "contenuto_testuale_incerto",
-            "evento": "contenuto_testuale_da_approfondire",
-            "significato": "e' presente testo osservabile, ma la sua funzione non e' ancora chiara",
+            "categoria": "informazione",
+            "evento": "contenuto_informativo_rilevante",
+            "significato": "e' presente testo leggibile utile per comprendere il contesto",
             "rilevanza": "media",
             "genera_condizione": False,
-            "azione_cognitiva": "osserva_meglio"
+            "azione_cognitiva": "interpreta_contenuto"
         })
 
     return _ritorna(risultato_base)

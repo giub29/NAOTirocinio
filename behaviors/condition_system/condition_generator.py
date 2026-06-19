@@ -81,6 +81,41 @@ def _key_presente(chiave_privata):
         return False
 
 
+def _evento_attivo(eventi, nome):
+    if not isinstance(eventi, dict):
+        return False
+
+    return eventi.get(nome) not in [False, None, "", [], {}]
+
+
+def _sanitizza_eventi_supporto_informativo(eventi):
+    if not isinstance(eventi, dict):
+        return eventi
+
+    eventi_forti = [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante",
+        "vincolo_comportamentale",
+        "accesso_non_disponibile",
+        "accesso_disponibile",
+        "accesso_o_percorso_limitato",
+        "oggetto_in_zona_rilevante",
+        "oggetto_funzione_sconosciuta",
+        "elemento_ambientale_anomalo",
+        "elemento_fuori_posto"
+    ]
+
+    if any(_evento_attivo(eventi, nome) for nome in eventi_forti):
+        eventi.pop("supporto_informativo_potenziale", None)
+        eventi.pop("supporto_informativo_non_disponibile", None)
+        return eventi
+
+    if _evento_attivo(eventi, "supporto_informativo_non_disponibile"):
+        eventi.pop("supporto_informativo_potenziale", None)
+
+    return eventi
+
+
 def _log_richiesta_llm(area, chiave_privata, endpoint, modello):
     logger.info(u"[GENERATOR][{}] API key presente: {}".format(
         area,
@@ -343,7 +378,7 @@ def estrai_eventi(mondo, stato_runtime):
     except Exception as e:
         logger.warning(u"[GENERATOR] Errore estrazione eventi sconosciuti: {}".format(e))
 
-    return eventi
+    return _sanitizza_eventi_supporto_informativo(eventi)
 
 def _normalizza_eventi_sconosciuti(eventi_sconosciuti):
     """
@@ -1435,9 +1470,11 @@ def _costruisci_prompt(
         u"- Se l'evento riguarda accesso_non_disponibile o accesso_o_percorso_limitato: usa prudenza, occhi red/yellow, guarda verso l'accesso/percorso e NON proporre esplorazione immediata.\n"
         u"- Se l'evento riguarda accesso_disponibile: usa curiosita' controllata, occhi green/yellow, guarda verso l'accesso e proponi esplorazione cauta.\n"
         u"- Se l'evento riguarda informazione_operativa: usa stato_interno 'attento', occhi blue/yellow, guarda il contenuto e memorizza/considera l'informazione. Non generare allerta rossa.\n"
+        u"- Per informazione_operativa usa frasi generali, per esempio 'Ho trovato indicazioni operative utili nell'ambiente.' oppure 'Ho letto informazioni che spiegano come usare correttamente questo elemento.'. Non dire 'Cosa ci sara dentro questo contenitore?' e non legare la frase a contenitore, cartello, lavagna, monitor o altro oggetto specifico originario.\n"
         u"- Se l'evento riguarda contenuto_informativo_rilevante o contenuto_testuale_da_approfondire: usa curiosita' o attenzione, occhi blue/yellow, osserva meglio.\n"
         u"- Se l'evento riguarda vincolo_comportamentale: usa prudenza, occhi red/yellow e frase che indichi rispetto del vincolo.\n"
         u"- Se l'evento riguarda oggetto_in_zona_rilevante: usa prudenza spaziale, occhi yellow/red, guarda l'elemento e non camminare se il robot e' fermo.\n"
+        u"- Se l'evento riguarda oggetto_funzione_sconosciuta: usa curiosita' controllata o attenzione, guarda l'elemento e memorizza la funzione osservata senza inventare dettagli.\n"
         u"- Non nominare oggetti specifici se non sono presenti nel MONDO. Ragiona sulla funzione dell'evento.\n"
         u"- Non trasformare eventi cognitivi in saluti o dialogo sociale.\n\n"
 
@@ -2345,6 +2382,29 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
     if eventi_originali.get("camminando", False) and pericolo_reale and not ha_fermati:
         return False, "Pericolo/frontale/urto durante cammino: serve fermati"
 
+    eventi_generali = [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante",
+        "vincolo_comportamentale"
+    ]
+    evento_generale = any(
+        eventi_originali.get(nome, False)
+        for nome in eventi_generali
+    ) or nome_base in eventi_generali
+
+    termini_specifici_evento_generale = [
+        "cosa ci",
+        "contenitore",
+        "scatola",
+        "cestino",
+        "bidone",
+        "cartello",
+        "lavagna",
+        "monitor",
+        "schermo",
+        "pulsante rosso"
+    ]
+
     for azione in azioni:
         if not isinstance(azione, dict):
             continue
@@ -2353,6 +2413,16 @@ def _valida_semantica_azioni(nome_base, eventi_originali, azioni):
             continue
 
         testo = azione.get("testo", "").lower()
+
+        if evento_generale:
+            for termine in termini_specifici_evento_generale:
+                if termine in testo:
+                    return (
+                        False,
+                        "Frase troppo specifica per evento generale: {}".format(
+                            termine
+                        )
+                    )
 
         if eventi_originali.get("ostacolo_sinistra", False):
             if "davanti" in testo or "frontale" in testo or "destra" in testo:

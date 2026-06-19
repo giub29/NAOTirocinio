@@ -157,10 +157,27 @@ FALLBACK_VISIVI_NON_GENERATIVI = [
     "non distinguo elementi rilevanti",
     "senza analisi visiva llm"
 ]
+EVENTI_SUPPORTO_INFORMATIVO_NON_GENERATIVI = [
+    "supporto_informativo_potenziale",
+    "supporto_informativo_non_disponibile"
+]
 COOLDOWN_SCENA_COMPRESA = 300
+COOLDOWN_CURIOSITA_RIPETUTA = 180
 TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
-    "Ho trovato indicazioni operative su come usare questo contenitore."
+    "Ho trovato indicazioni operative utili nell'ambiente."
 )
+TERMINI_TROPPO_SPECIFICI_EVENTO_GENERALE = [
+    "cosa ci",
+    "contenitore",
+    "scatola",
+    "cestino",
+    "bidone",
+    "cartello",
+    "lavagna",
+    "monitor",
+    "schermo",
+    "pulsante rosso"
+]
 
 
 def _diag_pipeline(label, valore):
@@ -285,6 +302,123 @@ def evento_informazione_operativa(stato_runtime):
     )
 
 
+def _evento_attivo(dati, nome):
+    if not isinstance(dati, dict):
+        return False
+
+    return dati.get(nome) not in [False, None, "", [], {}]
+
+
+def _sanitizza_eventi_supporto_informativo(eventi):
+    if not isinstance(eventi, dict):
+        return eventi
+
+    eventi_forti = [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante",
+        "vincolo_comportamentale",
+        "accesso_non_disponibile",
+        "accesso_disponibile",
+        "accesso_o_percorso_limitato",
+        "oggetto_in_zona_rilevante",
+        "oggetto_funzione_sconosciuta",
+        "elemento_ambientale_anomalo",
+        "elemento_fuori_posto"
+    ]
+
+    if any(_evento_attivo(eventi, nome) for nome in eventi_forti):
+        eventi.pop("supporto_informativo_potenziale", None)
+        eventi.pop("supporto_informativo_non_disponibile", None)
+        return eventi
+
+    if _evento_attivo(eventi, "supporto_informativo_non_disponibile"):
+        eventi.pop("supporto_informativo_potenziale", None)
+
+    return eventi
+
+
+def _evento_strutturato_supporto_non_generativo(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return False
+
+    categoria = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    stato = str(evento_strutturato.get("stato", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+    eventi_core = evento_strutturato.get("eventi_core", [])
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_core = [
+        str(e).lower().strip()
+        for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ]
+
+    return (
+        categoria == "supporto_informativo"
+        or stato in ["potenziale", "non_disponibile"]
+        or tipo in [
+            "supporto_informativo_potenziale",
+            "supporto_informativo_non_disponibile"
+        ]
+        or "supporto_informativo_potenziale" in eventi_core
+        or "supporto_informativo_non_disponibile" in eventi_core
+    )
+
+
+def evento_strutturato_non_deve_generare(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return False
+
+    genera = evento_strutturato.get("genera_condizione", False)
+    azione = str(
+        evento_strutturato.get("azione_cognitiva", "") or ""
+    ).lower()
+
+    if genera is False and azione == "ignora":
+        return True
+
+    return _evento_strutturato_supporto_non_generativo(evento_strutturato)
+
+
+def evento_strutturato_da_chiudere_senza_decisione(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return False
+
+    genera = evento_strutturato.get("genera_condizione", False)
+    azione = str(
+        evento_strutturato.get("azione_cognitiva", "") or ""
+    ).lower()
+    categoria = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    stato = str(evento_strutturato.get("stato", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+
+    return (
+        (genera is False and azione == "ignora")
+        or (
+            categoria == "supporto_informativo"
+            and (
+                stato == "non_disponibile"
+                or tipo == "supporto_informativo_non_disponibile"
+            )
+        )
+    )
+
+
+def chiudi_generazione_non_permessa(stato_runtime, motivo):
+    if not isinstance(stato_runtime, dict):
+        return
+
+    stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+    stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+    stato_runtime["decisione_non_generativa"] = motivo
+
+
 def _normalizza_firma_testo(testo):
     testo = _testo_sicuro(testo).lower()
     testo = testo.replace("report:", " ")
@@ -346,6 +480,157 @@ def registra_scena_operativa_compresa(stato_runtime, mondo):
     return firma
 
 
+def _testi_parlati_decisione(decisione):
+    if not isinstance(decisione, dict):
+        return []
+
+    testi = []
+    azioni = decisione.get("azioni", [])
+    if isinstance(azioni, list):
+        for azione in azioni:
+            if not isinstance(azione, dict):
+                continue
+            if azione.get("tipo") == "parla":
+                testo = _testo_sicuro(azione.get("testo", "")).strip()
+                if testo:
+                    testi.append(testo)
+
+    return testi
+
+
+def decisione_sembra_curiosa(decisione):
+    if not isinstance(decisione, dict):
+        return False
+
+    testi = " ".join(_testi_parlati_decisione(decisione)).lower()
+    indicatori_testo = [
+        "osservo meglio",
+        "lo osservo meglio",
+        "lo osservo con prudenza",
+        "ho notato qualcosa",
+        "prima di decidere",
+        "potrebbe essere utile"
+    ]
+    if any(indicatore in testi for indicatore in indicatori_testo):
+        return True
+
+    memoria = decisione.get("memoria", [])
+    if isinstance(memoria, list):
+        for voce in memoria:
+            if not isinstance(voce, dict):
+                continue
+            azione = str(voce.get("azione", "") or "").lower()
+            tipo = str(voce.get("tipo", "") or "").lower()
+            if azione in ["osserva_meglio", "osserva_con_prudenza"]:
+                return True
+            if tipo in ["curiosita", "politica_agentica"]:
+                return True
+
+    return False
+
+
+def firma_curiosita(mondo, stato_runtime, decisione, firma):
+    parti = ["curiosita"]
+
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    evento = str(evento_strutturato.get("evento", "") or "").lower()
+    parti.append("categoria=" + categoria)
+    parti.append("evento=" + evento)
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+    eventi_core = [
+        str(e).lower().strip()
+        for e in eventi_core
+        if str(e).strip()
+    ]
+    if eventi_core:
+        parti.append("core=" + ",".join(sorted(eventi_core)))
+
+    eventi_attivi = {}
+    for sorgente in [
+        firma.get("eventi", {}) if isinstance(firma, dict) else {},
+        firma.get("eventi_attivi", {}) if isinstance(firma, dict) else {},
+        stato_runtime.get("eventi", {}),
+        stato_runtime.get("eventi_reali", {})
+    ]:
+        if not isinstance(sorgente, dict):
+            continue
+        for nome, valore in sorgente.items():
+            if valore not in [False, None, "", [], {}]:
+                eventi_attivi[str(nome).lower().strip()] = True
+
+    if eventi_attivi:
+        parti.append("attivi=" + ",".join(sorted(eventi_attivi.keys())))
+
+    parti.append("scena=" + _normalizza_firma_testo(mondo))
+    parti.append(
+        "frase=" + _normalizza_firma_testo(
+            " ".join(_testi_parlati_decisione(decisione))
+        )
+    )
+
+    return "|".join(parti)
+
+
+def filtra_curiosita_ripetuta(decisione, stato_runtime, mondo, firma, origine):
+    if not isinstance(stato_runtime, dict):
+        return decisione
+
+    if not decisione_sembra_curiosa(decisione):
+        return decisione
+
+    firma_corrente = firma_curiosita(mondo, stato_runtime, decisione, firma)
+    memoria = stato_runtime.get("curiosita_recenti", {})
+    if not isinstance(memoria, dict):
+        memoria = {}
+
+    voce = memoria.get(firma_corrente)
+    if isinstance(voce, dict):
+        try:
+            recente = (
+                time.time() - float(voce.get("tempo", 0))
+                < COOLDOWN_CURIOSITA_RIPETUTA
+            )
+        except Exception:
+            recente = True
+
+        if recente:
+            stato_runtime["decisione_non_generativa"] = (
+                "curiosita_ripetuta_in_cooldown"
+            )
+            stato_runtime["ultima_curiosita_saltata"] = firma_corrente
+            logger.info(
+                "[AUTONOMIA] Curiosita gia' espressa di recente: "
+                "salto ripetizione ({})".format(origine)
+            )
+            return None
+
+    memoria[firma_corrente] = {
+        "tempo": time.time(),
+        "origine": origine
+    }
+
+    if len(memoria) > 20:
+        try:
+            elementi = sorted(
+                memoria.items(),
+                key=lambda item: item[1].get("tempo", 0)
+            )
+            memoria = dict(elementi[-20:])
+        except Exception:
+            pass
+
+    stato_runtime["curiosita_recenti"] = memoria
+    stato_runtime["ultima_curiosita_espressa"] = firma_corrente
+    return decisione
+
+
 def scena_operativa_gia_compresa(stato_runtime, mondo):
     if not evento_informazione_operativa(stato_runtime):
         return False
@@ -380,6 +665,7 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
         return decisione
 
     sostituita = False
+    motivo_bassa_generalita = ""
     for azione in azioni:
         if not isinstance(azione, dict):
             continue
@@ -388,11 +674,16 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
 
         testo = _testo_sicuro(azione.get("testo", "")).lower()
         if (
-            "cosa ci" in testo
+            any(
+                termine in testo
+                for termine in TERMINI_TROPPO_SPECIFICI_EVENTO_GENERALE
+            )
             or "interessante" in testo
-            or "contenitore" in testo
             or not testo
         ):
+            motivo_bassa_generalita = (
+                "frase troppo specifica per evento informazione_operativa"
+            )
             azione["testo"] = TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
             sostituita = True
             break
@@ -402,6 +693,27 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
             "tipo": "parla",
             "testo": TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
         })
+
+    if motivo_bassa_generalita and isinstance(stato_runtime, dict):
+        nome_condizione = stato_runtime.get(
+            "ultima_condizione_attiva",
+            "condizione_informazione_operativa"
+        )
+        condizioni = stato_runtime.get("condizioni_bassa_generalita", [])
+        if not isinstance(condizioni, list):
+            condizioni = []
+
+        condizioni.append({
+            "condizione": nome_condizione,
+            "evento": "informazione_operativa",
+            "azione": "rigenera_quando_possibile",
+            "motivo": motivo_bassa_generalita
+        })
+        stato_runtime["condizioni_bassa_generalita"] = condizioni[-10:]
+        stato_runtime["condizione_da_rigenerare"] = nome_condizione
+        stato_runtime["motivo_rigenerazione_condizione"] = (
+            motivo_bassa_generalita
+        )
 
     memoria = decisione.get("memoria", [])
     if not isinstance(memoria, list):
@@ -487,6 +799,9 @@ def evento_strutturato_va_ricostruito(evento_strutturato, mondo):
 
 def evento_strutturato_puo_generare_da_ipotesi(evento_strutturato):
     if not isinstance(evento_strutturato, dict):
+        return False
+
+    if _evento_strutturato_supporto_non_generativo(evento_strutturato):
         return False
 
     categoria = str(
@@ -1012,6 +1327,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             nome
             for nome, dati in eventi_descritti.items()
             if not dati.get("conosciuto", True)
+            and nome not in EVENTI_SUPPORTO_INFORMATIVO_NON_GENERATIVI
         ]
 
         eventi_sconosciuti = filtra_eventi_helper(eventi_sconosciuti)
@@ -1054,6 +1370,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 if valore not in [False, None, "", [], {}]:
                     stato_runtime["eventi"][nome_evento] = True
 
+        _sanitizza_eventi_supporto_informativo(stato_runtime.get("eventi", {}))
+        _sanitizza_eventi_supporto_informativo(
+            stato_runtime.get("eventi_reali", {})
+        )
+
     except Exception as e:
         logger.warning(
             "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
@@ -1063,13 +1384,24 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         mondo,
         stato_runtime.get("evento_strutturato", {})
     ):
-        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
-        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
-        stato_runtime["decisione_non_generativa"] = (
+        chiudi_generazione_non_permessa(
+            stato_runtime,
             "fallback visivo generico neutro"
         )
         logger.info(
             "[AUTONOMIA] Fallback visivo neutro: nessuna generazione"
+        )
+        return None
+
+    if evento_strutturato_da_chiudere_senza_decisione(
+        stato_runtime.get("evento_strutturato", {})
+    ):
+        chiudi_generazione_non_permessa(
+            stato_runtime,
+            "evento strutturato non generativo"
+        )
+        logger.info(
+            "[AUTONOMIA] Evento strutturato non generativo: nessuna generazione"
         )
         return None
 
@@ -1153,9 +1485,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                     stato_runtime,
                     decisione_evento_strutturato
                 )
-                return registra_osservazione_mirata_corrente(
+                return filtra_curiosita_ripetuta(
+                    registra_osservazione_mirata_corrente(
+                        stato_runtime,
+                        decisione_evento_strutturato
+                    ),
                     stato_runtime,
-                    decisione_evento_strutturato
+                    mondo,
+                    firma,
+                    "evento_strutturato"
                 )
 
     except Exception as e:
@@ -1171,9 +1509,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     if decisione_azione_successiva is not None:
         logger.info("[AUTONOMIA] Decisione da azione successiva suggerita")
-        return registra_osservazione_mirata_corrente(
+        return filtra_curiosita_ripetuta(
+            registra_osservazione_mirata_corrente(
+                stato_runtime,
+                decisione_azione_successiva
+            ),
             stato_runtime,
-            decisione_azione_successiva
+            mondo,
+            firma,
+            "azione_successiva"
         )
 
     esito_goal = valuta_goal_intent_sicuro(
@@ -1190,9 +1534,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             stato_runtime,
             decisione_goal
         )
-        return registra_osservazione_mirata_corrente(
+        return filtra_curiosita_ripetuta(
+            registra_osservazione_mirata_corrente(
+                stato_runtime,
+                decisione_goal
+            ),
             stato_runtime,
-            decisione_goal
+            mondo,
+            firma,
+            "goal_intent"
         )
 
     if stato_runtime.get("forza_generazione_safety", False):
@@ -1389,9 +1739,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
         if decisione_mirata is not None:
             logger.info("[AUTONOMIA] Decisione da osservazione mirata")
-            return registra_osservazione_mirata_corrente(
+            return filtra_curiosita_ripetuta(
+                registra_osservazione_mirata_corrente(
+                    stato_runtime,
+                    decisione_mirata
+                ),
                 stato_runtime,
-                decisione_mirata
+                mondo,
+                firma,
+                "osservazione_mirata"
             )
 
         if costruisci_decisione_ipotesi is not None:
@@ -1454,9 +1810,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                     logger.info(
                         "[AUTONOMIA] Decisione curiosa da osservazione mirata"
                     )
-                    return registra_osservazione_mirata_corrente(
+                    return filtra_curiosita_ripetuta(
+                        registra_osservazione_mirata_corrente(
+                            stato_runtime,
+                            decisione_mirata
+                        ),
                         stato_runtime,
-                        decisione_mirata
+                        mondo,
+                        firma,
+                        "curiosita_osservazione_mirata"
                     )
 
                 if (
@@ -1464,7 +1826,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                     and ragionamento.get("azione_cognitiva")
                     == "osserva_con_prudenza"
                 ):
-                    return {
+                    return filtra_curiosita_ripetuta({
                         "stato_interno": "prudente",
                         "obiettivo":
                             "valutare un elemento vicino a una zona rilevante",
@@ -1498,10 +1860,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                                         "ipotesi",
                                         "elemento vicino "
                                         "a una zona rilevante"
-                                    )
+                                )
                             }
                         ]
-                    }
+                    }, stato_runtime, mondo, firma, "osserva_con_prudenza")
 
             except Exception as e:
                 logger.warning(
@@ -1512,7 +1874,13 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 logger.info(
                     "[AUTONOMIA] Decisione curiosa autonoma senza generare condizione"
                 )
-                return decisione_curiosa
+                return filtra_curiosita_ripetuta(
+                    decisione_curiosa,
+                    stato_runtime,
+                    mondo,
+                    firma,
+                    "curiosita_autonoma"
+                )
 
     except Exception as e:
         logger.warning(
@@ -1838,17 +2206,26 @@ def situazione_merita_generazione(mondo, stato_runtime):
     if firma["gia_tentata"]:
         return False, "situazione gia' tentata"
 
-    if firma["banale"]:
-        return False, "situazione banale"
-
     evento_strutturato = firma.get("evento_strutturato", {})
     if not isinstance(evento_strutturato, dict):
         evento_strutturato = {}
 
     if situazione_fallback_visivo_neutra(mondo, evento_strutturato):
-        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
-        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+        chiudi_generazione_non_permessa(
+            stato_runtime,
+            "fallback visivo generico neutro"
+        )
         return False, "fallback visivo generico neutro non generativo"
+
+    if evento_strutturato_non_deve_generare(evento_strutturato):
+        chiudi_generazione_non_permessa(
+            stato_runtime,
+            "evento strutturato non generativo"
+        )
+        return False, "evento strutturato non generativo"
+
+    if firma["banale"]:
+        return False, "situazione banale"
 
     tipo = str(evento_strutturato.get("tipo", "")).lower()
     categoria = str(evento_strutturato.get("categoria", "")).lower()
@@ -1867,6 +2244,11 @@ def situazione_merita_generazione(mondo, stato_runtime):
             for nome_evento, valore in eventi_attivi_firma.items():
                 if valore not in [False, None, "", [], {}]:
                     stato_runtime["eventi"][nome_evento] = True
+
+        _sanitizza_eventi_supporto_informativo(stato_runtime.get("eventi", {}))
+        _sanitizza_eventi_supporto_informativo(
+            stato_runtime.get("eventi_reali", {})
+        )
 
     except Exception as e:
         logger.warning(
@@ -1967,6 +2349,7 @@ def situazione_merita_generazione(mondo, stato_runtime):
             nome
             for nome, dati in eventi_descritti.items()
             if not dati.get("conosciuto", True)
+            and nome not in EVENTI_SUPPORTO_INFORMATIVO_NON_GENERATIVI
         ]
 
         if eventi_sconosciuti:
@@ -2150,6 +2533,9 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         logger.warning(
             "[AUTONOMIA] Errore estrazione eventi sconosciuti: {}".format(e)
         )
+
+    _sanitizza_eventi_supporto_informativo(eventi)
+    _sanitizza_eventi_supporto_informativo(eventi_reali)
     
     parole_banali = [
         "la mia batteria",
@@ -2386,6 +2772,18 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
 
     adesso = time.time()
     mondo_normalizzato = (mondo or "").strip().lower()
+
+    if evento_strutturato_non_deve_generare(
+        stato_runtime.get("evento_strutturato", {})
+    ):
+        chiudi_generazione_non_permessa(
+            stato_runtime,
+            "evento strutturato non generativo"
+        )
+        logger.info(
+            "[AUTONOMIA] Generazione saltata: evento strutturato non generativo"
+        )
+        return None
 
     if stato_runtime.get("llm_generazione_non_disponibile", False):
         logger.warning(

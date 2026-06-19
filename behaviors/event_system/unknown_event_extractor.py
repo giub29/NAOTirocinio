@@ -46,6 +46,27 @@ def _contiene(testo, parole):
     return any(p in testo for p in parole)
 
 
+def _ha_contesto_accesso(testo):
+    return _contiene(testo, [
+        "porta", "accesso", "passaggio", "percorso",
+        "corridoio", "entrata", "uscita", "varco",
+        "ingresso"
+    ])
+
+
+def _ha_limite_movimento(testo):
+    return _contiene(testo, [
+        "non accessibile", "accesso impedito",
+        "non posso passare", "non si puo passare",
+        "passaggio ostruito", "percorso ostruito",
+        "passaggio bloccato", "percorso bloccato",
+        "davanti al passaggio", "davanti al percorso",
+        "davanti alla porta", "sul passaggio", "sul percorso",
+        "in mezzo al percorso", "in mezzo al passaggio",
+        "ostacolo", "ingombro", "ingombrante"
+    ])
+
+
 def _solo_descrizione_generica(testo):
     """
     True quando il testo descrive solo aspetto/ambiente,
@@ -194,7 +215,11 @@ def estrai_eventi_sconosciuti(testo):
         "lontana"
     ]
 
-    if any(x in testo for x in indicatori_non_leggibile):
+    if (
+        any(x in testo for x in indicatori_non_leggibile)
+        and "testo_visibile" not in testo
+        and "testo visibile" not in testo
+    ):
         return _ritorna([], "non_leggibile")
 
     # 1. Interprete semantico visuale:
@@ -247,26 +272,20 @@ def estrai_eventi_sconosciuti(testo):
             ], "reasoner_generativo")
 
     # 4. Regole simboliche residuali.
-    if _contiene(testo, [
-        "chius", "serrat", "blocc", "non aper",
-        "non accessibile", "accesso impedito",
-        "non posso passare", "non si puo passare"
-    ]):
+    if (
+        _ha_limite_movimento(testo)
+        or (
+            _ha_contesto_accesso(testo)
+            and _contiene(testo, ["chius", "serrat", "blocc", "non aper"])
+        )
+    ):
         eventi.append(_evento(
             "accesso_non_disponibile",
             "alta",
             "l'osservazione suggerisce che un accesso o passaggio potrebbe non essere disponibile"
         ))
 
-    if _contiene(testo, [
-        "passaggio ostruito", "percorso ostruito",
-        "passaggio bloccato", "percorso bloccato",
-        "davanti al passaggio", "davanti al percorso",
-        "davanti alla porta",
-        "sul passaggio", "sul percorso",
-        "in mezzo al percorso", "in mezzo al passaggio",
-        "ostacolo", "ingombro", "ingombrante"
-    ]):
+    if _ha_limite_movimento(testo):
         eventi.append(_evento(
             "percorso_potenzialmente_ostruito",
             "alta",
@@ -322,21 +341,23 @@ def estrai_eventi_sconosciuti(testo):
 
     if (
         _contiene(testo, [
-            "contenitore", "scatola", "cartone", "cestino",
-            "secchio", "area", "punto", "zona"
+            "oggetto", "elemento", "supporto", "superficie",
+            "area", "punto", "zona", "interfaccia", "contenuto"
         ])
         and
         _contiene(testo, [
             "testo leggibile", "scritta", "indica",
-            "istruzioni", "conferisci", "inserisci",
-            "metti", "qui", "materiali", "fogli",
-            "documenti", "oggetti"
+            "istruzioni", "procedura", "seguire",
+            "conferisci", "inserisci", "premere",
+            "usare", "utilizzare", "vietato",
+            "obbligo", "avviso", "materiali",
+            "ammessi", "non ammessi"
         ])
     ):
         eventi.append({
             "nome": "informazione_operativa",
             "categoria": "sconosciuta",
-            "descrizione": "contenitore o area con istruzioni leggibili potenzialmente utili",
+            "descrizione": "elemento osservato con indicazioni pratiche potenzialmente utili",
             "valore": True
         })
 

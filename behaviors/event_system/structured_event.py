@@ -79,6 +79,41 @@ def _eventi_booleani(eventi_grezzi):
     return eventi
 
 
+def _evento_attivo(eventi, nome):
+    if not isinstance(eventi, dict):
+        return False
+
+    return eventi.get(nome) not in [False, None, "", [], {}]
+
+
+def _sanitizza_eventi_supporto_informativo(eventi):
+    if not isinstance(eventi, dict):
+        return eventi
+
+    eventi_forti = [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante",
+        "vincolo_comportamentale",
+        "accesso_non_disponibile",
+        "accesso_disponibile",
+        "accesso_o_percorso_limitato",
+        "oggetto_in_zona_rilevante",
+        "oggetto_funzione_sconosciuta",
+        "elemento_ambientale_anomalo",
+        "elemento_fuori_posto"
+    ]
+
+    if any(_evento_attivo(eventi, nome) for nome in eventi_forti):
+        eventi.pop("supporto_informativo_potenziale", None)
+        eventi.pop("supporto_informativo_non_disponibile", None)
+        return eventi
+
+    if _evento_attivo(eventi, "supporto_informativo_non_disponibile"):
+        eventi.pop("supporto_informativo_potenziale", None)
+
+    return eventi
+
+
 def _origine_da_mondo(testo, eventi):
     if any(k in eventi for k in [
         "mano_destra",
@@ -191,11 +226,29 @@ def _categoria_da_ragionamento(ragionamento):
     ] or tipo in ["zona_rilevante", "spaziale_safety"]:
         return "ostacolo_spazio", "potenzialmente_ostruito"
 
+    if evento == "oggetto_funzione_sconosciuta":
+        return "oggetto_funzione", "da_chiarire"
+
     if evento in [
         "elemento_ambientale_anomalo",
         "elemento_fuori_posto"
     ] or tipo == "anomalia":
         return "anomalia", "anomalo"
+
+    if evento in [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante"
+    ] or tipo == "informazione_visiva":
+        return "informazione", "rilevante"
+
+    if evento == "vincolo_comportamentale":
+        return "informazione", "vincolo"
+
+    if evento == "supporto_informativo_non_disponibile":
+        return "supporto_informativo", "non_disponibile"
+
+    if evento == "supporto_informativo_potenziale":
+        return "supporto_informativo", "potenziale"
 
     if tipo in [
         "informazione_visiva_incerta",
@@ -208,20 +261,11 @@ def _categoria_da_ragionamento(ragionamento):
     if evento == "contenuto_testuale_da_approfondire":
         return "ambiguita", "incerto"
 
-    if evento in [
-        "informazione_operativa",
-        "contenuto_informativo_rilevante"
-    ] or tipo == "informazione_visiva":
-        return "informazione", "rilevante"
-
-    if evento == "supporto_informativo_non_disponibile":
-        return "supporto_informativo", "non_disponibile"
-
-    if evento == "supporto_informativo_potenziale":
-        return "supporto_informativo", "potenziale"
-
     if evento == "ambiente_didattico_probabile":
         return "contesto_ambientale", "didattico_probabile"
+
+    if evento == "contesto_da_approfondire":
+        return "contesto_ambientale", "da_approfondire"
 
     return "neutra", "osservato"
 
@@ -278,7 +322,9 @@ def costruisci_evento_strutturato(mondo, eventi_grezzi=None):
     _diag("input_mondo", mondo)
     _diag("input_eventi_grezzi", eventi_grezzi)
 
-    eventi = _eventi_booleani(eventi_grezzi)
+    eventi = _sanitizza_eventi_supporto_informativo(
+        _eventi_booleani(eventi_grezzi)
+    )
     evento = _base_evento(mondo, eventi)
 
     if not _applica_evento_noto(evento, eventi):

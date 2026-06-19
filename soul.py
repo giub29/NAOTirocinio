@@ -11,6 +11,10 @@ import re
 import logging
 import sys
 import signal
+try:
+    import select
+except Exception:
+    select = None
 
 utente_sta_scrivendo = False
 ultimo_input_tempo = 0
@@ -92,6 +96,39 @@ try:
 except NameError:
     raw_input = input
 
+
+def _leggi_input_tastiera_non_bloccante():
+    """
+    Legge comandi da terminale solo se una riga e' gia' disponibile.
+    In avvio autonomo su NAO non deve mai bloccare il loop cognitivo.
+    """
+    if os.environ.get("CHOREGRAPHE_BOOT", "") == "1":
+        return None
+
+    try:
+        stdin = sys.stdin
+        if stdin is None:
+            return None
+
+        if hasattr(stdin, "isatty") and not stdin.isatty():
+            return None
+
+        if select is None:
+            return None
+
+        leggibile, _, _ = select.select([stdin], [], [], 0)
+        if not leggibile:
+            return None
+
+        return raw_input()
+
+    except Exception as e:
+        logging.getLogger(__name__).debug(
+            u"Input tastiera non disponibile: {}".format(e)
+        )
+        return None
+
+
 root_logger = logging.getLogger()
 root_logger.handlers = []
 root_logger.addHandler(handler)
@@ -161,6 +198,7 @@ ANGOLI_OSSERVAZIONE_MIRATA = [
 
 MAX_OSSERVAZIONI_MIRATE = 2
 COOLDOWN_OSSERVAZIONE_MIRATA = 25
+COOLDOWN_VERBALIZZAZIONE_PERCEZIONE = 120
 HEARTBEAT_DIR = os.path.join(os.path.dirname(__file__), "runtime")
 HEARTBEAT_FILE = os.path.join(HEARTBEAT_DIR, "heartbeat.txt")
 
@@ -249,6 +287,8 @@ stato_runtime = {
     "routing_corrente": "",
     "routing_idle_attivo": False,
     "abilita_generazione_idle": False,
+    "ultimo_log_loop_tempo": 0,
+    "ultimo_log_inerzia_tempo": 0,
     "ultima_osservazione_mirata_tempo": 0,
     "conteggio_osservazioni_mirate": 0,
     "ultima_firma_osservazione_mirata": ""
@@ -397,13 +437,11 @@ def _thread_input_utente():
                 pass
 
         try:
-            if os.environ.get("CHOREGRAPHE_BOOT", "") == "1":
+            t = _leggi_input_tastiera_non_bloccante()
+            if t is None:
+                utente_sta_scrivendo = False
                 time.sleep(0.2)
                 continue
-
-            utente_sta_scrivendo = True
-
-            t = raw_input()
 
             utente_sta_scrivendo = False
             ultimo_input_tempo = time.time()
@@ -636,6 +674,32 @@ def _valuta_interazione_reale(mondo):
     )
 
 
+def _mondo_neutro_per_inerzia(mondo):
+    """
+    Riconosce un report idle anche quando contiene solo marker innocui.
+    Gli eventi reali restano esclusi da _valuta_interazione_reale.
+    """
+    try:
+        testo = normalizza_testo_ascii(mondo or u"").lower()
+    except Exception:
+        try:
+            testo = unicode(mondo or u"").lower()
+        except NameError:
+            testo = str(mondo or u"").lower()
+
+    for marker in [
+        u"report:",
+        u"sono fermo",
+        u"nessuna_condizione_attiva",
+        u".",
+        u":"
+    ]:
+        testo = testo.replace(marker, u" ")
+
+    testo = re.sub(r"\s+", " ", testo).strip()
+    return testo == u""
+
+
 def _ha_evento_sociale_tattile_prioritario(mondo, stato_runtime):
     try:
         eventi = stato_runtime.get("eventi_reali", {})
@@ -823,6 +887,273 @@ def _puo_attivare_routine_idle(corpo, adesso, ultimo_evento_tempo, messaggio_cor
         return False
 
     return True
+
+
+def _motivo_skip_inerzia(corpo, adesso, ultimo_evento_tempo, messaggio_corrente, mondo_neutro):
+    if not mondo_neutro:
+        return "mondo_non_neutro"
+
+    try:
+        if corpo.sta_camminando():
+            return "robot_in_movimento"
+    except Exception:
+        pass
+
+    if stato_runtime.get("in_pattugliamento", False):
+        return "pattugliamento_attivo"
+
+    if stato_runtime.get("controllo_manuale", False):
+        return "controllo_manuale"
+
+    if messaggio_corrente:
+        return "messaggio_utente_pendente"
+
+    if utente_sta_scrivendo:
+        return "utente_sta_scrivendo"
+
+    if adesso - ultimo_evento_tempo < TEMPO_IDLE_ROUTING:
+        return "silenzio_insufficiente"
+
+    ultima_route = stato_runtime.get("ultima_route_idle_tempo", 0)
+    if adesso - ultima_route < COOLDOWN_ROUTING_IDLE:
+        return "cooldown_routing_idle"
+
+    return "attivabile"
+
+
+def _log_inerzia(mondo, mondo_neutro, silenzio, inerzia_attivabile, motivo):
+    adesso = time.time()
+    if adesso - stato_runtime.get("ultimo_log_inerzia_tempo", 0) < 2.0:
+        return
+
+    logger.info(
+        u"[SOUL][INERZIA] mondo={}, neutro={}, silenzio={:.1f}, "
+        u"attivabile={}".format(
+            testo_per_log((mondo or u"")[:120]),
+            mondo_neutro,
+            silenzio,
+            inerzia_attivabile
+        )
+    )
+
+    if not inerzia_attivabile:
+        logger.info(u"[SOUL][INERZIA_SKIP] motivo={}".format(motivo))
+
+    stato_runtime["ultimo_log_inerzia_tempo"] = adesso
+
+
+def _chiudi_routing_idle(motivo):
+    if not stato_runtime.get("routing_idle_attivo", False):
+        return
+
+    stato_runtime["routing_idle_attivo"] = False
+    stato_runtime["routing_corrente"] = ""
+    stato_runtime["abilita_generazione_idle"] = False
+    stato_runtime.pop("osservazione_mirata_corrente", None)
+    stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+    stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+    logger.info(u"[SOUL][ROUTING_IDLE] chiuso: {}".format(motivo))
+
+
+def _idle_concluso_senza_evidenze(stato_runtime):
+    if not stato_runtime.get("routing_idle_attivo", False):
+        return False
+
+    decisione_non_generativa = stato_runtime.get("decisione_non_generativa", "")
+    if decisione_non_generativa:
+        return True
+
+    evento = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento, dict):
+        return False
+
+    categoria = str(evento.get("categoria", "") or "").lower()
+    stato = str(evento.get("stato", "") or "").lower()
+    azione = str(evento.get("azione_cognitiva", "") or "").lower()
+    genera = evento.get("genera_condizione", False)
+
+    return (
+        genera is False
+        and (
+            azione == "ignora"
+            or (
+                categoria == "supporto_informativo"
+                and stato in ["non_disponibile", "potenziale"]
+            )
+        )
+    )
+
+
+def _testo_norm_percezione(mondo):
+    try:
+        return normalizza_testo_ascii(mondo or u"").lower()
+    except Exception:
+        try:
+            return str(mondo or "").lower()
+        except Exception:
+            return ""
+
+
+def _evento_core_presente(evento, nome):
+    if not isinstance(evento, dict):
+        return False
+
+    eventi_core = evento.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        return False
+
+    return nome in [str(e or "").lower() for e in eventi_core]
+
+
+def _spiegazione_cognitiva_percezione(mondo, evento):
+    if not isinstance(evento, dict):
+        evento = {}
+
+    testo = _testo_norm_percezione(mondo)
+    categoria = str(evento.get("categoria", "") or "").lower()
+    stato = str(evento.get("stato", "") or "").lower()
+    azione = str(evento.get("azione_cognitiva", "") or "").lower()
+
+    ha_materiali_cartacei = any(p in testo for p in [
+        "conferisci", "raccolta", "differenzia", "fogli",
+        "fotocopie", "quaderni", "carta", "cartacei", "cartoncini"
+    ])
+    ha_orari = any(p in testo for p in [
+        "orari", "aperto", "apertura", "dalle", "alle",
+        "giovedi", "venerdi", "sabato", "domenica", "10 00", "20 00"
+    ])
+    testo_incomprensibile = any(p in testo for p in [
+        "testo scritto ma non leggibile",
+        "testo non leggibile",
+        "scritte non leggibili",
+        "non riesco a leggere",
+        "non leggo",
+        "illeggibile"
+    ])
+
+    if _evento_core_presente(evento, "informazione_operativa"):
+        if ha_materiali_cartacei:
+            return (
+                u"Ho letto alcune indicazioni. Sembra un contenitore "
+                u"per la raccolta di materiali cartacei."
+            )
+
+        return (
+            u"Ho letto alcune indicazioni operative utili "
+            u"nell'ambiente."
+        )
+
+    if _evento_core_presente(evento, "contenuto_informativo_rilevante"):
+        if ha_orari:
+            return (
+                u"Ho trovato alcune informazioni sul luogo. "
+                u"Sembrano indicare gli orari di apertura."
+            )
+
+        return (
+            u"Ho trovato alcune informazioni utili per comprendere "
+            u"meglio questo luogo."
+        )
+
+    if (
+        categoria == "supporto_informativo"
+        and stato == "potenziale"
+    ) or categoria == "ambiguita" or azione == "osserva_meglio":
+        return (
+            u"Vedo del testo, ma non riesco ancora a capirne "
+            u"il significato."
+        )
+
+    if (
+        categoria == "supporto_informativo"
+        and stato == "non_disponibile"
+    ) or azione == "ignora":
+        if testo_incomprensibile:
+            return (
+                u"Vedo del testo, ma non riesco ancora a capirne "
+                u"il significato."
+            )
+
+        return (
+            u"Ho osservato la scena, ma non ho trovato "
+            u"informazioni rilevanti."
+        )
+
+    return None
+
+
+def _firma_verbalizzazione_percezione(mondo, evento, frase):
+    if not isinstance(evento, dict):
+        evento = {}
+
+    eventi_core = evento.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    parti = [
+        str(evento.get("categoria", "") or "").lower(),
+        str(evento.get("stato", "") or "").lower(),
+        ",".join([str(e or "").lower() for e in eventi_core]),
+        _testo_norm_percezione(frase),
+        _firma_osservazione_mirata(mondo)[:120]
+    ]
+    return "|".join(parti)
+
+
+def _verbalizza_percezione_autonoma(voce, mondo):
+    if not stato_runtime.get("routing_idle_attivo", False):
+        return False
+
+    evento = stato_runtime.get("evento_strutturato", {})
+    frase = _spiegazione_cognitiva_percezione(mondo, evento)
+    if not frase:
+        return False
+
+    route_id = stato_runtime.get("ultima_route_idle_tempo", 0)
+    if (
+        route_id
+        and stato_runtime.get("ultima_verbalizzazione_route_id") == route_id
+    ):
+        return False
+
+    firma = _firma_verbalizzazione_percezione(mondo, evento, frase)
+    adesso = time.time()
+    recenti = stato_runtime.get("verbalizzazioni_percezione_recenti", {})
+    if not isinstance(recenti, dict):
+        recenti = {}
+
+    ultimo = recenti.get(firma, 0)
+    if adesso - ultimo < COOLDOWN_VERBALIZZAZIONE_PERCEZIONE:
+        logger.info(
+            u"[SOUL][PERCEZIONE] verbalizzazione saltata: gia' detta"
+        )
+        stato_runtime["ultima_verbalizzazione_route_id"] = route_id
+        return False
+
+    try:
+        voce.parla(frase)
+    except Exception as e:
+        logger.warning(
+            u"[SOUL][PERCEZIONE] verbalizzazione fallita: {}".format(e)
+        )
+        return False
+
+    recenti[firma] = adesso
+    stato_runtime["verbalizzazioni_percezione_recenti"] = recenti
+    stato_runtime["ultima_verbalizzazione_route_id"] = route_id
+    stato_runtime["ultima_verbalizzazione_percezione"] = frase
+    try:
+        frase_log = testo_per_log(frase)
+    except Exception:
+        frase_log = frase
+
+    logger.info(
+        u"[SOUL][PERCEZIONE] verbalizzazione: {}".format(
+            frase_log
+        )
+    )
+    return True
+
 
 def _attiva_routine_idle_ambiente(corpo, voce, motivo="inerzia"):
     """
@@ -1031,8 +1362,11 @@ def _prepara_runtime_autonomo(mondo, evento_composto=False, forza_safety=False, 
 
     stato_runtime["memoria"] = memoria_fisica
     stato_runtime["stato_robot"] = stato_robot
-    stato_runtime["openai_api_key"] = CHIAVE_PRIVATA
-    logger.info(u"[LLM][SOUL] stato_runtime openai_api_key presente: {}".format(
+    # La chiave resta nell'ambiente di processo, non nei dump runtime.
+    stato_runtime.pop("openai_api_key", None)
+    if CHIAVE_PRIVATA:
+        os.environ["OPENAI_API_KEY"] = CHIAVE_PRIVATA
+    logger.info(u"[LLM][SOUL] OPENAI_API_KEY disponibile nel processo: {}".format(
         _api_key_presente()
     ))
     stato_runtime["abilita_generazione_eventi_sconosciuti"] = True
@@ -1286,6 +1620,11 @@ def main():
 
         while not STOP_PROGRAMMA:
             aggiorna_heartbeat()
+            adesso_loop = time.time()
+
+            if adesso_loop - stato_runtime.get("ultimo_log_loop_tempo", 0) >= 2.0:
+                logger.info(u"[SOUL][LOOP] ciclo attivo")
+                stato_runtime["ultimo_log_loop_tempo"] = adesso_loop
 
             # STOP DI EMERGENZA TESTA
             try:
@@ -1684,31 +2023,75 @@ def main():
                 "riconosco" not in testo_mondo
             )
 
+            mondo_neutro = (
+                _mondo_neutro_per_inerzia(mondo)
+                and not _valuta_interazione_reale(mondo)
+            )
+            adesso = time.time()
+            silenzio = adesso - ultimo_evento_tempo
+            motivo_inerzia = _motivo_skip_inerzia(
+                corpo,
+                adesso,
+                ultimo_evento_tempo,
+                messaggio_utente,
+                mondo_neutro
+            )
+            inerzia_attivabile = motivo_inerzia == "attivabile"
+            _log_inerzia(
+                mondo,
+                mondo_neutro,
+                silenzio,
+                inerzia_attivabile,
+                motivo_inerzia
+            )
+
             if solo_percezione_spaziale_fermo:
+                logger.info(
+                    u"[SOUL][INERZIA_SKIP] motivo=percezione_spaziale_ferma"
+                )
                 stato_precedente = mondo
                 time.sleep(0.1)
                 continue
 
             # Curiosità autonoma su mondo neutro:
             # se non succede nulla per un po', NAO osserva da solo.
-            mondo_neutro = mondo.strip() in [
-                u"REPORT:",
-                u"REPORT: SONO FERMO.",
-                u"SONO FERMO.",
-                u""
-            ]
+            mondo_neutro = (
+                _mondo_neutro_per_inerzia(mondo)
+                and not _valuta_interazione_reale(mondo)
+            )
+
+            adesso = time.time()
+            silenzio = adesso - ultimo_evento_tempo
+            inerzia_attivabile = False
 
             if mondo_neutro:
-                adesso = time.time()
-
-                if _puo_attivare_routine_idle(
+                inerzia_attivabile = _puo_attivare_routine_idle(
                     corpo,
                     adesso,
                     ultimo_evento_tempo,
                     messaggio_utente
-                ):
-                    tempo_di_inerzia = adesso - ultimo_evento_tempo
+                )
 
+            if adesso - stato_runtime.get("ultimo_log_inerzia_tempo", 0) >= 2.0:
+                logger.info(
+                    u"[SOUL][INERZIA] mondo={}, neutro={}, silenzio={:.1f}, "
+                    u"attivabile={}".format(
+                        testo_per_log(mondo[:120]),
+                        mondo_neutro,
+                        silenzio,
+                        inerzia_attivabile
+                    )
+                )
+                stato_runtime["ultimo_log_inerzia_tempo"] = adesso
+
+            if mondo_neutro:
+                if inerzia_attivabile:
+                    tempo_di_inerzia = silenzio
+
+                    logger.info(
+                        u"[SOUL] Avvio curiosita autonoma per inerzia: "
+                        u"silenzio da {:.1f}s".format(tempo_di_inerzia)
+                    )
                     logger.info(
                         u"[SOUL][ROUTING_IDLE] esplora/osserva ambiente: "
                         u"silenzio da {:.1f}s".format(tempo_di_inerzia)
@@ -2075,6 +2458,18 @@ def main():
                         stato_runtime
                     )
 
+                    if (
+                        decisione_condizione is None
+                        and _idle_concluso_senza_evidenze(stato_runtime)
+                    ):
+                        _verbalizza_percezione_autonoma(voce, mondo)
+                        _chiudi_routing_idle(
+                            stato_runtime.get(
+                                "decisione_non_generativa",
+                                "idle senza nuove evidenze"
+                            )
+                        )
+
                 # Anti-loop decisione: evita di ripetere continuamente
                 # la stessa schivata laterale.
                 try:
@@ -2150,6 +2545,9 @@ def main():
                         decisione_condizione
                     )
                 )
+
+                if not richiede_osservazione_mirata:
+                    _verbalizza_percezione_autonoma(voce, mondo)
                 
                 esegui_decisione(
                     decisione_condizione,
@@ -2193,6 +2591,8 @@ def main():
                             stato_runtime
                         )
 
+                        _verbalizza_percezione_autonoma(voce, mondo_mirato)
+
                         if decisione_mirata:
                             decisione_mirata = valida_decisione(
                                 decisione_mirata,
@@ -2204,6 +2604,9 @@ def main():
                             ):
                                 logger.info(
                                     u"[SOUL] Curiosita conclusa senza nuove evidenze"
+                                )
+                                _chiudi_routing_idle(
+                                    "osservazione mirata senza nuove evidenze"
                                 )
                             else:
                                 logger.info(
@@ -2228,9 +2631,15 @@ def main():
                             logger.info(
                                 u"[SOUL] Curiosita conclusa senza nuove evidenze"
                             )
+                            _chiudi_routing_idle(
+                                "osservazione mirata senza decisione"
+                            )
                     else:
                         logger.info(
                             u"[SOUL] Curiosita conclusa senza nuove evidenze"
+                        )
+                        _chiudi_routing_idle(
+                            "osservazione mirata non disponibile"
                         )
 
             _riprendi_cammino_automatico(corpo, ultima_decisione)

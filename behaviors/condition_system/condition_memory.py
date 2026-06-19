@@ -269,7 +269,9 @@ def _eventi_da_metadati(dati):
         "accesso_non_disponibile",
         "informazione_operativa",
         "contenuto_informativo_rilevante",
+        "vincolo_comportamentale",
         "oggetto_in_zona_rilevante",
+        "oggetto_funzione_sconosciuta",
         "elemento_ambientale_anomalo",
         "elemento_fuori_posto",
         "ostacolo_destra",
@@ -380,9 +382,15 @@ def _categoria_cognitiva_da_eventi(eventi_attivi, mondo):
     if _contiene_evento(eventi_attivi, [
         "informazione_operativa",
         "contenuto_informativo_rilevante",
-        "contenuto_testuale_da_approfondire"
+        "contenuto_testuale_da_approfondire",
+        "vincolo_comportamentale"
     ]):
         return "informazione"
+
+    if _contiene_evento(eventi_attivi, [
+        "oggetto_funzione_sconosciuta"
+    ]):
+        return "oggetto_funzione"
 
     if _contiene_evento(eventi_attivi, [
         "oggetto_in_zona_rilevante",
@@ -416,6 +424,9 @@ def _azione_cognitiva_da_categoria(categoria, eventi_attivi):
 
     if categoria == "informazione":
         return "interpreta_e_memorizza"
+
+    if categoria == "oggetto_funzione":
+        return "memorizza_funzione"
 
     if categoria == "prudenza":
         return "osserva_con_prudenza"

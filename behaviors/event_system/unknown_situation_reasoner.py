@@ -37,6 +37,54 @@ def _contiene(testo, parole):
     return any(p in testo for p in parole)
 
 
+def _ha_contesto_accesso(testo):
+    return _contiene(testo, [
+        "porta", "ingresso", "uscita", "accesso",
+        "entrata", "varco", "passaggio", "percorso",
+        "corridoio"
+    ])
+
+
+def _ha_limite_movimento(testo):
+    return _contiene(testo, [
+        "non accessibile", "non posso passare",
+        "davanti al passaggio", "davanti al percorso",
+        "in mezzo al percorso", "sul percorso",
+        "sul passaggio", "passaggio impedito",
+        "passaggio ostruito", "percorso ostruito",
+        "ostacolo", "ingombro"
+    ])
+
+
+def _ha_oggetto_funzione_incerta(testo):
+    oggetti_funzione = [
+        "oggetto", "elemento", "dispositivo", "strumento",
+        "macchina", "apparecchio", "contenitore", "scatola",
+        "pacco", "cartone", "pulsante", "leva", "maniglia"
+    ]
+    segnali_funzione_possibile = [
+        "etichetta", "etichette", "simbolo", "simboli",
+        "meccanismo", "parti", "comando", "controllo",
+        "chiuso", "chiusa", "sigillato", "sigillata",
+        "funzione non chiara", "non capisco la funzione",
+        "non so a cosa serve", "non e chiaro a cosa serve"
+    ]
+    return _contiene(testo, oggetti_funzione) and _contiene(
+        testo,
+        segnali_funzione_possibile
+    )
+
+
+def _ha_contesto_da_approfondire(testo):
+    return _contiene(testo, [
+        "ambiente nuovo", "zona nuova", "area nuova",
+        "situazione nuova", "non riconosco la scena",
+        "dettagli potenzialmente utili",
+        "dettaglio potenzialmente utile",
+        "contesto non chiaro", "contesto da capire"
+    ])
+
+
 def _categoria_stato(evento, tipo):
     evento = (evento or "").lower()
     tipo = (tipo or "").lower()
@@ -50,8 +98,23 @@ def _categoria_stato(evento, tipo):
     if evento in ["oggetto_in_zona_rilevante", "percorso_potenzialmente_ostruito"]:
         return "ostacolo_spazio", "potenzialmente_ostruito"
 
+    if evento == "oggetto_funzione_sconosciuta":
+        return "oggetto_funzione", "da_chiarire"
+
     if evento in ["elemento_ambientale_anomalo", "elemento_fuori_posto"]:
         return "anomalia", "anomalo"
+
+    if evento in ["informazione_operativa", "contenuto_informativo_rilevante"]:
+        return "informazione", "rilevante"
+
+    if evento == "vincolo_comportamentale":
+        return "informazione", "vincolo"
+
+    if evento == "supporto_informativo_non_disponibile":
+        return "supporto_informativo", "non_disponibile"
+
+    if evento == "supporto_informativo_potenziale":
+        return "supporto_informativo", "potenziale"
 
     if tipo in [
         "informazione_visiva_incerta",
@@ -64,17 +127,11 @@ def _categoria_stato(evento, tipo):
     if evento == "contenuto_testuale_da_approfondire":
         return "ambiguita", "incerto"
 
-    if evento in ["informazione_operativa", "contenuto_informativo_rilevante"]:
-        return "informazione", "rilevante"
-
-    if evento == "supporto_informativo_non_disponibile":
-        return "supporto_informativo", "non_disponibile"
-
-    if evento == "supporto_informativo_potenziale":
-        return "supporto_informativo", "potenziale"
-
     if evento == "ambiente_didattico_probabile":
         return "contesto_ambientale", "didattico_probabile"
+
+    if evento == "contesto_da_approfondire":
+        return "contesto_ambientale", "da_approfondire"
 
     return "neutra", "osservato"
 
@@ -180,10 +237,7 @@ def ragiona_situazione_sconosciuta(testo):
                         False
                     )
                 ),
-                "tipo": interpretazione_visiva.get(
-                    "categoria",
-                    "informazione_visiva"
-                ),
+                "tipo": evento_visivo,
                 "evento": evento_visivo,
                 "ipotesi": interpretazione_visiva.get(
                     "significato",
@@ -220,6 +274,19 @@ def ragiona_situazione_sconosciuta(testo):
     ]
 
     if any(x in testo for x in indicatori_ambiguita):
+        if _ha_oggetto_funzione_incerta(testo):
+            return _arricchisci_strutturato({
+                "significativa": True,
+                "genera_condizione": False,
+                "tipo": "oggetto_funzione_sconosciuta",
+                "evento": "oggetto_funzione_sconosciuta",
+                "ipotesi": (
+                    "un elemento sembra avere una funzione, ma serve "
+                    "osservazione mirata prima di memorizzarlo"
+                ),
+                "azione_cognitiva": "osserva_meglio"
+            })
+
         return _arricchisci_strutturato({
             "significativa": False,
             "genera_condizione": False,
@@ -232,13 +299,13 @@ def ragiona_situazione_sconosciuta(testo):
         })
 
     # 2. Situazioni che influenzano movimento/accesso
-    if _contiene(testo, [
-        "chius", "blocc", "ostru", "impedis",
-        "non accessibile", "non posso passare",
-        "davanti al passaggio", "davanti al percorso",
-        "in mezzo al percorso", "sul percorso",
-        "ostacolo", "ingombro"
-    ]):
+    if (
+        _ha_limite_movimento(testo)
+        or (
+            _ha_contesto_accesso(testo)
+            and _contiene(testo, ["chius", "blocc", "ostru", "impedis"])
+        )
+    ):
         return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": True,
@@ -320,8 +387,6 @@ def ragiona_situazione_sconosciuta(testo):
         "in parte illeggibili",
         "non possibile discernere",
         "non e possibile discernere",
-        "testo scritto",
-        "testo sulla lavagna",
         "scritte non leggibili",
         "non leggibili localmente",
         "segni o scritte"
@@ -429,6 +494,32 @@ def ragiona_situazione_sconosciuta(testo):
             "tipo": "supporto_informativo_potenziale",
             "evento": None,
             "ipotesi": "vedo un supporto che potrebbe contenere informazioni utili",
+            "azione_cognitiva": "osserva_meglio"
+        })
+
+    if _ha_oggetto_funzione_incerta(testo):
+        return _arricchisci_strutturato({
+            "significativa": True,
+            "genera_condizione": False,
+            "tipo": "oggetto_funzione_sconosciuta",
+            "evento": "oggetto_funzione_sconosciuta",
+            "ipotesi": (
+                "un elemento sembra avere una funzione, ma non e' ancora "
+                "abbastanza chiaro da creare una condizione"
+            ),
+            "azione_cognitiva": "osserva_meglio"
+        })
+
+    if _ha_contesto_da_approfondire(testo):
+        return _arricchisci_strutturato({
+            "significativa": True,
+            "genera_condizione": False,
+            "tipo": "contesto_da_approfondire",
+            "evento": "contesto_da_approfondire",
+            "ipotesi": (
+                "la scena contiene dettagli nuovi potenzialmente utili, "
+                "ma non ancora una regola comportamentale"
+            ),
             "azione_cognitiva": "osserva_meglio"
         })
     

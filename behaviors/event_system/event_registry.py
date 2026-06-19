@@ -116,6 +116,11 @@ EVENTI_BASE_NOTI = {
         "categoria": "spaziale",
         "descrizione": "elemento collocato in una zona rilevante per movimento, accesso o esplorazione"
     },
+    "oggetto_funzione_sconosciuta": {
+        "origine": "semantica",
+        "categoria": "cognitiva",
+        "descrizione": "elemento osservato con funzione potenzialmente utile da chiarire o memorizzare"
+    },
     "informazione_operativa": {
         "origine": "semantica",
         "categoria": "cognitiva",
@@ -150,6 +155,11 @@ EVENTI_BASE_NOTI = {
         "origine": "semantica",
         "categoria": "esplorativa",
         "descrizione": "zona nuova o non riconosciuta da esplorare con cautela"
+    },
+    "contesto_da_approfondire": {
+        "origine": "semantica",
+        "categoria": "esplorativa",
+        "descrizione": "contesto nuovo o poco chiaro con dettagli potenzialmente utili"
     }
 }
 

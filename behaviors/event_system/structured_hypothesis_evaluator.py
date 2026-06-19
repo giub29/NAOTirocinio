@@ -40,7 +40,10 @@ def _evento_strutturato_puo_generare(evento):
         return False
 
     categoria = _testo(evento.get("categoria"))
-    if categoria in ["", "neutra", "ambiguita"]:
+    stato = _testo(evento.get("stato"))
+    tipo = _testo(evento.get("tipo"))
+
+    if categoria in ["", "neutra", "ambiguita", "supporto_informativo"]:
         return False
 
     eventi_core = evento.get("eventi_core", [])
@@ -51,7 +54,20 @@ def _evento_strutturato_puo_generare(evento):
         e for e in eventi_core
         if e not in [None, False, "", [], {}]
     ]
+    eventi_core_norm = [_testo(e) for e in eventi_core]
+
     if len(eventi_core) == 0:
+        return False
+
+    if (
+        stato in ["potenziale", "non_disponibile"]
+        or tipo in [
+            "supporto_informativo_potenziale",
+            "supporto_informativo_non_disponibile"
+        ]
+        or "supporto_informativo_potenziale" in eventi_core_norm
+        or "supporto_informativo_non_disponibile" in eventi_core_norm
+    ):
         return False
 
     ragionamento = evento.get("ragionamento_unknown", {})
@@ -63,6 +79,20 @@ def _evento_strutturato_puo_generare(evento):
         return False
 
     return True
+
+
+def _supporto_informativo_peggiorato_ma_inconclusivo(
+    categoria_ipotesi,
+    stato_ipotesi,
+    categoria_nuova,
+    stato_nuovo
+):
+    return (
+        categoria_ipotesi == "supporto_informativo"
+        and stato_ipotesi == "potenziale"
+        and categoria_nuova == "supporto_informativo"
+        and stato_nuovo == "non_disponibile"
+    )
 
 
 def _esito(
@@ -132,6 +162,19 @@ def valuta_ipotesi_da_evento_strutturato(
         aggiornata["ultima_categoria"] = categoria_nuova
         aggiornata["ultimo_stato"] = stato_nuovo
 
+        if (
+            categoria_nuova == "supporto_informativo"
+            and stato_nuovo in ["potenziale", "non_disponibile"]
+        ):
+            return _esito(
+                True,
+                "scaduta",
+                False,
+                "supporto informativo non convertito dopo osservazione mirata",
+                None,
+                aggiornata
+            )
+
         genera = (
             (rilevanza >= 0.6 or confidenza >= 0.6)
             and _evento_strutturato_puo_generare(nuovo_evento_strutturato)
@@ -148,6 +191,39 @@ def valuta_ipotesi_da_evento_strutturato(
             genera,
             motivo,
             "genera_condizione" if genera else None,
+            aggiornata
+        )
+
+    if _supporto_informativo_peggiorato_ma_inconclusivo(
+        categoria_ipotesi,
+        stato_ipotesi,
+        categoria_nuova,
+        stato_nuovo
+    ):
+        tentativi = _tentativi(ipotesi) + 1
+        aggiornata["tentativi"] = tentativi
+        aggiornata["confermata"] = False
+        aggiornata["ultimo_mondo"] = nuovo_mondo
+        aggiornata["ultima_categoria"] = categoria_nuova
+        aggiornata["ultimo_stato"] = stato_nuovo
+        aggiornata["osservazione_inconclusiva"] = True
+
+        if tentativi >= 3:
+            return _esito(
+                True,
+                "scaduta",
+                False,
+                "supporto informativo potenziale non chiarito dopo osservazioni ripetute",
+                None,
+                aggiornata
+            )
+
+        return _esito(
+            True,
+            "incerta",
+            False,
+            "osservazione mirata inconclusiva: mantengo ipotesi potenziale",
+            None,
             aggiornata
         )
 
