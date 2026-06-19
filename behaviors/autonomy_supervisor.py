@@ -145,6 +145,12 @@ ULTIMO_MONDO_GENERATO = None
 EVENTI_HELPER_NON_GENERATIVI = [
     "interazione_utente"
 ]
+FALLBACK_VISIVI_NON_GENERATIVI = [
+    "non distinguo elementi rilevanti senza analisi visiva llm",
+    "scena acquisita dalla camera, ma non distinguo elementi rilevanti",
+    "non distinguo elementi rilevanti",
+    "senza analisi visiva llm"
+]
 
 
 def _diag_pipeline(label, valore):
@@ -159,6 +165,41 @@ def filtra_eventi_helper(eventi):
         e for e in eventi
         if str(e).lower().strip() not in EVENTI_HELPER_NON_GENERATIVI
     ]
+
+
+def _testo_contiene_fallback_visivo_generico(mondo):
+    testo = str(mondo or "").lower()
+    return any(
+        indicatore in testo
+        for indicatore in FALLBACK_VISIVI_NON_GENERATIVI
+    )
+
+
+def _evento_strutturato_neutro_non_generativo(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return False
+
+    categoria = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    genera = evento_strutturato.get("genera_condizione", False)
+    eventi_core = evento_strutturato.get("eventi_core", [])
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    return (
+        categoria == "neutra"
+        and genera is False
+        and len(filtra_eventi_helper(eventi_core)) == 0
+    )
+
+
+def situazione_fallback_visivo_neutra(mondo, evento_strutturato):
+    return (
+        _testo_contiene_fallback_visivo_generico(mondo)
+        and _evento_strutturato_neutro_non_generativo(evento_strutturato)
+    )
 
 
 def integra_eventi_sconosciuti_in_evento_strutturato(
@@ -799,6 +840,20 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         logger.warning(
             "[AUTONOMIA] Errore propagando eventi_attivi nel runtime: {}".format(e)
         )
+
+    if situazione_fallback_visivo_neutra(
+        mondo,
+        stato_runtime.get("evento_strutturato", {})
+    ):
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+        stato_runtime["decisione_non_generativa"] = (
+            "fallback visivo generico neutro"
+        )
+        logger.info(
+            "[AUTONOMIA] Fallback visivo neutro: nessuna generazione"
+        )
+        return None
 
     valutazione_ipotesi_strutturata = valuta_ipotesi_strutturata_sicura(
         stato_runtime,
@@ -1547,6 +1602,11 @@ def situazione_merita_generazione(mondo, stato_runtime):
     if not isinstance(evento_strutturato, dict):
         evento_strutturato = {}
 
+    if situazione_fallback_visivo_neutra(mondo, evento_strutturato):
+        stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+        stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+        return False, "fallback visivo generico neutro non generativo"
+
     tipo = str(evento_strutturato.get("tipo", "")).lower()
     categoria = str(evento_strutturato.get("categoria", "")).lower()
     origine = str(evento_strutturato.get("origine", "")).lower()
@@ -2013,10 +2073,18 @@ def costruisci_firma_situazione(mondo, stato_runtime):
         ]
     ]
 
+    fallback_visivo_neutro = situazione_fallback_visivo_neutra(
+        mondo,
+        evento_strutturato
+    )
+
     ha_novita_runtime = (
         presenza_eventi_reali
         or len(eventi_significativi) > 0
-        or evento_strutturato.get("tipo", "generico") != "generico"
+        or (
+            evento_strutturato.get("tipo", "generico") != "generico"
+            and not fallback_visivo_neutro
+        )
     )
 
     ha_testo_sensoriale_non_banale = (
@@ -2076,6 +2144,12 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     adesso = time.time()
     mondo_normalizzato = (mondo or "").strip().lower()
 
+    if stato_runtime.get("llm_generazione_non_disponibile", False):
+        logger.warning(
+            "[AUTONOMIA] Generazione saltata: LLM temporaneamente non disponibile"
+        )
+        return None
+
     if ULTIMO_MONDO_GENERATO == mondo_normalizzato:
         logger.info("[AUTONOMIA] Generazione saltata: situazione gia' tentata")
         return None
@@ -2090,6 +2164,21 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
         import behaviors.condition_system.condition_generator as condition_generator
 
         logger.info("[AUTONOMIA] Provo generazione autonoma. Motivo: {}".format(motivo))
+
+        if getattr(condition_generator, "LLM_NON_DISPONIBILE", False):
+            stato_runtime["llm_generazione_non_disponibile"] = True
+            stato_runtime["motivo_llm_generazione_non_disponibile"] = (
+                getattr(
+                    condition_generator,
+                    "LLM_MOTIVO_NON_DISPONIBILE",
+                    None
+                )
+                or "llm_non_disponibile"
+            )
+            logger.warning(
+                "[AUTONOMIA] Generazione saltata: API key non valida, generazione disabilitata temporaneamente"
+            )
+            return None
 
         if hasattr(condition_generator, "genera_condizione_autonoma"):
             dati_memoria_runtime = stato_runtime.get("memoria", {})
@@ -2127,6 +2216,21 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 chiave_privata,
                 storia_episodica=storia_episodica
             )
+
+            if getattr(condition_generator, "LLM_NON_DISPONIBILE", False):
+                stato_runtime["llm_generazione_non_disponibile"] = True
+                stato_runtime["motivo_llm_generazione_non_disponibile"] = (
+                    getattr(
+                        condition_generator,
+                        "LLM_MOTIVO_NON_DISPONIBILE",
+                        None
+                    )
+                    or "llm_non_disponibile"
+                )
+                logger.warning(
+                    "[AUTONOMIA] API key non valida: generazione disabilitata temporaneamente"
+                )
+                return None
 
             if path_nuova_condizione:
                 ULTIMO_MONDO_GENERATO = mondo_normalizzato

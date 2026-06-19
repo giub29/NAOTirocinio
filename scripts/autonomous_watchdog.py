@@ -6,6 +6,7 @@ import time
 import subprocess
 import logging
 import signal
+import errno
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -41,6 +42,33 @@ def assicura_runtime():
     if not os.path.exists(RUNTIME_DIR):
         os.makedirs(RUNTIME_DIR)
 
+
+def pid_esiste(pid):
+    try:
+        pid = int(str(pid).strip())
+    except Exception:
+        return False
+
+    if pid <= 0:
+        return False
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError as e:
+        return getattr(e, "errno", None) == errno.EPERM
+    except Exception:
+        return False
+
+
+def _leggi_pid_lock_watchdog():
+    try:
+        with open(WATCHDOG_LOCK_FILE, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
 def acquisisci_lock_watchdog():
     assicura_runtime()
 
@@ -60,8 +88,27 @@ def acquisisci_lock_watchdog():
         return True
 
     except OSError:
+        pid_lock = _leggi_pid_lock_watchdog()
+
+        if not pid_esiste(pid_lock):
+            try:
+                os.remove(WATCHDOG_LOCK_FILE)
+                logger.warning(
+                    "Lock watchdog orfano rimosso: PID {}".format(
+                        pid_lock or "non valido"
+                    )
+                )
+            except Exception as e:
+                logger.error(
+                    "Errore rimozione lock watchdog orfano: {}".format(e)
+                )
+                return False
+
+            return acquisisci_lock_watchdog()
+
         logger.error(
-            "Watchdog gia' attivo: blocco secondo avvio."
+            "Watchdog gia' attivo con PID {}: blocco secondo avvio."
+            .format(pid_lock)
         )
         return False
 

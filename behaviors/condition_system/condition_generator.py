@@ -69,6 +69,7 @@ if not logger.handlers:
 
 LLM_NON_DISPONIBILE = False
 LLM_NON_DISPONIBILE_LOGGATO = False
+LLM_MOTIVO_NON_DISPONIBILE = None
 OPENAI_CHAT_COMPLETIONS_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL_GENERATORE = "gpt-4o-mini"
 
@@ -111,7 +112,7 @@ def _llm_disponibile(chiave_privata):
 
     if LLM_NON_DISPONIBILE or not _key_presente(chiave_privata):
         if not LLM_NON_DISPONIBILE_LOGGATO:
-            logger.warning(u"[GENERATOR] LLM non disponibile: chiave OpenAI assente o invalida")
+            logger.warning(u"[GENERATOR] API key non valida: generazione disabilitata temporaneamente")
             LLM_NON_DISPONIBILE_LOGGATO = True
         return False
 
@@ -136,13 +137,15 @@ def _risposta_indica_api_key_invalida(testo):
 def _marca_llm_non_disponibile(testo):
     global LLM_NON_DISPONIBILE
     global LLM_NON_DISPONIBILE_LOGGATO
+    global LLM_MOTIVO_NON_DISPONIBILE
 
     if not _risposta_indica_api_key_invalida(testo):
         return False
 
     LLM_NON_DISPONIBILE = True
+    LLM_MOTIVO_NON_DISPONIBILE = "invalid_api_key"
     if not LLM_NON_DISPONIBILE_LOGGATO:
-        logger.warning(u"[GENERATOR] LLM non disponibile: chiave OpenAI assente o invalida")
+        logger.warning(u"[GENERATOR] API key non valida: generazione disabilitata temporaneamente")
         LLM_NON_DISPONIBILE_LOGGATO = True
 
     return True

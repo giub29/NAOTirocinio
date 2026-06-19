@@ -1,49 +1,172 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
+import os
+import subprocess
 import time
 import traceback
-import os
-import sys
-import subprocess
 
 try:
     from naoqi import ALProxy
 except Exception:
     ALProxy = None
 
-try:
-    import urllib2
-except Exception:
-    urllib2 = None
+
+BASE_DIR = "/data/home/nao/NAOTirocinio"
+RUNTIME_DIR = os.path.join(BASE_DIR, "runtime")
+BOOT_LOG = os.path.join(RUNTIME_DIR, "boot_autonomo.log")
+WATCHDOG_REL_PATH = os.path.join("scripts", "autonomous_watchdog.py")
+WATCHDOG_PATH = os.path.join(BASE_DIR, WATCHDOG_REL_PATH)
+WATCHDOG_LOCK_FILE = os.path.join(RUNTIME_DIR, "watchdog.lock")
+PYTHON_CMD = "/usr/bin/python"
+
+ALMEMORY_STATUS_KEY = "AutonomousSystem/Status"
+ALMEMORY_BOOT_TIME_KEY = "AutonomousSystem/BootstrapTime"
+ALMEMORY_WATCHDOG_PID_KEY = "AutonomousSystem/WatchdogPid"
 
 
-PC_IP = os.environ.get("PC_IP", "172.16.165.75")
-PC_PORT = int(os.environ.get("PC_PORT", "8765"))
-MAX_TENTATIVI_PC = int(os.environ.get("BOOTSTRAP_MAX_TENTATIVI_PC", "60"))
-PAUSA_TENTATIVI_PC = int(os.environ.get("BOOTSTRAP_PAUSA_TENTATIVI_PC", "5"))
-BOOTSTRAP_MODE = os.environ.get("BOOTSTRAP_MODE", "onboard").strip().lower()
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-WATCHDOG_PATH = os.path.join(PROJECT_ROOT, "scripts", "autonomous_watchdog.py")
-RUNTIME_DIR = os.path.join(PROJECT_ROOT, "runtime")
-WATCHDOG_ONBOARD_LOG = os.path.join(RUNTIME_DIR, "watchdog_onboard.log")
-
-
-def scrivi_log(messaggio):
+def assicura_runtime():
     try:
-        f = open("/home/nao/autonomous_bootstrap.log", "a")
-        f.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), messaggio))
-        f.close()
+        if not os.path.exists(RUNTIME_DIR):
+            os.makedirs(RUNTIME_DIR)
     except Exception:
         pass
 
 
-def parla(tts, frase):
+def scrivi_log(messaggio):
     try:
-        if tts is not None:
-            tts.say(frase)
+        assicura_runtime()
+        f = open(BOOT_LOG, "a")
+        try:
+            f.write("[%s] %s\n" % (
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                messaggio
+            ))
+        finally:
+            f.close()
+    except Exception:
+        pass
+
+
+def aggiorna_memoria(memory, stato, extra=None):
+    try:
+        if memory is None:
+            return
+
+        memory.insertData(ALMEMORY_STATUS_KEY, stato)
+        memory.insertData(ALMEMORY_BOOT_TIME_KEY, time.time())
+
+        if extra:
+            for chiave, valore in extra.items():
+                memory.insertData(chiave, valore)
     except Exception as e:
-        scrivi_log("Errore voce: %s" % str(e))
+        scrivi_log("Errore aggiornamento ALMemory: %s" % str(e))
+
+
+def connetti_almemory():
+    if ALProxy is None:
+        scrivi_log("NAOqi non disponibile: continuo senza ALMemory")
+        return None
+
+    try:
+        return ALProxy("ALMemory", "127.0.0.1", 9559)
+    except Exception as e:
+        scrivi_log("Errore connessione ALMemory: %s" % str(e))
+        return None
+
+
+def pid_esiste(pid):
+    try:
+        pid = int(str(pid).strip())
+    except Exception:
+        return False
+
+    if pid <= 0:
+        return False
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+    except Exception:
+        return False
+
+
+def pid_da_lock_watchdog():
+    try:
+        if not os.path.exists(WATCHDOG_LOCK_FILE):
+            return None
+
+        f = open(WATCHDOG_LOCK_FILE, "r")
+        try:
+            valore = f.read().strip()
+        finally:
+            f.close()
+
+        if valore:
+            return valore
+    except Exception as e:
+        scrivi_log("Errore lettura watchdog.lock: %s" % str(e))
+
+    return None
+
+
+def watchdog_attivo_da_lock():
+    pid_lock = pid_da_lock_watchdog()
+    if not pid_lock:
+        return False, None
+
+    if pid_esiste(pid_lock):
+        return True, pid_lock
+
+    scrivi_log(
+        "watchdog.lock presente ma PID non attivo: %s. "
+        "Lascio la gestione al watchdog." % pid_lock
+    )
+    return False, None
+
+
+def watchdog_attivo_da_ps():
+    try:
+        processo = subprocess.Popen(
+            ["ps", "aux"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        output, _ = processo.communicate()
+
+        if not isinstance(output, str):
+            try:
+                output = output.decode("utf-8", "ignore")
+            except Exception:
+                output = ""
+
+        for riga in output.splitlines():
+            if "autonomous_watchdog.py" not in riga:
+                continue
+            if "grep" in riga:
+                continue
+            if "nao_autonomous_bootstrap.py" in riga:
+                continue
+            return True
+    except Exception as e:
+        scrivi_log("Errore controllo ps watchdog: %s" % str(e))
+
+    return False
+
+
+def watchdog_gia_attivo():
+    attivo, pid_lock = watchdog_attivo_da_lock()
+    if attivo:
+        return True, pid_lock
+
+    if watchdog_attivo_da_ps():
+        return True, None
+
+    return False, None
 
 
 def carica_openai_api_key_locale(env):
@@ -51,8 +174,8 @@ def carica_openai_api_key_locale(env):
         return
 
     percorsi = [
-        os.path.join(PROJECT_ROOT, "config", "openai_api_key.txt"),
-        os.path.join(PROJECT_ROOT, "openai_api_key.txt")
+        os.path.join(BASE_DIR, "config", "openai_api_key.txt"),
+        os.path.join(BASE_DIR, "openai_api_key.txt")
     ]
 
     for percorso in percorsi:
@@ -61,19 +184,20 @@ def carica_openai_api_key_locale(env):
                 continue
 
             f = open(percorso, "r")
-            chiave = f.read().strip()
-            f.close()
+            try:
+                chiave = f.read().strip()
+            finally:
+                f.close()
 
             if chiave:
                 env["OPENAI_API_KEY"] = chiave
                 scrivi_log("OPENAI_API_KEY caricata da file locale")
                 return
-
         except Exception as e:
             scrivi_log("Errore lettura OPENAI_API_KEY locale: %s" % str(e))
 
 
-def prepara_env_onboard():
+def prepara_env():
     env = os.environ.copy()
     env.setdefault("NAO_IP", "127.0.0.1")
     env.setdefault("NAO_AUTONOMOUS_LIFE", "1")
@@ -83,166 +207,77 @@ def prepara_env_onboard():
     return env
 
 
-def avvia_watchdog_onboard():
-    try:
-        if not os.path.exists(WATCHDOG_PATH):
-            return False, "watchdog non trovato: %s" % WATCHDOG_PATH
+def avvia_watchdog():
+    if not os.path.exists(BASE_DIR):
+        return False, "BASE_DIR non trovato: %s" % BASE_DIR, None
 
-        if not os.path.exists(RUNTIME_DIR):
-            os.makedirs(RUNTIME_DIR)
+    if not os.path.exists(WATCHDOG_PATH):
+        return False, "watchdog non trovato: %s" % WATCHDOG_PATH, None
 
-        env = prepara_env_onboard()
-        log_file = open(WATCHDOG_ONBOARD_LOG, "a")
+    os.chdir(BASE_DIR)
+    assicura_runtime()
 
-        python_cmd = os.environ.get("NAO_PYTHON") or sys.executable or "python"
+    log_file = open(BOOT_LOG, "a")
+    env = prepara_env()
 
-        processo = subprocess.Popen(
-            [python_cmd, WATCHDOG_PATH],
-            cwd=PROJECT_ROOT,
-            env=env,
-            stdout=log_file,
-            stderr=log_file
-        )
+    processo = subprocess.Popen(
+        [PYTHON_CMD, WATCHDOG_REL_PATH],
+        cwd=BASE_DIR,
+        env=env,
+        stdout=log_file,
+        stderr=log_file
+    )
 
-        return True, "watchdog onboard pid=%s" % processo.pid
-
-    except Exception as e:
-        scrivi_log(traceback.format_exc())
-        return False, str(e)
-
-
-def chiama_pc(percorso):
-    if urllib2 is None:
-        return False, "urllib2 non disponibile"
-
-    url = "http://%s:%s%s" % (PC_IP, PC_PORT, percorso)
-
-    try:
-        risposta = urllib2.urlopen(url, timeout=10)
-        testo = risposta.read()
-        return True, testo
-    except Exception as e:
-        return False, str(e)
+    return True, "watchdog avviato pid=%s" % processo.pid, processo.pid
 
 
 def main():
-    scrivi_log("BOOTSTRAP AVVIATO")
-    scrivi_log("Modalita bootstrap: %s" % BOOTSTRAP_MODE)
-    scrivi_log("Project root: %s" % PROJECT_ROOT)
-    scrivi_log("Watchdog onboard: %s" % WATCHDOG_PATH)
-    scrivi_log("PC fallback target: %s:%s" % (PC_IP, PC_PORT))
+    assicura_runtime()
+    scrivi_log("BOOTSTRAP_STARTED")
+    scrivi_log("BASE_DIR=%s" % BASE_DIR)
+    scrivi_log("WATCHDOG_PATH=%s" % WATCHDOG_PATH)
 
-    tts = None
-    memory = None
+    memory = connetti_almemory()
+    aggiorna_memoria(memory, "BOOTSTRAP_STARTED")
 
     try:
-        tts = ALProxy("ALTextToSpeech", "127.0.0.1", 9559)
-        memory = ALProxy("ALMemory", "127.0.0.1", 9559)
+        attivo, pid_attivo = watchdog_gia_attivo()
+        if attivo:
+            messaggio = "watchdog gia' attivo"
+            if pid_attivo:
+                messaggio += " pid=%s" % pid_attivo
 
-        memory.insertData("AutonomousSystem/Status", "BOOTSTRAP_STARTED")
-        memory.insertData("AutonomousSystem/Command", "")
-        memory.insertData("AutonomousSystem/BootstrapCommand", "START")
-        memory.insertData("AutonomousSystem/BootstrapTime", time.time())
-
-        parla(tts, "Sistema autonomo in avvio.")
-        scrivi_log("ALMemory aggiornata: BootstrapCommand=START")
-
-    except Exception as e:
-        scrivi_log("ERRORE inizializzazione NAOqi: %s" % str(e))
-        scrivi_log(traceback.format_exc())
-
-    if BOOTSTRAP_MODE in ["onboard", "local", "standalone", "auto", ""]:
-        ok_onboard, risposta_onboard = avvia_watchdog_onboard()
-        scrivi_log(
-            "START WATCHDOG ONBOARD: ok=%s risposta=%s" % (
-                ok_onboard,
-                risposta_onboard
+            scrivi_log(messaggio)
+            aggiorna_memoria(
+                memory,
+                "WATCHDOG_STARTED",
+                {ALMEMORY_WATCHDOG_PID_KEY: str(pid_attivo or "")}
             )
-        )
-
-        if ok_onboard:
-            parla(tts, "Sistema autonomo avviato.")
-            try:
-                if memory is not None:
-                    memory.insertData(
-                        "AutonomousSystem/Status",
-                        "WATCHDOG_ONBOARD_STARTED"
-                    )
-            except Exception:
-                pass
             return
 
-        if BOOTSTRAP_MODE not in ["auto"]:
-            parla(tts, "Errore avvio autonomo locale.")
-            try:
-                if memory is not None:
-                    memory.insertData(
-                        "AutonomousSystem/Status",
-                        "WATCHDOG_ONBOARD_START_FAILED"
-                    )
-            except Exception:
-                pass
-            return
+        aggiorna_memoria(memory, "WATCHDOG_START_REQUESTED")
+        scrivi_log("WATCHDOG_START_REQUESTED")
 
-        scrivi_log("Fallback PC abilitato dopo errore onboard")
-
-    if BOOTSTRAP_MODE not in ["pc", "remote", "auto"]:
-        scrivi_log("Fallback PC disabilitato")
-        return
-
-    ok = False
-    risposta = ""
-
-    for tentativo in range(1, MAX_TENTATIVI_PC + 1):
-        ok, risposta = chiama_pc("/ping")
-        scrivi_log(
-            "PING PC tentativo %s/%s: ok=%s risposta=%s" % (
-                tentativo,
-                MAX_TENTATIVI_PC,
-                ok,
-                risposta
-            )
-        )
+        ok, messaggio, pid = avvia_watchdog()
+        scrivi_log(messaggio)
 
         if ok:
-            break
+            aggiorna_memoria(
+                memory,
+                "WATCHDOG_STARTED",
+                {ALMEMORY_WATCHDOG_PID_KEY: str(pid or "")}
+            )
+            scrivi_log("WATCHDOG_STARTED")
+            return
 
-        try:
-            if memory is not None:
-                memory.insertData("AutonomousSystem/Status", "WAITING_PC")
-        except Exception:
-            pass
+        aggiorna_memoria(memory, "WATCHDOG_START_FAILED")
+        scrivi_log("WATCHDOG_START_FAILED: %s" % messaggio)
 
-        time.sleep(PAUSA_TENTATIVI_PC)
-
-    if not ok:
-        parla(tts, "Supervisore non disponibile.")
-        try:
-            if memory is not None:
-                memory.insertData("AutonomousSystem/Status", "PC_NOT_AVAILABLE")
-        except Exception:
-            pass
-        return
-
-    parla(tts, "Supervisore trovato.")
-
-    ok, risposta = chiama_pc("/start")
-    scrivi_log("START PC: ok=%s risposta=%s" % (ok, risposta))
-
-    if ok:
-        parla(tts, "Watchdog avviato.")
-        try:
-            if memory is not None:
-                memory.insertData("AutonomousSystem/Status", "WATCHDOG_STARTED")
-        except Exception:
-            pass
-    else:
-        parla(tts, "Errore avvio watchdog.")
-        try:
-            if memory is not None:
-                memory.insertData("AutonomousSystem/Status", "WATCHDOG_START_FAILED")
-        except Exception:
-            pass
+    except Exception as e:
+        aggiorna_memoria(memory, "WATCHDOG_START_FAILED")
+        scrivi_log("WATCHDOG_START_FAILED: %s" % str(e))
+        scrivi_log(traceback.format_exc())
 
 
-main()
+if __name__ == "__main__":
+    main()
