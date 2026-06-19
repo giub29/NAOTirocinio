@@ -2546,7 +2546,16 @@ def main():
                     )
                 )
 
-                if not richiede_osservazione_mirata:
+                ha_gia_parlato = False
+                try:
+                    for azione in decisione_condizione.get("azioni", []):
+                        if isinstance(azione, dict) and azione.get("tipo") == "parla":
+                            ha_gia_parlato = True
+                            break
+                except Exception:
+                    ha_gia_parlato = False
+
+                if not richiede_osservazione_mirata and not ha_gia_parlato:
                     _verbalizza_percezione_autonoma(voce, mondo)
                 
                 esegui_decisione(

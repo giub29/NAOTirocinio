@@ -131,6 +131,15 @@ except Exception:
     costruisci_decisione_azione_successiva = None
     aggiorna_azione_successiva_da_osservazione = None
 
+try:
+    from behaviors.event_system.knowledge_memory import (
+        costruisci_ipotesi_da_evento,
+        salva_ipotesi_semantica
+    )
+except Exception:
+    costruisci_ipotesi_da_evento = None
+    salva_ipotesi_semantica = None
+
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
 logger = logging.getLogger(__name__)
@@ -164,7 +173,7 @@ EVENTI_SUPPORTO_INFORMATIVO_NON_GENERATIVI = [
 COOLDOWN_SCENA_COMPRESA = 300
 COOLDOWN_CURIOSITA_RIPETUTA = 180
 TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
-    "Ho trovato indicazioni operative utili nell'ambiente."
+    "Ho trovato alcune informazioni utili per comprendere meglio questo luogo."
 )
 TERMINI_TROPPO_SPECIFICI_EVENTO_GENERALE = [
     "cosa ci",
@@ -295,10 +304,17 @@ def evento_informazione_operativa(stato_runtime):
 
     return (
         "informazione_operativa" in eventi_core
+        or "contenuto_informativo_rilevante" in eventi_core
         or eventi.get("informazione_operativa") not in [
             False, None, "", [], {}
         ]
-        or ragionamento.get("evento") == "informazione_operativa"
+        or eventi.get("contenuto_informativo_rilevante") not in [
+            False, None, "", [], {}
+        ]
+        or ragionamento.get("evento") in [
+            "informazione_operativa",
+            "contenuto_informativo_rilevante"
+        ]
     )
 
 
@@ -1244,6 +1260,145 @@ def chiama_genera_condizione_autonoma_sicura(
         chiave_privata
     )
 
+def _testo_visibile_da_mondo(mondo):
+    testo = _testo_sicuro(mondo)
+
+    marker = "TESTO_VISIBILE:"
+    if marker not in testo:
+        return ""
+
+    parte = testo.split(marker, 1)[1]
+
+    if "SONO FERMO" in parte:
+        parte = parte.split("SONO FERMO", 1)[0]
+
+    return parte.strip()
+
+
+def testo_visibile_puo_generare_significato_specifico(mondo):
+    testo = _testo_visibile_da_mondo(mondo).lower()
+
+    if not testo:
+        return False
+
+    parole = [
+        p.strip()
+        for p in re.split(r"\s+", testo)
+        if len(p.strip()) >= 3
+    ]
+
+    indicatori_specifici = [
+        "vietato", "non entrare", "chiuso", "chiusa",
+        "aperto", "aperta", "uscita", "entrata",
+        "orario", "istruzioni", "premere", "usare",
+        "attenzione", "pericolo", "obbligatorio",
+        "riservato", "accesso", "laboratorio",
+        "errore", "warning", "emergenza"
+    ]
+
+    if any(indicatore in testo for indicatore in indicatori_specifici):
+        return True
+
+    # Nuova regola generalista:
+    # se c'e' testo visibile con piu' parole significative,
+    # la condizione generale non deve chiudere subito.
+    if len(parole) >= 3:
+        return True
+
+    return False
+
+def evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
+    if not isinstance(stato_runtime, dict):
+        return False
+
+    evento = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento, dict):
+        evento = {}
+
+    eventi_core = evento.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    return (
+        "contenuto_informativo_rilevante" in eventi_core
+        and testo_visibile_puo_generare_significato_specifico(mondo)
+    )
+
+def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
+    if costruisci_ipotesi_da_evento is None:
+        return None
+
+    if salva_ipotesi_semantica is None:
+        return None
+
+    if not isinstance(stato_runtime, dict):
+        return None
+
+    eventi = {}
+
+    if isinstance(firma, dict):
+        sorgenti = [
+            firma.get("eventi_attivi", {}),
+            firma.get("eventi", {})
+        ]
+    else:
+        sorgenti = []
+
+    sorgenti.extend([
+        stato_runtime.get("eventi", {}),
+        stato_runtime.get("eventi_reali", {})
+    ])
+
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if isinstance(evento_strutturato, dict):
+        for ev in evento_strutturato.get("eventi_core", []):
+            eventi[ev] = True
+
+    for sorgente in sorgenti:
+        if not isinstance(sorgente, dict):
+            continue
+
+        for nome, valore in sorgente.items():
+            if valore not in [False, None, "", [], {}]:
+                eventi[nome] = True
+
+    eventi_utili = [
+        "contenuto_informativo_rilevante",
+        "informazione_operativa",
+        "supporto_informativo_potenziale",
+        "dettaglio_funzionale_osservabile"
+    ]
+
+    salvate = []
+
+    for evento in eventi_utili:
+        if not eventi.get(evento):
+            continue
+
+        ipotesi = costruisci_ipotesi_da_evento(evento, mondo)
+        if not isinstance(ipotesi, dict):
+            continue
+
+        voce = salva_ipotesi_semantica(ipotesi, mondo)
+        if isinstance(voce, dict):
+            salvate.append(voce)
+
+    if salvate:
+        stato_runtime["conoscenze_semantiche_salvate"] = salvate[-5:]
+        logger.info(
+            "[AUTONOMIA][KNOWLEDGE] Ipotesi semantiche salvate: {}".format(
+                [
+                    (
+                        v.get("concetto"),
+                        v.get("fiducia"),
+                        v.get("firma")
+                    )
+                    for v in salvate
+                ]
+            )
+        )
+
+    return salvate
 
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
@@ -1351,6 +1506,17 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             _maschera_dati_sensibili(firma)
         )
     )
+
+    try:
+        salva_conoscenza_semantica_da_evento(
+            mondo,
+            stato_runtime,
+            firma=firma
+        )
+    except Exception as e:
+        logger.warning(
+            "[AUTONOMIA][KNOWLEDGE] Errore salvando conoscenza semantica: {}".format(e)
+        )
 
     if "eventi" not in stato_runtime:
         stato_runtime["eventi"] = firma.get("eventi", {})
@@ -1568,17 +1734,25 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
         logger.info("[AUTONOMIA] Generazione safety non riuscita: provo condizioni esistenti")
 
-        decisione = valuta_condizioni_generate_sicure(
-            mondo,
-            stato_runtime
-        )
+        decisione = valuta_condizioni_generate_sicure(mondo, stato_runtime)
 
         if decisione is not None:
-            return rafforza_decisione_informazione_operativa(
-                decisione,
-                stato_runtime,
-                mondo
-            )
+            if evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
+                logger.info(
+                    "[AUTONOMIA] Condizione informativa generale non conclusiva: "
+                    "testo visibile potenzialmente specifico"
+                )
+                stato_runtime["condizione_generale_non_conclusiva"] = True
+                stato_runtime["motivo_condizione_generale_non_conclusiva"] = (
+                    "testo_visibile_specifico"
+                )
+            else:
+                logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata")
+                return rafforza_decisione_informazione_operativa(
+                    decisione,
+                    stato_runtime,
+                    mondo
+                )
 
         return None
 
@@ -1693,18 +1867,26 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
         return None
 
-    # CASO NORMALE:
-    # per situazioni semplici, prima uso condizioni gia' generate.
     decisione = valuta_condizioni_generate_sicure(mondo, stato_runtime)
 
     if decisione is not None:
-        logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata")
-        return rafforza_decisione_informazione_operativa(
-            decisione,
-            stato_runtime,
-            mondo
-        )
-
+        if evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
+            logger.info(
+                "[AUTONOMIA] Condizione informativa generale non conclusiva: "
+                "testo visibile potenzialmente specifico"
+            )
+            stato_runtime["condizione_generale_non_conclusiva"] = True
+            stato_runtime["motivo_condizione_generale_non_conclusiva"] = (
+                "testo_visibile_specifico"
+            )
+        else:
+            logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata")
+            return rafforza_decisione_informazione_operativa(
+                decisione,
+                stato_runtime,
+                mondo
+            )
+        
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
 
     esito_ipotesi = valuta_ipotesi_temporanee_sicura(
@@ -2292,6 +2474,9 @@ def situazione_merita_generazione(mondo, stato_runtime):
                 ]
             )
         )
+
+    if evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
+        return True, "testo visibile con possibile significato specifico"
 
     if gia_coperta:
         logger.info(

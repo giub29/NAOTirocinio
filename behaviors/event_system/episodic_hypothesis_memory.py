@@ -128,7 +128,8 @@ def _classifica_ipotesi(mondo, firma):
     ):
         return {
             "ipotesi": "informazione_operativa",
-            "descrizione": "il contenuto osservato potrebbe essere utile",
+            "descrizione":
+                "la scena potrebbe contenere informazioni utili per comprendere il contesto",
             "fiducia_iniziale": 0.55,
             "incremento_conferma": 0.25,
             "azione_temporanea": "interpreta_e_memorizza",
@@ -329,7 +330,10 @@ def costruisci_decisione_ipotesi(esito):
         frase = "Ho un'ipotesi prudente sulla situazione. La verifico prima di memorizzarla."
     elif azione == "interpreta_e_memorizza":
         colore = "blue"
-        frase = "Ho notato un'informazione potenzialmente utile. La tengo in memoria temporanea."
+        frase = (
+            "Questa osservazione potrebbe aiutarmi a comprendere "
+            "meglio il contesto. La tengo in memoria temporanea."
+        )
     elif azione == "osserva_meglio":
         colore = "yellow"
         frase = "Non ho abbastanza evidenza. Osservo meglio prima di creare una condizione."

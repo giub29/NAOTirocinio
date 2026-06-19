@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+try:
+    from behaviors.event_system.semantic_hypothesis_reasoner import (
+        genera_ipotesi_semantica
+    )
+except Exception:
+    genera_ipotesi_semantica = None
+
 import re
 import unicodedata
 import logging
@@ -81,7 +88,9 @@ def _ha_contesto_da_approfondire(testo):
         "situazione nuova", "non riconosco la scena",
         "dettagli potenzialmente utili",
         "dettaglio potenzialmente utile",
-        "contesto non chiaro", "contesto da capire"
+        "contesto non chiaro", "contesto da capire",
+        "orologio",
+        "orientamento", "posizione", "riferimento spaziale"
     ])
 
 
@@ -155,6 +164,16 @@ def _arricchisci_strutturato(esito):
         "confidenza": 0.7 if significativa else 0.4,
         "eventi_core": [evento] if evento else []
     }
+
+    if genera_ipotesi_semantica is not None:
+        try:
+            ipotesi_semantica = genera_ipotesi_semantica(esito)
+
+            if isinstance(ipotesi_semantica, dict):
+                esito["ipotesi_semantica"] = ipotesi_semantica
+
+        except Exception:
+            pass
 
     _diag("output", esito)
     return esito
@@ -517,13 +536,13 @@ def ragiona_situazione_sconosciuta(testo):
         return _arricchisci_strutturato({
             "significativa": True,
             "genera_condizione": False,
-            "tipo": "contesto_da_approfondire",
-            "evento": "contesto_da_approfondire",
+            "tipo": "dettaglio_funzionale",
+            "evento": "dettaglio_funzionale_osservabile",
             "ipotesi": (
-                "la scena contiene dettagli nuovi potenzialmente utili, "
-                "ma non ancora una regola comportamentale"
+                "la scena contiene un elemento che potrebbe "
+                "essere utile per comprendere meglio il contesto"
             ),
-            "azione_cognitiva": "osserva_meglio"
+            "azione_cognitiva": "memorizza"
         })
     
     # 5. Oggetto/elemento generico interessante ma senza stato utile
