@@ -21,6 +21,7 @@ import traceback
 import time
 import os
 import inspect
+import re
 
 try:
     from behaviors.event_system.unknown_event_extractor import (
@@ -133,6 +134,11 @@ except Exception:
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
 
 logger = logging.getLogger(__name__)
+try:
+    basestring
+except NameError:
+    basestring = str
+
 BASE_DIR = os.path.dirname(__file__)
 CONDIZIONI_GENERATE_DIR = os.path.join(
     BASE_DIR,
@@ -151,10 +157,58 @@ FALLBACK_VISIVI_NON_GENERATIVI = [
     "non distinguo elementi rilevanti",
     "senza analisi visiva llm"
 ]
+COOLDOWN_SCENA_COMPRESA = 300
+TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
+    "Ho trovato indicazioni operative su come usare questo contenitore."
+)
 
 
 def _diag_pipeline(label, valore):
     return None
+
+
+def _testo_sicuro(valore):
+    if isinstance(valore, basestring):
+        return valore
+
+    try:
+        return str(valore or "")
+    except Exception:
+        return ""
+
+
+def _maschera_dati_sensibili(valore):
+    try:
+        if isinstance(valore, dict):
+            risultato = {}
+            for chiave, contenuto in valore.items():
+                chiave_testo = str(chiave).lower()
+                if (
+                    "api_key" in chiave_testo
+                    or "openai" in chiave_testo
+                    or "chiave_privata" in chiave_testo
+                ):
+                    risultato[chiave] = "***MASKED***"
+                else:
+                    risultato[chiave] = _maschera_dati_sensibili(contenuto)
+            return risultato
+
+        if isinstance(valore, list):
+            return [_maschera_dati_sensibili(v) for v in valore]
+
+        if isinstance(valore, tuple):
+            return tuple(_maschera_dati_sensibili(v) for v in valore)
+
+        if isinstance(valore, basestring):
+            return re.sub(
+                r"sk-[A-Za-z0-9_\-]{8,}",
+                "sk-***MASKED***",
+                valore
+            )
+    except Exception:
+        return "***MASKED***"
+
+    return valore
 
 
 def filtra_eventi_helper(eventi):
@@ -168,7 +222,7 @@ def filtra_eventi_helper(eventi):
 
 
 def _testo_contiene_fallback_visivo_generico(mondo):
-    testo = str(mondo or "").lower()
+    testo = _testo_sicuro(mondo).lower()
     return any(
         indicatore in testo
         for indicatore in FALLBACK_VISIVI_NON_GENERATIVI
@@ -200,6 +254,166 @@ def situazione_fallback_visivo_neutra(mondo, evento_strutturato):
         _testo_contiene_fallback_visivo_generico(mondo)
         and _evento_strutturato_neutro_non_generativo(evento_strutturato)
     )
+
+
+def evento_informazione_operativa(stato_runtime):
+    if not isinstance(stato_runtime, dict):
+        return False
+
+    evento = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento, dict):
+        evento = {}
+
+    eventi_core = evento.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi = stato_runtime.get("eventi", {})
+    if not isinstance(eventi, dict):
+        eventi = {}
+
+    ragionamento = evento.get("ragionamento_unknown", {})
+    if not isinstance(ragionamento, dict):
+        ragionamento = {}
+
+    return (
+        "informazione_operativa" in eventi_core
+        or eventi.get("informazione_operativa") not in [
+            False, None, "", [], {}
+        ]
+        or ragionamento.get("evento") == "informazione_operativa"
+    )
+
+
+def _normalizza_firma_testo(testo):
+    testo = _testo_sicuro(testo).lower()
+    testo = testo.replace("report:", " ")
+    testo = testo.replace("vedo:", " ")
+    testo = re.sub(r"[^a-z0-9\s_]", " ", testo)
+    testo = re.sub(r"\s+", " ", testo).strip()
+    parole = []
+    stop = [
+        "sono", "fermo", "vedo", "ancora", "una", "uno", "con",
+        "che", "per", "del", "della", "dei", "delle", "qui"
+    ]
+    for parola in testo.split():
+        if len(parola) < 4:
+            continue
+        if parola in stop:
+            continue
+        if parola not in parole:
+            parole.append(parola)
+    return "_".join(parole[:8])
+
+
+def firma_scena_operativa(mondo, stato_runtime):
+    parti = ["informazione_operativa"]
+
+    for sorgente in [
+        stato_runtime.get("belief_state", {}),
+        stato_runtime.get("world_model", {})
+    ]:
+        if not isinstance(sorgente, dict):
+            continue
+
+        chiave = sorgente.get("chiave")
+        if not chiave and isinstance(sorgente.get("credenza"), dict):
+            chiave = sorgente.get("credenza", {}).get("chiave")
+
+        if chiave:
+            parti.append(str(chiave).lower())
+            return "|".join(parti)
+
+    parti.append(_normalizza_firma_testo(mondo))
+    return "|".join(parti)
+
+
+def registra_scena_operativa_compresa(stato_runtime, mondo):
+    if not isinstance(stato_runtime, dict):
+        return None
+
+    firma = firma_scena_operativa(mondo, stato_runtime)
+    memoria = stato_runtime.get("scene_operative_comprese", {})
+    if not isinstance(memoria, dict):
+        memoria = {}
+
+    memoria[firma] = {
+        "tempo": time.time(),
+        "evento": "informazione_operativa"
+    }
+    stato_runtime["scene_operative_comprese"] = memoria
+    stato_runtime["ultima_scena_operativa_compresa"] = firma
+    return firma
+
+
+def scena_operativa_gia_compresa(stato_runtime, mondo):
+    if not evento_informazione_operativa(stato_runtime):
+        return False
+
+    firma = firma_scena_operativa(mondo, stato_runtime)
+    memoria = stato_runtime.get("scene_operative_comprese", {})
+    if not isinstance(memoria, dict):
+        return False
+
+    voce = memoria.get(firma)
+    if not isinstance(voce, dict):
+        return False
+
+    ultimo = voce.get("tempo", 0)
+    try:
+        recente = time.time() - float(ultimo) < COOLDOWN_SCENA_COMPRESA
+    except Exception:
+        recente = True
+
+    return recente
+
+
+def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
+    if not isinstance(decisione, dict):
+        return decisione
+
+    if not evento_informazione_operativa(stato_runtime):
+        return decisione
+
+    azioni = decisione.get("azioni", [])
+    if not isinstance(azioni, list):
+        return decisione
+
+    sostituita = False
+    for azione in azioni:
+        if not isinstance(azione, dict):
+            continue
+        if azione.get("tipo") != "parla":
+            continue
+
+        testo = _testo_sicuro(azione.get("testo", "")).lower()
+        if (
+            "cosa ci" in testo
+            or "interessante" in testo
+            or "contenitore" in testo
+            or not testo
+        ):
+            azione["testo"] = TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+            sostituita = True
+            break
+
+    if not sostituita:
+        azioni.append({
+            "tipo": "parla",
+            "testo": TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+        })
+
+    memoria = decisione.get("memoria", [])
+    if not isinstance(memoria, list):
+        memoria = []
+    memoria.append({
+        "tipo": "scena_operativa_compresa",
+        "evento": "informazione_operativa",
+        "firma": registra_scena_operativa_compresa(stato_runtime, mondo)
+    })
+    decisione["memoria"] = memoria
+
+    return decisione
 
 
 def integra_eventi_sconosciuti_in_evento_strutturato(
@@ -815,7 +1029,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             "[AUTONOMIA] Errore propagando firma nel runtime: {}".format(e)
         )
 
-    logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
+    logger.info(
+        "[AUTONOMIA] Firma situazione: {}".format(
+            _maschera_dati_sensibili(firma)
+        )
+    )
 
     if "eventi" not in stato_runtime:
         stato_runtime["eventi"] = firma.get("eventi", {})
@@ -852,6 +1070,15 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         )
         logger.info(
             "[AUTONOMIA] Fallback visivo neutro: nessuna generazione"
+        )
+        return None
+
+    if scena_operativa_gia_compresa(stato_runtime, mondo):
+        logger.info(
+            "[AUTONOMIA] Scena informativa gia' compresa: evito nuova curiosita'"
+        )
+        stato_runtime["decisione_non_generativa"] = (
+            "informazione_operativa_gia_compresa"
         )
         return None
 
@@ -996,7 +1223,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         )
 
         if decisione is not None:
-            return decisione
+            return rafforza_decisione_informazione_operativa(
+                decisione,
+                stato_runtime,
+                mondo
+            )
 
         return None
 
@@ -1103,7 +1334,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
         if decisione is not None:
             logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata esistente")
-            return decisione
+            return rafforza_decisione_informazione_operativa(
+                decisione,
+                stato_runtime,
+                mondo
+            )
 
         return None
 
@@ -1113,7 +1348,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     if decisione is not None:
         logger.info("[AUTONOMIA] Decisione ottenuta da condizione generata")
-        return decisione
+        return rafforza_decisione_informazione_operativa(
+            decisione,
+            stato_runtime,
+            mondo
+        )
 
     logger.info("[AUTONOMIA] Nessuna condizione autonoma applicabile")
 
@@ -1587,7 +1826,11 @@ def situazione_merita_generazione(mondo, stato_runtime):
     """
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
-    logger.info("[AUTONOMIA] Firma situazione: {}".format(firma))
+    logger.info(
+        "[AUTONOMIA] Firma situazione: {}".format(
+            _maschera_dati_sensibili(firma)
+        )
+    )
 
     if firma["mondo_vuoto"]:
         return False, "mondo vuoto"

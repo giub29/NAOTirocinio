@@ -21,6 +21,10 @@ WATCHDOG_REL_PATH = os.path.join("scripts", "autonomous_watchdog.py")
 WATCHDOG_PATH = os.path.join(BASE_DIR, WATCHDOG_REL_PATH)
 WATCHDOG_LOCK_FILE = os.path.join(RUNTIME_DIR, "watchdog.lock")
 PYTHON_CMD = "/usr/bin/python"
+NAOQI_HOST = "127.0.0.1"
+NAOQI_PORT = 9559
+NAOQI_TIMEOUT_SEC = 180
+NAOQI_RETRY_SEC = 2
 
 ALMEMORY_STATUS_KEY = "AutonomousSystem/Status"
 ALMEMORY_BOOT_TIME_KEY = "AutonomousSystem/BootstrapTime"
@@ -71,10 +75,47 @@ def connetti_almemory():
         return None
 
     try:
-        return ALProxy("ALMemory", "127.0.0.1", 9559)
+        return ALProxy("ALMemory", NAOQI_HOST, NAOQI_PORT)
     except Exception as e:
         scrivi_log("Errore connessione ALMemory: %s" % str(e))
         return None
+
+
+def prova_proxy_naoqi(nome_servizio):
+    if ALProxy is None:
+        return None
+
+    try:
+        return ALProxy(nome_servizio, NAOQI_HOST, NAOQI_PORT)
+    except Exception:
+        return None
+
+
+def attendi_naoqi_pronto():
+    if ALProxy is None:
+        scrivi_log("NAOqi non disponibile: modulo naoqi assente")
+        return False, None
+
+    inizio = time.time()
+
+    while time.time() - inizio < NAOQI_TIMEOUT_SEC:
+        memory = prova_proxy_naoqi("ALMemory")
+        if memory is not None:
+            scrivi_log("NAOqi pronto: ALMemory disponibile")
+            return True, memory
+
+        system = prova_proxy_naoqi("ALSystem")
+        if system is not None:
+            scrivi_log("NAOqi pronto: ALSystem disponibile")
+            return True, connetti_almemory()
+
+        scrivi_log("NAOqi non pronto, attendo...")
+        time.sleep(NAOQI_RETRY_SEC)
+
+    scrivi_log(
+        "Timeout attesa NAOqi dopo %s secondi" % NAOQI_TIMEOUT_SEC
+    )
+    return False, None
 
 
 def pid_esiste(pid):
@@ -237,7 +278,12 @@ def main():
     scrivi_log("BASE_DIR=%s" % BASE_DIR)
     scrivi_log("WATCHDOG_PATH=%s" % WATCHDOG_PATH)
 
-    memory = connetti_almemory()
+    naoqi_pronto, memory = attendi_naoqi_pronto()
+
+    if not naoqi_pronto:
+        scrivi_log("WATCHDOG_START_FAILED: NAOqi non pronto")
+        return
+
     aggiorna_memoria(memory, "BOOTSTRAP_STARTED")
 
     try:
