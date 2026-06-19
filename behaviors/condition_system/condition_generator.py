@@ -102,7 +102,8 @@ def _sanitizza_eventi_supporto_informativo(eventi):
         "oggetto_in_zona_rilevante",
         "oggetto_funzione_sconosciuta",
         "elemento_ambientale_anomalo",
-        "elemento_fuori_posto"
+        "elemento_fuori_posto",
+        "dettaglio_funzionale_osservabile"
     ]
 
     if any(_evento_attivo(eventi, nome) for nome in eventi_forti):

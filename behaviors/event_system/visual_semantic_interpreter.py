@@ -301,6 +301,94 @@ def _ha_oggetto_funzione_incerta(testo):
     )
 
 
+def _ha_dettaglio_temporale_o_orientativo(testo):
+    return _contiene(testo, [
+        "orologio", "ora visibile", "orario visibile",
+        "calendario", "data visibile", "agenda",
+        "indicatore temporale", "riferimento temporale",
+        "segnale direzionale", "freccia", "mappa",
+        "indicatore", "segnaletica"
+    ])
+
+
+def _ha_supporto_visivo_non_operativo(testo):
+    return (
+        _ha_supporto_informativo(testo)
+        and _contiene(testo, [
+            "acceso", "accesa", "attivo", "attiva",
+            "immagine", "figura", "grafica", "visuale",
+            "astratta", "astratto", "colori", "schema"
+        ])
+        and not _ha_testo_leggibile(testo)
+        and not _ha_indicatori_operativi(testo)
+    )
+
+
+def _ha_contesto_ambientale_osservabile(testo):
+    return _contiene(testo, [
+        "ripiano", "ripiani", "scaffale", "scaffali",
+        "mensola", "mensole", "banco", "bancone",
+        "tavolo", "tavoli", "sedie", "sedia",
+        "postazione", "postazioni", "area di lavoro",
+        "oggetti disposti", "oggetti appoggiati",
+        "materiali appoggiati", "contenitori", "strumenti",
+        "arredi", "zona organizzata"
+    ])
+
+
+def _dettaglio_funzionale_osservabile(testo):
+    if _ha_funzione_oggetto_chiara(testo) and not _ha_funzione_operativa_testuale(testo):
+        return {
+            "categoria": "oggetto_funzione",
+            "evento": "oggetto_funzione_sconosciuta",
+            "significato": "la funzione di un elemento osservato e' diventata utile per decisioni future",
+            "rilevanza": "alta",
+            "genera_condizione": True,
+            "azione_cognitiva": "memorizza_funzione"
+        }
+
+    if _ha_dettaglio_temporale_o_orientativo(testo):
+        return {
+            "categoria": "contesto_ambientale",
+            "evento": "dettaglio_funzionale_osservabile",
+            "significato": (
+                "la scena contiene un dettaglio funzionale osservabile "
+                "potenzialmente utile per orientamento o decisioni future"
+            ),
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "interpreta_contesto"
+        }
+
+    if _ha_supporto_visivo_non_operativo(testo):
+        return {
+            "categoria": "supporto_informativo",
+            "evento": "supporto_informativo_potenziale",
+            "significato": (
+                "un supporto visivo e' presente, ma il contenuto non sembra "
+                "ancora operativo o testuale"
+            ),
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "osserva_meglio"
+        }
+
+    if _ha_contesto_ambientale_osservabile(testo):
+        return {
+            "categoria": "contesto_ambientale",
+            "evento": "contesto_da_approfondire",
+            "significato": (
+                "la scena contiene elementi ambientali osservabili che "
+                "possono aiutare a comprenderne la funzione"
+            ),
+            "rilevanza": "media",
+            "genera_condizione": False,
+            "azione_cognitiva": "interpreta_contesto"
+        }
+
+    return None
+
+
 def _oggetto_in_zona_rilevante(testo):
     testo = testo.lower()
 
@@ -386,6 +474,10 @@ def interpreta_contenuto_visivo(testo_osservato):
             "genera_condizione": False,
             "azione_cognitiva": "interpreta_contenuto"
         })
+
+    dettaglio = _dettaglio_funzionale_osservabile(testo)
+    if dettaglio:
+        return _ritorna(dettaglio)
 
     if _ha_assenza_totale_informativa(testo):
         return _ritorna({

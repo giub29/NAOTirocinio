@@ -160,6 +160,11 @@ EVENTI_BASE_NOTI = {
         "origine": "semantica",
         "categoria": "esplorativa",
         "descrizione": "contesto nuovo o poco chiaro con dettagli potenzialmente utili"
+    },
+    "dettaglio_funzionale_osservabile": {
+        "origine": "semantica",
+        "categoria": "esplorativa",
+        "descrizione": "dettaglio osservabile con possibile utilita' contestuale o orientativa"
     }
 }
 

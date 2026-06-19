@@ -133,6 +133,9 @@ def _categoria_stato(evento, tipo):
     if evento == "contesto_da_approfondire":
         return "contesto_ambientale", "da_approfondire"
 
+    if evento == "dettaglio_funzionale_osservabile":
+        return "contesto_ambientale", "dettaglio_funzionale"
+
     return "neutra", "osservato"
 
 
