@@ -7,6 +7,8 @@ import os
 import time
 import logging
 
+from utils.py2_compat import unicode, basestring
+
 logger = logging.getLogger(__name__)
 
 _ultime_riparazioni = {}
@@ -143,7 +145,7 @@ def tenta_riparazione_condizione(nome_condizione, motivo, mondo=None, stato_runt
         return _esito(False, REPAIR_VALIDATION_FAILED, reason)
 
     except Exception as e:
-        reason = unicode(e) if "unicode" in globals() else str(e)
+        reason = unicode(e)
         if "invalid_api_key" in reason or "Incorrect API key" in reason:
             logger.warning(u"[REPAIR] INVALID_API_KEY {} | {}".format(
                 nome_condizione,

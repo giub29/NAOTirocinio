@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from utils.py2_compat import unicode, basestring
 
 def normalizza_testo_ascii(testo):
     if testo is None:

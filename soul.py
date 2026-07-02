@@ -16,6 +16,11 @@ try:
 except Exception:
     select = None
 
+try:
+    reload
+except NameError:
+    from importlib import reload
+
 utente_sta_scrivendo = False
 ultimo_input_tempo = 0
 MODALITA_TEST = False

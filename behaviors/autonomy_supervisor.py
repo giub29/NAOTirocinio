@@ -458,6 +458,151 @@ def _normalizza_firma_testo(testo):
     return "_".join(parole[:8])
 
 
+def firma_scena_generale(mondo, stato_runtime=None, firma=None):
+    parti = ["scena"]
+
+    evento_strutturato = {}
+    if isinstance(stato_runtime, dict):
+        evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    if isinstance(firma, dict):
+        evento_firma = firma.get("evento_strutturato", {})
+        if isinstance(evento_firma, dict) and evento_firma:
+            evento_strutturato = evento_firma
+
+    for chiave in ["categoria", "tipo", "stato"]:
+        valore = str(evento_strutturato.get(chiave, "") or "").lower()
+        if valore:
+            parti.append(chiave + "=" + valore)
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_core = filtra_eventi_helper([
+        str(e).lower().strip()
+        for e in eventi_core
+        if str(e).strip()
+    ])
+    if eventi_core:
+        parti.append("core=" + ",".join(sorted(eventi_core)))
+
+    parti.append("testo=" + _normalizza_firma_testo(mondo))
+    return "|".join(parti)
+
+
+def osservazioni_mirate_per_scena(stato_runtime, mondo, firma=None):
+    if not isinstance(stato_runtime, dict):
+        return 0
+
+    memoria = stato_runtime.get("osservazioni_mirate_scene", {})
+    if not isinstance(memoria, dict):
+        return 0
+
+    scena = firma_scena_generale(mondo, stato_runtime, firma=firma)
+    voce = memoria.get(scena, {})
+    if not isinstance(voce, dict):
+        return 0
+
+    try:
+        return int(voce.get("conteggio", 0) or 0)
+    except Exception:
+        return 0
+
+
+def evento_rilevante_per_generazione_dopo_osservazione(
+    stato_runtime,
+    firma=None
+):
+    evento_strutturato = {}
+    if isinstance(stato_runtime, dict):
+        evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    if isinstance(firma, dict):
+        evento_firma = firma.get("evento_strutturato", {})
+        if isinstance(evento_firma, dict) and evento_firma:
+            evento_strutturato = evento_firma
+
+    if evento_strutturato_non_deve_generare(evento_strutturato):
+        return False
+
+    if evento_strutturato.get("genera_condizione") is True:
+        return True
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    if categoria in ["", "neutra", "ambiguita", "supporto_informativo"]:
+        return False
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+    eventi_core = filtra_eventi_helper([
+        e for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ])
+    if len(eventi_core) == 0:
+        return False
+
+    try:
+        rilevanza = float(evento_strutturato.get("rilevanza", 0) or 0)
+    except Exception:
+        rilevanza = 0
+
+    return rilevanza >= 0.6
+
+
+def registra_osservazione_mirata_per_scena(
+    stato_runtime,
+    decisione,
+    mondo,
+    firma=None
+):
+    if not isinstance(stato_runtime, dict):
+        return decisione
+
+    scena = firma_scena_generale(mondo, stato_runtime, firma=firma)
+    memoria = stato_runtime.get("osservazioni_mirate_scene", {})
+    if not isinstance(memoria, dict):
+        memoria = {}
+
+    voce = memoria.get(scena, {})
+    if not isinstance(voce, dict):
+        voce = {}
+
+    conteggio = int(voce.get("conteggio", 0) or 0)
+    if conteggio >= 1:
+        stato_runtime["decisione_non_generativa"] = (
+            "osservazione_mirata_gia_eseguita"
+        )
+        stato_runtime["forza_generazione_dopo_osservazione_mirata"] = True
+        stato_runtime["motivo_generazione_dopo_osservazione_mirata"] = (
+            "osservazione mirata gia' eseguita per la scena"
+        )
+        return None
+
+    voce["conteggio"] = conteggio + 1
+    voce["tempo"] = time.time()
+    memoria[scena] = voce
+
+    if len(memoria) > 20:
+        try:
+            elementi = sorted(
+                memoria.items(),
+                key=lambda item: item[1].get("tempo", 0)
+            )
+            memoria = dict(elementi[-20:])
+        except Exception:
+            pass
+
+    stato_runtime["osservazioni_mirate_scene"] = memoria
+    stato_runtime["ultima_scena_osservazione_mirata"] = scena
+    return registra_osservazione_mirata_corrente(stato_runtime, decisione)
+
+
 def firma_scena_operativa(mondo, stato_runtime):
     parti = ["informazione_operativa"]
 
@@ -1058,6 +1203,12 @@ def valuta_osservazione_mirata_corrente_sicura(
         esito,
         stato_runtime
     )
+    aggiorna_ipotesi_strutturata_da_osservazione_sicura(
+        esito,
+        stato_runtime,
+        evento_strutturato=firma.get("evento_strutturato", {}),
+        mondo=mondo
+    )
     aggiorna_world_model_da_osservazione_mirata_sicura(
         esito,
         stato_runtime
@@ -1093,6 +1244,106 @@ def valuta_osservazione_mirata_corrente_sicura(
     )
 
     return esito
+
+
+def _numero_sicuro(valore, default=0.0):
+    try:
+        return float(valore)
+    except Exception:
+        return default
+
+
+def aggiorna_ipotesi_strutturata_da_osservazione_sicura(
+    esito,
+    stato_runtime,
+    evento_strutturato=None,
+    mondo=None
+):
+    if not isinstance(stato_runtime, dict):
+        return None
+
+    if not isinstance(esito, dict):
+        return None
+
+    ipotesi = stato_runtime.get("ipotesi_temporanea")
+    if not isinstance(ipotesi, dict):
+        return None
+
+    if evento_strutturato is None:
+        evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    categoria_ipotesi = str(ipotesi.get("categoria", "") or "").lower()
+    stato_ipotesi = str(ipotesi.get("stato", "") or "").lower()
+    categoria_evento = str(
+        evento_strutturato.get("categoria", "") or ""
+    ).lower()
+    stato_evento = str(evento_strutturato.get("stato", "") or "").lower()
+
+    eventi_ipotesi = ipotesi.get("eventi_core", [])
+    eventi_evento = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_ipotesi, list):
+        eventi_ipotesi = []
+    if not isinstance(eventi_evento, list):
+        eventi_evento = []
+
+    eventi_ipotesi = filtra_eventi_helper(eventi_ipotesi)
+    eventi_evento = filtra_eventi_helper(eventi_evento)
+
+    stesso_evento = (
+        categoria_ipotesi
+        and categoria_ipotesi == categoria_evento
+        and (
+            not stato_ipotesi
+            or not stato_evento
+            or stato_ipotesi == stato_evento
+        )
+    )
+    if not stesso_evento and eventi_ipotesi and eventi_evento:
+        stesso_evento = bool(
+            set([str(e) for e in eventi_ipotesi]).intersection(
+                set([str(e) for e in eventi_evento])
+            )
+        )
+
+    if not stesso_evento:
+        return ipotesi
+
+    tentativo_esito = int(esito.get("tentativo", 0) or 0)
+    tentativi = max(int(ipotesi.get("tentativi", 0) or 0), tentativo_esito)
+    tentativi += 1 if tentativi == 0 else 0
+
+    aggiornata = dict(ipotesi)
+    aggiornata["tentativi"] = tentativi
+    aggiornata["ultimo_mondo"] = mondo or esito.get("mondo", "")
+    aggiornata["ultima_categoria"] = categoria_evento
+    aggiornata["ultimo_stato"] = stato_evento
+
+    rilevanza = _numero_sicuro(evento_strutturato.get("rilevanza", 0.0))
+    confidenza = _numero_sicuro(evento_strutturato.get("confidenza", 0.0))
+    rilevante = rilevanza >= 0.6 or confidenza >= 0.6
+    trovato = bool(esito.get("trovato"))
+
+    if tentativi >= 2 or (trovato and rilevante):
+        aggiornata["confermata"] = True
+    else:
+        aggiornata["confermata"] = bool(aggiornata.get("confermata", False))
+
+    stato_runtime["ipotesi_temporanea"] = aggiornata
+
+    if (
+        aggiornata.get("confermata")
+        and rilevante
+        and evento_strutturato_puo_generare_da_ipotesi(evento_strutturato)
+    ):
+        stato_runtime["forza_generazione_da_ipotesi_strutturata"] = True
+        stato_runtime["motivo_generazione_ipotesi_strutturata"] = (
+            "ipotesi confermata da osservazione mirata"
+        )
+        stato_runtime.pop("_esito_ipotesi_temporanea", None)
+
+    return aggiornata
 
 
 def aggiorna_ipotesi_da_osservazione_mirata_sicura(esito, stato_runtime):
@@ -1738,6 +1989,29 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             )
             return nuova_decisione
 
+    if (
+        osservazioni_mirate_per_scena(stato_runtime, mondo, firma=firma) >= 1
+        and evento_rilevante_per_generazione_dopo_osservazione(
+            stato_runtime,
+            firma=firma
+        )
+    ):
+        motivo_osservazione = stato_runtime.get(
+            "motivo_generazione_dopo_osservazione_mirata",
+            "osservazione mirata gia' eseguita per la scena"
+        )
+        nuova_decisione = prova_generazione_autonoma(
+            mondo,
+            stato_runtime,
+            motivo_osservazione
+        )
+
+        if nuova_decisione is not None:
+            logger.info(
+                "[AUTONOMIA] Decisione ottenuta dopo osservazione mirata"
+            )
+            return nuova_decisione
+
     try:
         valutazione_strutturata = stato_runtime.get(
             "valutazione_ipotesi_strutturata",
@@ -1773,9 +2047,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                     decisione_evento_strutturato
                 )
                 return filtra_curiosita_ripetuta(
-                    registra_osservazione_mirata_corrente(
+                    registra_osservazione_mirata_per_scena(
                         stato_runtime,
-                        decisione_evento_strutturato
+                        decisione_evento_strutturato,
+                        mondo,
+                        firma=firma
                     ),
                     stato_runtime,
                     mondo,
@@ -1797,9 +2073,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     if decisione_azione_successiva is not None:
         logger.info("[AUTONOMIA] Decisione da azione successiva suggerita")
         return filtra_curiosita_ripetuta(
-            registra_osservazione_mirata_corrente(
+            registra_osservazione_mirata_per_scena(
                 stato_runtime,
-                decisione_azione_successiva
+                decisione_azione_successiva,
+                mondo,
+                firma=firma
             ),
             stato_runtime,
             mondo,
@@ -1822,9 +2100,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             decisione_goal
         )
         return filtra_curiosita_ripetuta(
-            registra_osservazione_mirata_corrente(
+            registra_osservazione_mirata_per_scena(
                 stato_runtime,
-                decisione_goal
+                decisione_goal,
+                mondo,
+                firma=firma
             ),
             stato_runtime,
             mondo,
@@ -1925,9 +2205,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                 logger.info(
                     "[AUTONOMIA] Decisione da osservazione mirata composta"
                 )
-                return registra_osservazione_mirata_corrente(
+                return registra_osservazione_mirata_per_scena(
                     stato_runtime,
-                    decisione_mirata
+                    decisione_mirata,
+                    mondo,
+                    firma=firma
                 )
 
             if costruisci_decisione_ipotesi is not None:
@@ -2017,10 +2299,17 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
     if esito_ipotesi.get("ha_ipotesi") and not esito_ipotesi.get("genera_condizione"):
         decisione_ipotesi = None
+        ipotesi_runtime = stato_runtime.get("ipotesi_temporanea", {})
+        ipotesi_runtime_confermata = (
+            isinstance(ipotesi_runtime, dict)
+            and ipotesi_runtime.get("confermata")
+        )
 
         if (
             esito_world_model.get("familiare")
             and not esito_world_model.get("anomalia")
+            and not stato_runtime.get("forza_generazione_da_ipotesi_strutturata", False)
+            and not ipotesi_runtime_confermata
             and costruisci_decisione_world_model is not None
         ):
             decisione_world = costruisci_decisione_world_model(
@@ -2043,9 +2332,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         if decisione_mirata is not None:
             logger.info("[AUTONOMIA] Decisione da osservazione mirata")
             return filtra_curiosita_ripetuta(
-                registra_osservazione_mirata_corrente(
+                registra_osservazione_mirata_per_scena(
                     stato_runtime,
-                    decisione_mirata
+                    decisione_mirata,
+                    mondo,
+                    firma=firma
                 ),
                 stato_runtime,
                 mondo,
@@ -2114,9 +2405,11 @@ def gestisci_autonomia(mondo, stato_runtime=None):
                         "[AUTONOMIA] Decisione curiosa da osservazione mirata"
                     )
                     return filtra_curiosita_ripetuta(
-                        registra_osservazione_mirata_corrente(
+                        registra_osservazione_mirata_per_scena(
                             stato_runtime,
-                            decisione_mirata
+                            decisione_mirata,
+                            mondo,
+                            firma=firma
                         ),
                         stato_runtime,
                         mondo,
@@ -2527,6 +2820,13 @@ def situazione_merita_generazione(mondo, stato_runtime):
         )
         return False, "evento strutturato non generativo"
 
+    if _evento_strutturato_neutro_non_generativo(evento_strutturato):
+        chiudi_generazione_non_permessa(
+            stato_runtime,
+            "evento strutturato neutro non generativo"
+        )
+        return False, "evento strutturato neutro non generativo"
+
     if firma["banale"]:
         return False, "situazione banale"
 
@@ -2573,6 +2873,15 @@ def situazione_merita_generazione(mondo, stato_runtime):
         stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
         stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
         return False, "ipotesi strutturata non generativa"
+
+    if (
+        osservazioni_mirate_per_scena(stato_runtime, mondo, firma=firma) >= 1
+        and evento_rilevante_per_generazione_dopo_osservazione(
+            stato_runtime,
+            firma=firma
+        )
+    ):
+        return True, "osservazione mirata gia' eseguita per la scena"
 
     gia_coperta, motivo_memoria, condizioni_simili = (
         _generazione_gia_coperta_da_memoria(
@@ -2625,10 +2934,19 @@ def situazione_merita_generazione(mondo, stato_runtime):
         )
 
     esito_world_model = stato_runtime.get("world_model", {})
+    ipotesi_attiva = stato_runtime.get("ipotesi_temporanea", {})
     if (
         isinstance(esito_world_model, dict)
         and esito_world_model.get("familiare")
         and not esito_world_model.get("anomalia")
+        and not stato_runtime.get(
+            "forza_generazione_da_ipotesi_strutturata",
+            False
+        )
+        and not (
+            isinstance(ipotesi_attiva, dict)
+            and ipotesi_attiva.get("confermata")
+        )
     ):
         return False, "situazione gia' familiare nel world model"
 
@@ -3079,8 +3397,16 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
     adesso = time.time()
     mondo_normalizzato = (mondo or "").strip().lower()
 
-    if evento_strutturato_non_deve_generare(
+    evento_non_generativo = evento_strutturato_non_deve_generare(
         stato_runtime.get("evento_strutturato", {})
+    )
+    if (
+        evento_non_generativo
+        and "ipotesi" not in str(motivo or "").lower()
+        and "osservazione mirata" not in str(motivo or "").lower()
+        and not evento_rilevante_per_generazione_dopo_osservazione(
+            stato_runtime
+        )
     ):
         chiudi_generazione_non_permessa(
             stato_runtime,
@@ -3091,11 +3417,51 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
         )
         return None
 
-    if stato_runtime.get("llm_generazione_non_disponibile", False):
+    chiave_privata_runtime = (
+        stato_runtime.get("openai_api_key")
+        or os.environ.get("OPENAI_API_KEY")
+    )
+
+    if (
+        stato_runtime.get("llm_generazione_non_disponibile", False)
+        and not str(chiave_privata_runtime or "").strip()
+    ):
+        stato_runtime["llm_generazione_non_disponibile"] = True
+        stato_runtime["motivo_llm_generazione_non_disponibile"] = (
+            stato_runtime.get("motivo_llm_generazione_non_disponibile")
+            or "llm_non_disponibile"
+        )
         logger.warning(
             "[AUTONOMIA] Generazione saltata: LLM temporaneamente non disponibile"
         )
         return None
+
+    if stato_runtime.get("llm_generazione_non_disponibile", False):
+        stato_runtime.pop("llm_generazione_non_disponibile", None)
+        stato_runtime.pop("motivo_llm_generazione_non_disponibile", None)
+
+    if (
+        not str(chiave_privata_runtime or "").strip()
+        and stato_runtime.get("openai_api_key") in [None, ""]
+    ):
+        try:
+            import behaviors.condition_system.condition_generator as condition_generator_stato
+            if getattr(condition_generator_stato, "LLM_NON_DISPONIBILE", False):
+                stato_runtime["llm_generazione_non_disponibile"] = True
+                stato_runtime["motivo_llm_generazione_non_disponibile"] = (
+                    getattr(
+                        condition_generator_stato,
+                        "LLM_MOTIVO_NON_DISPONIBILE",
+                        None
+                    )
+                    or "llm_non_disponibile"
+                )
+                logger.warning(
+                    "[AUTONOMIA] Generazione saltata: LLM temporaneamente non disponibile"
+                )
+                return None
+        except Exception:
+            pass
 
     if ULTIMO_MONDO_GENERATO == mondo_normalizzato:
         logger.info("[AUTONOMIA] Generazione saltata: situazione gia' tentata")
@@ -3112,7 +3478,10 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
 
         logger.info("[AUTONOMIA] Provo generazione autonoma. Motivo: {}".format(motivo))
 
-        if getattr(condition_generator, "LLM_NON_DISPONIBILE", False):
+        if (
+            getattr(condition_generator, "LLM_NON_DISPONIBILE", False)
+            and not getattr(condition_generator, "LLM_CHIAVE_NON_DISPONIBILE", None)
+        ):
             stato_runtime["llm_generazione_non_disponibile"] = True
             stato_runtime["motivo_llm_generazione_non_disponibile"] = (
                 getattr(
@@ -3123,7 +3492,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 or "llm_non_disponibile"
             )
             logger.warning(
-                "[AUTONOMIA] Generazione saltata: API key non valida, generazione disabilitata temporaneamente"
+                "[AUTONOMIA] Generazione saltata: LLM temporaneamente non disponibile"
             )
             return None
 
@@ -3145,8 +3514,7 @@ def prova_generazione_autonoma(mondo, stato_runtime, motivo):
                 storia_episodica = None
 
             chiave_privata = (
-                stato_runtime.get("openai_api_key")
-                or os.environ.get("OPENAI_API_KEY")
+                chiave_privata_runtime
             )
             logger.info(
                 "[AUTONOMIA][LLM] API key presente per generator: {} | fonte={}".format(

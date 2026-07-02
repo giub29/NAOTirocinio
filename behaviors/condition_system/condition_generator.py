@@ -70,8 +70,13 @@ if not logger.handlers:
 LLM_NON_DISPONIBILE = False
 LLM_NON_DISPONIBILE_LOGGATO = False
 LLM_MOTIVO_NON_DISPONIBILE = None
+LLM_CHIAVE_NON_DISPONIBILE = None
+LLM_ULTIMA_CHIAVE_TESTATA = None
+LLM_NON_DISPONIBILE_DA = 0
+LLM_RIPROVA_DOPO_SECONDI = 60
 OPENAI_CHAT_COMPLETIONS_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL_GENERATORE = "gpt-4o-mini"
+OPENAI_REQUEST_TIMEOUT_SECONDI = 30
 
 
 def _key_presente(chiave_privata):
@@ -79,6 +84,35 @@ def _key_presente(chiave_privata):
         return bool(str(chiave_privata or "").strip())
     except Exception:
         return False
+
+
+def _firma_chiave(chiave_privata):
+    try:
+        chiave = str(chiave_privata or "").strip()
+    except Exception:
+        chiave = ""
+
+    if not chiave:
+        return ""
+
+    return "{}:{}".format(len(chiave), chiave[-6:])
+
+
+def _riabilita_llm(motivo):
+    global LLM_NON_DISPONIBILE
+    global LLM_NON_DISPONIBILE_LOGGATO
+    global LLM_MOTIVO_NON_DISPONIBILE
+    global LLM_CHIAVE_NON_DISPONIBILE
+    global LLM_ULTIMA_CHIAVE_TESTATA
+    global LLM_NON_DISPONIBILE_DA
+
+    LLM_NON_DISPONIBILE = False
+    LLM_NON_DISPONIBILE_LOGGATO = False
+    LLM_MOTIVO_NON_DISPONIBILE = None
+    LLM_CHIAVE_NON_DISPONIBILE = None
+    LLM_ULTIMA_CHIAVE_TESTATA = None
+    LLM_NON_DISPONIBILE_DA = 0
+    logger.info(u"[GENERATOR] LLM riabilitato: {}".format(motivo))
 
 
 def _evento_attivo(eventi, nome):
@@ -144,13 +178,43 @@ def _log_fallback(area, motivo):
 
 
 def _llm_disponibile(chiave_privata):
+    global LLM_NON_DISPONIBILE
     global LLM_NON_DISPONIBILE_LOGGATO
+    global LLM_ULTIMA_CHIAVE_TESTATA
 
-    if LLM_NON_DISPONIBILE or not _key_presente(chiave_privata):
+    if not _key_presente(chiave_privata):
         if not LLM_NON_DISPONIBILE_LOGGATO:
             logger.warning(u"[GENERATOR] API key non valida: generazione disabilitata temporaneamente")
             LLM_NON_DISPONIBILE_LOGGATO = True
         return False
+
+    LLM_ULTIMA_CHIAVE_TESTATA = _firma_chiave(chiave_privata)
+
+    if LLM_NON_DISPONIBILE:
+        firma_corrente = LLM_ULTIMA_CHIAVE_TESTATA
+        chiave_cambiata = (
+            LLM_CHIAVE_NON_DISPONIBILE
+            and firma_corrente != LLM_CHIAVE_NON_DISPONIBILE
+        )
+        try:
+            tempo_blocco = float(LLM_NON_DISPONIBILE_DA or 0)
+            retry_scaduto = (
+                tempo_blocco > 0
+                and time.time() - tempo_blocco
+                >= LLM_RIPROVA_DOPO_SECONDI
+            )
+        except Exception:
+            retry_scaduto = False
+
+        if chiave_cambiata:
+            _riabilita_llm("chiave API cambiata")
+        elif retry_scaduto:
+            _riabilita_llm("retry automatico dopo errore API key")
+        else:
+            if not LLM_NON_DISPONIBILE_LOGGATO:
+                logger.warning(u"[GENERATOR] API key non valida: generazione disabilitata temporaneamente")
+                LLM_NON_DISPONIBILE_LOGGATO = True
+            return False
 
     return True
 
@@ -174,12 +238,17 @@ def _marca_llm_non_disponibile(testo):
     global LLM_NON_DISPONIBILE
     global LLM_NON_DISPONIBILE_LOGGATO
     global LLM_MOTIVO_NON_DISPONIBILE
+    global LLM_CHIAVE_NON_DISPONIBILE
+    global LLM_ULTIMA_CHIAVE_TESTATA
+    global LLM_NON_DISPONIBILE_DA
 
     if not _risposta_indica_api_key_invalida(testo):
         return False
 
     LLM_NON_DISPONIBILE = True
     LLM_MOTIVO_NON_DISPONIBILE = "invalid_api_key"
+    LLM_CHIAVE_NON_DISPONIBILE = LLM_ULTIMA_CHIAVE_TESTATA
+    LLM_NON_DISPONIBILE_DA = time.time()
     if not LLM_NON_DISPONIBILE_LOGGATO:
         logger.warning(u"[GENERATOR] API key non valida: generazione disabilitata temporaneamente")
         LLM_NON_DISPONIBILE_LOGGATO = True
@@ -1607,7 +1676,7 @@ def _chiama_llm_codice(
         OPENAI_CHAT_COMPLETIONS_ENDPOINT,
         headers=headers,
         data=json.dumps(payload),
-        timeout=10
+        timeout=OPENAI_REQUEST_TIMEOUT_SECONDI
     )
 
     if res.status_code != 200:
@@ -1844,7 +1913,7 @@ def valuta_se_generare_condizione(mondo, ultima_decisione, dati_memoria, stato_r
             OPENAI_CHAT_COMPLETIONS_ENDPOINT,
             headers=headers,
             data=json.dumps(payload),
-            timeout=8
+            timeout=OPENAI_REQUEST_TIMEOUT_SECONDI
         )
 
         if res.status_code != 200:

@@ -203,7 +203,9 @@ def ragiona_situazione_sconosciuta(testo):
 
     indicatori_prossimita = [
         "vicino", "davanti", "ostruisce",
-        "accanto", "in mezzo", "sul passaggio", "qualcosa"
+        "accanto", "in mezzo", "sul passaggio",
+        "nel passaggio", "zona di passaggio",
+        "in zona di passaggio", "qualcosa"
     ]
 
     if (

@@ -43,4 +43,4 @@ behaviors/condition_system/quarantine_metadata/*
 
 config/openai_api_key.txt
 tests/*
-!tests/test_knowledge_memory_multiple.py
+
