@@ -176,6 +176,23 @@ EVENTI_SUPPORTO_INFORMATIVO_NON_GENERATIVI = [
     "supporto_informativo_potenziale",
     "supporto_informativo_non_disponibile"
 ]
+CONDIZIONI_INFORMATIVE_GENERALI = [
+    "condizione_contenuto_informativo_rilevante",
+    "condizione_informazione_operativa"
+]
+EVENTI_NOVITA_SPECIFICHE_GENERATIVE = [
+    "vincolo_comportamentale",
+    "accesso_non_disponibile",
+    "accesso_disponibile",
+    "accesso_o_percorso_limitato",
+    "oggetto_in_zona_rilevante",
+    "oggetto_funzione_sconosciuta",
+    "elemento_ambientale_anomalo",
+    "elemento_fuori_posto",
+    "ostacolo_destra",
+    "ostacolo_sinistra",
+    "ostacolo_frontale"
+]
 COOLDOWN_SCENA_COMPRESA = 300
 COOLDOWN_CURIOSITA_RIPETUTA = 180
 TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
@@ -187,6 +204,33 @@ TERMINI_TROPPO_SPECIFICI_EVENTO_GENERALE = [
     "oggetto specifico",
     "elemento specifico",
     "supporto specifico"
+]
+TERMINI_TESTO_OPERATIVO_SPECIFICO = [
+    "vietato",
+    "obbligatorio",
+    "riservato",
+    "accesso",
+    "uscita",
+    "entrata",
+    "entrare",
+    "non entrare",
+    "pericolo",
+    "attenzione",
+    "rischio",
+    "orario",
+    "orari",
+    "aperto",
+    "chiuso",
+    "dalle",
+    "alle",
+    "procedura",
+    "istruzione",
+    "istruzioni",
+    "seguire",
+    "premere",
+    "usare",
+    "utilizzare",
+    "emergenza"
 ]
 
 
@@ -1972,16 +2016,39 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             "motivo_generazione_ipotesi_strutturata",
             "ipotesi strutturata confermata"
         )
-        nuova_decisione = prova_generazione_autonoma(
-            mondo,
-            stato_runtime,
-            motivo_ipotesi_strutturata
+        gia_coperta_ipotesi, motivo_coperta_ipotesi, _ = (
+            _generazione_gia_coperta_da_memoria(
+                mondo,
+                firma,
+                stato_runtime
+            )
         )
-        archivia_ipotesi_strutturata(
-            stato_runtime,
-            "generata" if nuova_decisione is not None else "generazione_fallita",
-            motivo_ipotesi_strutturata
-        )
+
+        if gia_coperta_ipotesi:
+            stato_runtime["decisione_non_generativa"] = motivo_coperta_ipotesi
+            stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
+            stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
+            archivia_ipotesi_strutturata(
+                stato_runtime,
+                "gia_coperta",
+                motivo_coperta_ipotesi
+            )
+            nuova_decisione = None
+        else:
+            nuova_decisione = prova_generazione_autonoma(
+                mondo,
+                stato_runtime,
+                motivo_ipotesi_strutturata
+            )
+            archivia_ipotesi_strutturata(
+                stato_runtime,
+                (
+                    "generata"
+                    if nuova_decisione is not None
+                    else "generazione_fallita"
+                ),
+                motivo_ipotesi_strutturata
+            )
 
         if nuova_decisione is not None:
             logger.info(
@@ -1996,21 +2063,34 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             firma=firma
         )
     ):
-        motivo_osservazione = stato_runtime.get(
-            "motivo_generazione_dopo_osservazione_mirata",
-            "osservazione mirata gia' eseguita per la scena"
-        )
-        nuova_decisione = prova_generazione_autonoma(
-            mondo,
-            stato_runtime,
-            motivo_osservazione
+        gia_coperta_osservazione, motivo_coperta_osservazione, _ = (
+            _generazione_gia_coperta_da_memoria(
+                mondo,
+                firma,
+                stato_runtime
+            )
         )
 
-        if nuova_decisione is not None:
-            logger.info(
-                "[AUTONOMIA] Decisione ottenuta dopo osservazione mirata"
+        if gia_coperta_osservazione:
+            stato_runtime["decisione_non_generativa"] = (
+                motivo_coperta_osservazione
             )
-            return nuova_decisione
+        else:
+            motivo_osservazione = stato_runtime.get(
+                "motivo_generazione_dopo_osservazione_mirata",
+                "osservazione mirata gia' eseguita per la scena"
+            )
+            nuova_decisione = prova_generazione_autonoma(
+                mondo,
+                stato_runtime,
+                motivo_osservazione
+            )
+
+            if nuova_decisione is not None:
+                logger.info(
+                    "[AUTONOMIA] Decisione ottenuta dopo osservazione mirata"
+                )
+                return nuova_decisione
 
     try:
         valutazione_strutturata = stato_runtime.get(
@@ -2222,11 +2302,25 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         deve_generare, motivo = situazione_merita_generazione(mondo, stato_runtime)
 
         if esito_ipotesi.get("genera_condizione"):
-            deve_generare = True
-            motivo = esito_ipotesi.get(
-                "motivo",
-                "ipotesi temporanea confermata"
+            gia_coperta_ipotesi, motivo_coperta_ipotesi, _ = (
+                _generazione_gia_coperta_da_memoria(
+                    mondo,
+                    firma,
+                    stato_runtime
+                )
             )
+            if gia_coperta_ipotesi:
+                deve_generare = False
+                motivo = motivo_coperta_ipotesi
+                stato_runtime["decisione_non_generativa"] = (
+                    motivo_coperta_ipotesi
+                )
+            else:
+                deve_generare = True
+                motivo = esito_ipotesi.get(
+                    "motivo",
+                    "ipotesi temporanea confermata"
+                )
 
         logger.info("[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
             deve_generare,
@@ -2491,11 +2585,25 @@ def gestisci_autonomia(mondo, stato_runtime=None):
     )
 
     if esito_ipotesi.get("genera_condizione"):
-        deve_generare = True
-        motivo = esito_ipotesi.get(
-            "motivo",
-            "ipotesi temporanea confermata"
+        gia_coperta_ipotesi, motivo_coperta_ipotesi, _ = (
+            _generazione_gia_coperta_da_memoria(
+                mondo,
+                firma,
+                stato_runtime
+            )
         )
+        if gia_coperta_ipotesi:
+            deve_generare = False
+            motivo = motivo_coperta_ipotesi
+            stato_runtime["decisione_non_generativa"] = (
+                motivo_coperta_ipotesi
+            )
+        else:
+            deve_generare = True
+            motivo = esito_ipotesi.get(
+                "motivo",
+                "ipotesi temporanea confermata"
+            )
 
     logger.info(
         "[AUTONOMIA] Valutazione generazione autonoma: {} - {}".format(
@@ -2650,6 +2758,133 @@ def _numero_eventi_coperti_da_voce(firma, stato_runtime, voce):
     return coperti
 
 
+def _nome_condizione_senza_estensione(nome):
+    nome = str(nome or "").strip()
+
+    if nome.endswith(".py"):
+        nome = nome[:-3]
+
+    return nome
+
+
+def _evento_informativo_generale(evento_strutturato, eventi_core):
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_core = [
+        str(e).lower().strip()
+        for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ]
+
+    return (
+        categoria in ["informazione", "supporto_informativo"]
+        or tipo in [
+            "informazione_operativa",
+            "contenuto_informativo_rilevante",
+            "supporto_informativo_potenziale",
+            "dettaglio_funzionale_osservabile"
+        ]
+        or "informazione_operativa" in eventi_core
+        or "contenuto_informativo_rilevante" in eventi_core
+        or "supporto_informativo_potenziale" in eventi_core
+        or "dettaglio_funzionale_osservabile" in eventi_core
+    )
+
+
+def _testo_contiene_termine_operativo(testo):
+    testo = _testo_sicuro(testo).lower()
+
+    for termine in TERMINI_TESTO_OPERATIVO_SPECIFICO:
+        termine = str(termine or "").lower().strip()
+
+        if not termine:
+            continue
+
+        pattern = r"(^|[^a-z0-9_]){}($|[^a-z0-9_])".format(
+            re.escape(termine)
+        )
+
+        if re.search(pattern, testo):
+            return True
+
+    return False
+
+
+def _evento_ha_novita_specifica_generativa(mondo, evento_strutturato, eventi_core):
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    eventi_core_norm = [
+        str(e).lower().strip()
+        for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ]
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+    stato = str(evento_strutturato.get("stato", "") or "").lower()
+
+    if categoria in [
+        "accesso",
+        "ostacolo_spazio",
+        "anomalia",
+        "evento_composto"
+    ]:
+        return True
+
+    if stato in ["non_disponibile", "anomalo", "potenzialmente_ostruito"]:
+        return True
+
+    if tipo in EVENTI_NOVITA_SPECIFICHE_GENERATIVE:
+        return True
+
+    for evento in eventi_core_norm:
+        if evento in EVENTI_NOVITA_SPECIFICHE_GENERATIVE:
+            return True
+
+    return _testo_contiene_termine_operativo(mondo)
+
+
+def _copertura_informativa_affidabile(
+    voce,
+    punteggio,
+    positivi,
+    negativi
+):
+    nome = _nome_condizione_senza_estensione(voce.get("nome", ""))
+    categoria_voce = str(
+        voce.get("categoria_cognitiva", "") or ""
+    ).lower()
+    motivi = voce.get("motivi_similarita", [])
+
+    if nome not in CONDIZIONI_INFORMATIVE_GENERALI:
+        return False
+
+    if categoria_voce not in ["informazione", "curiosita", ""]:
+        return False
+
+    if not _condizione_memoria_eseguibile(voce):
+        return False
+
+    if negativi > 0 and negativi >= positivi:
+        return False
+
+    if punteggio >= 5:
+        return True
+
+    return punteggio >= 4 and "categoria" in motivi
+
+
 def _generazione_gia_coperta_da_memoria(mondo, firma, stato_runtime):
     """
     Recupera condizioni simili prima di arrivare al prompt LLM.
@@ -2687,6 +2922,26 @@ def _generazione_gia_coperta_da_memoria(mondo, firma, stato_runtime):
         firma.get("eventi_multipli", False)
         or firma.get("situazione_composta", False)
     )
+    evento_strutturato = firma.get("evento_strutturato", {})
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    eventi_core = firma.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+
+    informativo_generale = _evento_informativo_generale(
+        evento_strutturato,
+        eventi_core
+    )
+    novita_specifica = _evento_ha_novita_specifica_generativa(
+        mondo,
+        evento_strutturato,
+        eventi_core
+    )
+
+    if novita_specifica:
+        return False, "", simili
 
     for voce in simili_eseguibili:
         punteggio = voce.get("punteggio_similarita", 0)
@@ -2706,6 +2961,20 @@ def _generazione_gia_coperta_da_memoria(mondo, firma, stato_runtime):
 
         if negativi > positivi and negativi >= 2:
             continue
+
+        if (
+            informativo_generale
+            and not novita_specifica
+            and _copertura_informativa_affidabile(
+                voce,
+                punteggio,
+                positivi,
+                negativi
+            )
+        ):
+            return True, (
+                "contenuto informativo gia' coperto da condizione esistente"
+            ), simili
 
         if scena_composta:
             eventi_coperti = _numero_eventi_coperti_da_voce(
@@ -2881,6 +3150,17 @@ def situazione_merita_generazione(mondo, stato_runtime):
             firma=firma
         )
     ):
+        gia_coperta_osservazione, motivo_coperta_osservazione, _ = (
+            _generazione_gia_coperta_da_memoria(
+                mondo,
+                firma,
+                stato_runtime
+            )
+        )
+
+        if gia_coperta_osservazione:
+            return False, motivo_coperta_osservazione
+
         return True, "osservazione mirata gia' eseguita per la scena"
 
     gia_coperta, motivo_memoria, condizioni_simili = (
@@ -2904,9 +3184,6 @@ def situazione_merita_generazione(mondo, stato_runtime):
             )
         )
 
-    if evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
-        return True, "testo visibile con possibile significato specifico"
-
     if gia_coperta:
         logger.info(
             "[AUTONOMIA][MEMORIA] Generazione evitata: {}".format(
@@ -2914,6 +3191,9 @@ def situazione_merita_generazione(mondo, stato_runtime):
             )
         )
         return False, motivo_memoria
+
+    if evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
+        return True, "testo visibile con possibile significato specifico"
 
     esito_ipotesi = valuta_ipotesi_temporanee_sicura(
         mondo,
