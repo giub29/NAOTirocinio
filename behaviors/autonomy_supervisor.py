@@ -195,6 +195,7 @@ EVENTI_NOVITA_SPECIFICHE_GENERATIVE = [
 ]
 COOLDOWN_SCENA_COMPRESA = 300
 COOLDOWN_CURIOSITA_RIPETUTA = 180
+COOLDOWN_CONCETTO_SEMANTICO = 300
 TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
     "Ho trovato alcune informazioni utili per comprendere meglio questo luogo."
 )
@@ -502,6 +503,301 @@ def _normalizza_firma_testo(testo):
     return "_".join(parole[:8])
 
 
+def _termine_presente_non_negato(testo, termini):
+    testo = _testo_sicuro(testo).lower()
+    if not testo:
+        return False
+
+    termini_norm = [
+        _testo_sicuro(t).lower()
+        for t in termini
+        if _testo_sicuro(t).strip()
+    ]
+
+    for termine in termini_norm:
+        pattern = r"\b{}\b".format(re.escape(termine))
+        for match in re.finditer(pattern, testo):
+            inizio = match.start()
+            contesto_pre = testo[max(0, inizio - 70):inizio]
+            contesto_post = testo[match.end():match.end() + 35]
+            finestra = contesto_pre + termine + contesto_post
+
+            negata = (
+                "non ci sono" in contesto_pre
+                or "non c'e" in contesto_pre
+                or "non ce" in contesto_pre
+                or "non vedo" in contesto_pre
+                or "non sono presenti" in contesto_pre
+                or "non risulta" in contesto_pre
+                or "nessun" in contesto_pre[-25:]
+                or "nessuno" in contesto_pre[-25:]
+                or "nessuna" in contesto_pre[-25:]
+                or "assenza di" in contesto_pre
+                or "senza" in contesto_pre[-25:]
+            )
+
+            if not negata:
+                return True
+
+            separatori = [".", ";", "\n"]
+            if any(s in finestra for s in separatori):
+                contesto_frase = contesto_pre.split(".")[-1]
+                if not (
+                    "non ci sono" in contesto_frase
+                    or "non vedo" in contesto_frase
+                    or "nessun" in contesto_frase
+                    or "nessuno" in contesto_frase
+                    or "nessuna" in contesto_frase
+                ):
+                    return True
+
+    return False
+
+
+def _termini_presenti_non_negati(testo, termini):
+    return _termine_presente_non_negato(testo, termini)
+
+
+def _solo_segnali_operativi_negati(testo):
+    testo = _testo_sicuro(testo).lower()
+    termini_negabili = [
+        "errore",
+        "errori",
+        "warning",
+        "avviso",
+        "avvisi",
+        "codice"
+    ]
+    contiene_termine = any(t in testo for t in termini_negabili)
+    if not contiene_termine:
+        return False
+
+    if _termine_presente_non_negato(testo, termini_negabili):
+        return False
+
+    indicatori_positivi = [
+        "vietato", "non entrare", "chiuso", "chiusa",
+        "aperto", "aperta", "uscita", "entrata",
+        "orario", "istruzioni", "premere", "usare",
+        "attenzione", "pericolo", "obbligatorio",
+        "riservato", "accesso", "laboratorio", "emergenza"
+    ]
+    return not any(indicatore in testo for indicatore in indicatori_positivi)
+
+
+def normalizza_concetto_semantico(evento_strutturato, mondo):
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    categoria = str(evento_strutturato.get("categoria", "") or "").lower()
+    tipo = str(evento_strutturato.get("tipo", "") or "").lower()
+    stato = str(evento_strutturato.get("stato", "") or "").lower()
+    azione = str(evento_strutturato.get("azione_cognitiva", "") or "").lower()
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        eventi_core = []
+    eventi_core = [
+        str(e).lower().strip()
+        for e in eventi_core
+        if str(e).strip()
+    ]
+
+    testo = _testo_sicuro(mondo).lower()
+    ind_lav = "lava" + "gna"
+    ind_car = "car" + "tello"
+    ind_mon = "moni" + "tor"
+
+    famiglia_informativa = [
+        "informazione_operativa",
+        "contenuto_informativo_rilevante",
+        "supporto_informativo_potenziale",
+        "supporto_informativo_non_disponibile",
+        "dettaglio_funzionale_osservabile"
+    ]
+    indizi_informativi = [
+        ind_lav,
+        ind_car,
+        "bacheca",
+        "foglio",
+        "documento",
+        ind_mon,
+        "schermo",
+        "schermi",
+        "computer",
+        "display"
+    ]
+
+    if (
+        categoria in ["informazione", "supporto_informativo"]
+        or tipo in famiglia_informativa
+        or any(e in famiglia_informativa for e in eventi_core)
+        or (
+            _termini_presenti_non_negati(testo, indizi_informativi)
+            and (
+                "testo" in testo
+                or "scritte" in testo
+                or "parole" in testo
+                or "leggibile" in testo
+                or "non leggibile" in testo
+            )
+        )
+    ):
+        if (
+            "aula" in testo
+            or ind_lav in testo
+            or "orolo" + "gio" in testo
+            or "sedie" in testo
+        ):
+            return "supporto_informativo"
+        return "supporto_informativo"
+
+    if categoria == "accesso" or any(
+        e in eventi_core
+        for e in [
+            "accesso_non_disponibile",
+            "accesso_disponibile",
+            "accesso_o_percorso_limitato"
+        ]
+    ):
+        return "accesso"
+
+    if categoria == "ostacolo_spazio" or any(
+        e in eventi_core
+        for e in [
+            "oggetto_in_zona_rilevante",
+            "ostacolo_frontale",
+            "ostacolo_destra",
+            "ostacolo_sinistra"
+        ]
+    ):
+        return "ostacolo_spazio"
+
+    if categoria == "anomalia" or any(
+        e in eventi_core
+        for e in ["elemento_ambientale_anomalo", "elemento_fuori_posto"]
+    ):
+        return "anomalia"
+
+    if categoria:
+        return categoria
+
+    if azione:
+        return azione
+
+    return ""
+
+
+def _firma_concetto_semantico(mondo, evento_strutturato, concetto):
+    parti = [concetto or "concetto"]
+    testo = _testo_sicuro(mondo).lower()
+    ind_lav = "lava" + "gna"
+    ind_car = "car" + "tello"
+    ind_mon = "moni" + "tor"
+    ind_oro = "orolo" + "gio"
+    indizi = [
+        ([ind_lav], ind_lav),
+        ([ind_car], ind_car),
+        (["bacheca"], "bacheca"),
+        (["foglio"], "foglio"),
+        ([ind_mon, "schermo", "schermi", "display", "computer"], ind_mon),
+        (["contenitore"], "contenitore"),
+        ([ind_oro], ind_oro),
+        (["scritte"], "scritte"),
+        (["testo"], "testo")
+    ]
+    for termini, valore in indizi:
+        if concetto == "supporto_informativo" and valore in [
+            "scritte",
+            "testo"
+        ]:
+            continue
+        if (
+            _termini_presenti_non_negati(testo, termini)
+            and valore not in parti
+        ):
+            parti.append(valore)
+
+    materiale = _materiale_operativo_da_testo(testo)
+    verbo = _verbo_operativo_da_testo(testo)
+    if materiale:
+        parti.append(materiale)
+    if verbo:
+        parti.append(verbo)
+
+    return "|".join(parti[:6])
+
+
+def aggiorna_concetto_semantico_runtime(stato_runtime, mondo, firma=None):
+    if not isinstance(stato_runtime, dict):
+        return ""
+
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if isinstance(firma, dict):
+        evento_firma = firma.get("evento_strutturato", {})
+        if isinstance(evento_firma, dict) and evento_firma:
+            evento_strutturato = evento_firma
+    if not isinstance(evento_strutturato, dict):
+        evento_strutturato = {}
+
+    concetto = normalizza_concetto_semantico(evento_strutturato, mondo)
+    if not concetto:
+        return ""
+
+    firma_concetto = _firma_concetto_semantico(
+        mondo,
+        evento_strutturato,
+        concetto
+    )
+    stato_runtime["concetto_semantico_corrente"] = concetto
+    stato_runtime["firma_concetto_semantico_corrente"] = firma_concetto
+    evento_strutturato["concetto_semantico"] = concetto
+    evento_strutturato["firma_concetto_semantico"] = firma_concetto
+    stato_runtime["evento_strutturato"] = evento_strutturato
+    return concetto
+
+
+def registra_concetto_semantico_recente(stato_runtime, mondo, origine):
+    if not isinstance(stato_runtime, dict):
+        return ""
+
+    concetto = aggiorna_concetto_semantico_runtime(stato_runtime, mondo)
+    if not concetto:
+        return ""
+
+    firma_concetto = stato_runtime.get(
+        "firma_concetto_semantico_corrente",
+        ""
+    )
+    if not firma_concetto:
+        return concetto
+
+    memoria = stato_runtime.get("concetti_semantici_recenti", {})
+    if not isinstance(memoria, dict):
+        memoria = {}
+
+    adesso = time.time()
+    memoria[firma_concetto] = {
+        "tempo": adesso,
+        "concetto": concetto,
+        "origine": origine
+    }
+
+    if len(memoria) > 20:
+        try:
+            elementi = sorted(
+                memoria.items(),
+                key=lambda item: item[1].get("tempo", 0)
+            )
+            memoria = dict(elementi[-20:])
+        except Exception:
+            pass
+
+    stato_runtime["concetti_semantici_recenti"] = memoria
+    stato_runtime["ultimo_concetto_semantico_osservato"] = concetto
+    stato_runtime["ultimo_tempo_concetto_semantico"] = adesso
+    return concetto
+
+
 def firma_scena_generale(mondo, stato_runtime=None, firma=None):
     parti = ["scena"]
 
@@ -516,10 +812,14 @@ def firma_scena_generale(mondo, stato_runtime=None, firma=None):
         if isinstance(evento_firma, dict) and evento_firma:
             evento_strutturato = evento_firma
 
-    for chiave in ["categoria", "tipo", "stato"]:
-        valore = str(evento_strutturato.get(chiave, "") or "").lower()
-        if valore:
-            parti.append(chiave + "=" + valore)
+    concetto = normalizza_concetto_semantico(evento_strutturato, mondo)
+    if concetto:
+        parti.append("concetto=" + concetto)
+    else:
+        for chiave in ["categoria", "tipo", "stato"]:
+            valore = str(evento_strutturato.get(chiave, "") or "").lower()
+            if valore:
+                parti.append(chiave + "=" + valore)
 
     eventi_core = evento_strutturato.get("eventi_core", [])
     if not isinstance(eventi_core, list):
@@ -530,10 +830,19 @@ def firma_scena_generale(mondo, stato_runtime=None, firma=None):
         for e in eventi_core
         if str(e).strip()
     ])
-    if eventi_core:
+    if eventi_core and not concetto:
         parti.append("core=" + ",".join(sorted(eventi_core)))
 
-    parti.append("testo=" + _normalizza_firma_testo(mondo))
+    if concetto:
+        parti.append(
+            "sem=" + _firma_concetto_semantico(
+                mondo,
+                evento_strutturato,
+                concetto
+            )
+        )
+    else:
+        parti.append("testo=" + _normalizza_firma_testo(mondo))
     return "|".join(parti)
 
 
@@ -792,6 +1101,59 @@ def filtra_curiosita_ripetuta(decisione, stato_runtime, mondo, firma, origine):
     if not decisione_sembra_curiosa(decisione):
         return decisione
 
+    aggiorna_concetto_semantico_runtime(stato_runtime, mondo, firma=firma)
+    concetto = stato_runtime.get("concetto_semantico_corrente", "")
+    firma_concetto = stato_runtime.get("firma_concetto_semantico_corrente", "")
+    if concetto in ["supporto_informativo"] and firma_concetto:
+        memoria_concetti = stato_runtime.get("concetti_semantici_recenti", {})
+        if not isinstance(memoria_concetti, dict):
+            memoria_concetti = {}
+
+        voce_concetto = memoria_concetti.get(firma_concetto)
+        if isinstance(voce_concetto, dict):
+            try:
+                recente_concetto = (
+                    time.time() - float(voce_concetto.get("tempo", 0))
+                    < COOLDOWN_CONCETTO_SEMANTICO
+                )
+            except Exception:
+                recente_concetto = True
+
+            if recente_concetto:
+                stato_runtime["decisione_non_generativa"] = (
+                    "curiosita_semantica_in_cooldown"
+                )
+                stato_runtime["ultima_curiosita_saltata"] = firma_concetto
+                stato_runtime["ultimo_concetto_semantico_osservato"] = concetto
+                stato_runtime["ultimo_tempo_concetto_semantico"] = (
+                    voce_concetto.get("tempo", time.time())
+                )
+                logger.info(
+                    "[AUTONOMIA] Concetto semantico gia' osservato di "
+                    "recente: salto curiosita ({})".format(origine)
+                )
+                return None
+
+        adesso = time.time()
+        memoria_concetti[firma_concetto] = {
+            "tempo": adesso,
+            "concetto": concetto,
+            "origine": origine
+        }
+        if len(memoria_concetti) > 20:
+            try:
+                elementi = sorted(
+                    memoria_concetti.items(),
+                    key=lambda item: item[1].get("tempo", 0)
+                )
+                memoria_concetti = dict(elementi[-20:])
+            except Exception:
+                pass
+
+        stato_runtime["concetti_semantici_recenti"] = memoria_concetti
+        stato_runtime["ultimo_concetto_semantico_osservato"] = concetto
+        stato_runtime["ultimo_tempo_concetto_semantico"] = adesso
+
     firma_corrente = firma_curiosita(mondo, stato_runtime, decisione, firma)
     memoria = stato_runtime.get("curiosita_recenti", {})
     if not isinstance(memoria, dict):
@@ -877,6 +1239,11 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
     )
     if not sintesi:
         sintesi = TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+    registra_concetto_semantico_recente(
+        stato_runtime,
+        mondo,
+        "condizione_informativa"
+    )
 
     sostituita = False
     motivo_bassa_generalita = ""
@@ -887,6 +1254,8 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
             continue
 
         testo = _testo_sicuro(azione.get("testo", "")).lower()
+        azione["testo"] = sintesi
+        sostituita = True
         if (
             any(
                 termine in testo
@@ -898,9 +1267,7 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
             motivo_bassa_generalita = (
                 "frase troppo specifica per evento informazione_operativa"
             )
-            azione["testo"] = sintesi
-            sostituita = True
-            break
+        break
 
     if not sostituita:
         azioni.append({
@@ -1054,6 +1421,16 @@ def salva_ipotesi_temporanea_da_decisione(stato_runtime, decisione):
     if not isinstance(ipotesi, dict):
         return None
 
+    evento = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento, dict):
+        evento = {}
+    concetto = evento.get("concetto_semantico")
+    firma_concetto = evento.get("firma_concetto_semantico")
+    if concetto:
+        ipotesi["concetto_semantico"] = concetto
+    if firma_concetto:
+        ipotesi["firma_concetto_semantico"] = firma_concetto
+
     stato_runtime["ipotesi_temporanea"] = ipotesi
 
     recenti = stato_runtime.get("ipotesi_temporanee_recenti", [])
@@ -1105,6 +1482,14 @@ def valuta_ipotesi_strutturata_sicura(stato_runtime, evento_strutturato, mondo):
 
     if valuta_ipotesi_da_evento_strutturato is None:
         return None
+
+    concetto = normalizza_concetto_semantico(evento_strutturato, mondo)
+    if concetto:
+        evento_strutturato = dict(evento_strutturato)
+        evento_strutturato["concetto_semantico"] = concetto
+        evento_strutturato["firma_concetto_semantico"] = (
+            _firma_concetto_semantico(mondo, evento_strutturato, concetto)
+        )
 
     try:
         valutazione = valuta_ipotesi_da_evento_strutturato(
@@ -1882,7 +2267,7 @@ def _indizi_osservati_da_mondo(mondo):
         ("bacheca", ["bacheca"]),
         (ind_car, [ind_car, "segnale"]),
         ("foglio", ["foglio", "documento", "pagina"]),
-        (ind_mon, [ind_mon, "schermo", "display"]),
+        (ind_mon, [ind_mon, "schermo", "schermi", "display", "computer"]),
         ("contenitore", ["contenitore", "cestino", "scatola"]),
         (ind_por, [ind_por]),
         ("corridoio", ["corridoio"]),
@@ -1900,10 +2285,8 @@ def _indizi_osservati_da_mondo(mondo):
     indizi = []
 
     for nome, parole in catalogo:
-        for parola in parole:
-            if parola in testo:
-                indizi.append(nome)
-                break
+        if _termini_presenti_non_negati(testo, parole):
+            indizi.append(nome)
 
     risultato = []
     for indizio in indizi:
@@ -2262,16 +2645,27 @@ def testo_visibile_puo_generare_significato_specifico(mondo):
         if len(p.strip()) >= 3
     ]
 
+    if _solo_segnali_operativi_negati(testo):
+        return False
+
     indicatori_specifici = [
         "vietato", "non entrare", "chiuso", "chiusa",
         "aperto", "aperta", "uscita", "entrata",
         "orario", "istruzioni", "premere", "usare",
         "attenzione", "pericolo", "obbligatorio",
         "riservato", "accesso", "laboratorio",
-        "errore", "warning", "emergenza"
+        "errore", "warning", "codice", "emergenza"
     ]
 
-    if any(indicatore in testo for indicatore in indicatori_specifici):
+    for indicatore in indicatori_specifici:
+        if indicatore not in testo:
+            continue
+        if indicatore in ["errore", "warning", "codice"]:
+            if not _termine_presente_non_negato(
+                testo,
+                [indicatore, indicatore + "i"]
+            ):
+                continue
         return True
 
     # Nuova regola generalista:
@@ -2344,6 +2738,7 @@ def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
         "contenuto_informativo_rilevante",
         "informazione_operativa",
         "supporto_informativo_potenziale",
+        "supporto_informativo_non_disponibile",
         "dettaglio_funzionale_osservabile"
     ]
 
@@ -2382,8 +2777,19 @@ def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
                 continue
             gia_viste[chiave] = True
 
+            concetto_norm = normalizza_concetto_semantico(
+                evento_strutturato,
+                mondo
+            )
+            if concetto_norm:
+                ipotesi["concetto_semantico_superiore"] = concetto_norm
+                if not ipotesi.get("concetto"):
+                    ipotesi["concetto"] = concetto_norm
+
             voce = salva_ipotesi_semantica(ipotesi, mondo)
             if isinstance(voce, dict):
+                if concetto_norm:
+                    voce["concetto_semantico_superiore"] = concetto_norm
                 salvate.append(voce)
 
     if salvate:
@@ -2552,6 +2958,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             )
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
+    aggiorna_concetto_semantico_runtime(stato_runtime, mondo, firma=firma)
     esito_world_model = aggiorna_world_model_sicuro(
         mondo,
         firma,
@@ -3755,6 +4162,7 @@ def situazione_merita_generazione(mondo, stato_runtime):
     """
 
     firma = costruisci_firma_situazione(mondo, stato_runtime)
+    aggiorna_concetto_semantico_runtime(stato_runtime, mondo, firma=firma)
     logger.info(
         "[AUTONOMIA] Firma situazione: {}".format(
             _maschera_dati_sensibili(firma)

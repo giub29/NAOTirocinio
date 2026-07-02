@@ -188,6 +188,7 @@ CHIAVE_PRIVATA = _carica_openai_api_key_locale()
 TEMPO_INERZIA_INIZIATIVA = 20
 TEMPO_IDLE_ROUTING = 10
 COOLDOWN_ROUTING_IDLE = TEMPO_INERZIA_INIZIATIVA
+COOLDOWN_CONCETTO_SEMANTICO_IDLE = 300
 LUNGHEZZA_MAX_RICORDI = 20
 VELOCITA_CAMMINO = 0.3
 
@@ -891,7 +892,77 @@ def _puo_attivare_routine_idle(corpo, adesso, ultimo_evento_tempo, messaggio_cor
     if adesso - ultima_route < COOLDOWN_ROUTING_IDLE:
         return False
 
+    if _supporto_informativo_in_cooldown_semantico(adesso):
+        return False
+
     return True
+
+
+def _evento_reale_non_bloccabile_da_cooldown():
+    eventi = stato_runtime.get("eventi_reali", {})
+    if not isinstance(eventi, dict):
+        eventi = stato_runtime.get("eventi", {})
+    if not isinstance(eventi, dict):
+        return False
+
+    eventi_non_bloccabili = [
+        "ostacolo_destra",
+        "ostacolo_sinistra",
+        "ostacolo_frontale",
+        "oggetto_in_zona_rilevante",
+        "accesso_non_disponibile",
+        "accesso_disponibile",
+        "accesso_o_percorso_limitato",
+        "elemento_ambientale_anomalo",
+        "elemento_fuori_posto",
+        "carezza_testa",
+        "mano_destra",
+        "mano_sinistra",
+        "entrambe_mani",
+        "volto_riconosciuto",
+        "volto_ignoto",
+        "rumore_improvviso",
+        "rumore_singolo",
+        "battiti_mani"
+    ]
+
+    for nome in eventi_non_bloccabili:
+        if eventi.get(nome) not in [False, None, "", [], {}]:
+            return True
+
+    return False
+
+
+def _supporto_informativo_in_cooldown_semantico(adesso):
+    if _evento_reale_non_bloccabile_da_cooldown():
+        return False
+
+    concetto = str(
+        stato_runtime.get("concetto_semantico_corrente", "") or ""
+    ).lower()
+    firma = str(
+        stato_runtime.get("firma_concetto_semantico_corrente", "") or ""
+    )
+
+    if concetto != "supporto_informativo":
+        return False
+
+    ultimo_tempo = stato_runtime.get("ultimo_tempo_concetto_semantico", 0)
+    memoria = stato_runtime.get("concetti_semantici_recenti", {})
+    if isinstance(memoria, dict) and firma:
+        voce = memoria.get(firma, {})
+        if isinstance(voce, dict):
+            ultimo_tempo = voce.get("tempo", ultimo_tempo)
+
+    try:
+        recente = (
+            adesso - float(ultimo_tempo or 0)
+            < COOLDOWN_CONCETTO_SEMANTICO_IDLE
+        )
+    except Exception:
+        recente = False
+
+    return recente
 
 
 def _motivo_skip_inerzia(corpo, adesso, ultimo_evento_tempo, messaggio_corrente, mondo_neutro):
@@ -922,6 +993,9 @@ def _motivo_skip_inerzia(corpo, adesso, ultimo_evento_tempo, messaggio_corrente,
     ultima_route = stato_runtime.get("ultima_route_idle_tempo", 0)
     if adesso - ultima_route < COOLDOWN_ROUTING_IDLE:
         return "cooldown_routing_idle"
+
+    if _supporto_informativo_in_cooldown_semantico(adesso):
+        return "concetto_semantico_in_cooldown"
 
     return "attivabile"
 
@@ -1225,6 +1299,29 @@ def _decisione_richiede_osservazione_mirata(decisione):
         pass
 
     return False
+
+
+def _decisione_contiene_azione_parla(decisione):
+    try:
+        azioni = decisione.get("azioni", [])
+        if not isinstance(azioni, list):
+            return False
+
+        for azione in azioni:
+            if isinstance(azione, dict) and azione.get("tipo") == "parla":
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _deve_verbalizzare_dopo_decisione_mirata(decisione):
+    return (
+        not _decisione_contiene_azione_parla(decisione)
+        and not _decisione_richiede_osservazione_mirata(decisione)
+    )
+
 
 def _firma_osservazione_mirata(mondo):
     try:
@@ -2579,14 +2676,9 @@ def main():
                     )
                 )
 
-                ha_gia_parlato = False
-                try:
-                    for azione in decisione_condizione.get("azioni", []):
-                        if isinstance(azione, dict) and azione.get("tipo") == "parla":
-                            ha_gia_parlato = True
-                            break
-                except Exception:
-                    ha_gia_parlato = False
+                ha_gia_parlato = _decisione_contiene_azione_parla(
+                    decisione_condizione
+                )
 
                 if not richiede_osservazione_mirata and not ha_gia_parlato:
                     _verbalizza_percezione_autonoma(voce, mondo)
@@ -2633,17 +2725,26 @@ def main():
                             stato_runtime
                         )
 
-                        _verbalizza_percezione_autonoma(voce, mondo_mirato)
-
                         if decisione_mirata:
                             decisione_mirata = valida_decisione(
                                 decisione_mirata,
                                 mondo_mirato
                             )
+                            decisione_mirata_richiede_osservazione = (
+                                _decisione_richiede_osservazione_mirata(
+                                    decisione_mirata
+                                )
+                            )
 
-                            if _decisione_richiede_osservazione_mirata(
+                            if _deve_verbalizzare_dopo_decisione_mirata(
                                 decisione_mirata
                             ):
+                                _verbalizza_percezione_autonoma(
+                                    voce,
+                                    mondo_mirato
+                                )
+
+                            if decisione_mirata_richiede_osservazione:
                                 logger.info(
                                     u"[SOUL] Curiosita conclusa senza nuove evidenze"
                                 )
@@ -2670,6 +2771,7 @@ def main():
                                 ultima_decisione = decisione_mirata
                                 ultimo_evento_tempo = time.time()
                         else:
+                            _verbalizza_percezione_autonoma(voce, mondo_mirato)
                             logger.info(
                                 u"[SOUL] Curiosita conclusa senza nuove evidenze"
                             )

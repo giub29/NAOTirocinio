@@ -95,6 +95,33 @@ def _supporto_informativo_peggiorato_ma_inconclusivo(
     )
 
 
+def _concetto(ipotesi_o_evento):
+    if not isinstance(ipotesi_o_evento, dict):
+        return ""
+    return _testo(ipotesi_o_evento.get("concetto_semantico"))
+
+
+def _firma_concetto(ipotesi_o_evento):
+    if not isinstance(ipotesi_o_evento, dict):
+        return ""
+    return _testo(ipotesi_o_evento.get("firma_concetto_semantico"))
+
+
+def _qualita_informativa_inferiore(categoria, stato, tipo, eventi_core):
+    return (
+        categoria == "supporto_informativo"
+        or stato in ["potenziale", "non_disponibile"]
+        or tipo in [
+            "supporto_informativo_potenziale",
+            "supporto_informativo_non_disponibile",
+            "dettaglio_funzionale_osservabile"
+        ]
+        or "supporto_informativo_potenziale" in eventi_core
+        or "supporto_informativo_non_disponibile" in eventi_core
+        or "dettaglio_funzionale_osservabile" in eventi_core
+    )
+
+
 def _esito(
     ha_ipotesi,
     stato,
@@ -136,10 +163,16 @@ def valuta_ipotesi_da_evento_strutturato(
     stato_ipotesi = _testo(ipotesi.get("stato"))
     categoria_nuova = _testo(nuovo_evento_strutturato.get("categoria"))
     stato_nuovo = _testo(nuovo_evento_strutturato.get("stato"))
+    tipo_nuovo = _testo(nuovo_evento_strutturato.get("tipo"))
     azione_nuova = _testo(nuovo_evento_strutturato.get("azione_cognitiva"))
     eventi_core_nuovi = nuovo_evento_strutturato.get("eventi_core", [])
     if not isinstance(eventi_core_nuovi, list):
         eventi_core_nuovi = []
+    eventi_core_nuovi_norm = [_testo(e) for e in eventi_core_nuovi]
+    concetto_ipotesi = _concetto(ipotesi)
+    concetto_nuovo = _concetto(nuovo_evento_strutturato)
+    firma_concetto_ipotesi = _firma_concetto(ipotesi)
+    firma_concetto_nuova = _firma_concetto(nuovo_evento_strutturato)
 
     rilevanza = _numero(
         nuovo_evento_strutturato.get(
@@ -190,6 +223,65 @@ def valuta_ipotesi_da_evento_strutturato(
             "confermata",
             genera,
             motivo,
+            "genera_condizione" if genera else None,
+            aggiornata
+        )
+
+    stesso_concetto = (
+        concetto_ipotesi
+        and concetto_ipotesi == concetto_nuovo
+        and (
+            not firma_concetto_ipotesi
+            or not firma_concetto_nuova
+            or firma_concetto_ipotesi == firma_concetto_nuova
+            or concetto_ipotesi == "supporto_informativo"
+        )
+    )
+
+    if stesso_concetto:
+        tentativi = _tentativi(ipotesi) + 1
+        aggiornata["tentativi"] = tentativi
+        aggiornata["confermata"] = tentativi >= 2
+        aggiornata["ultimo_mondo"] = nuovo_mondo
+        aggiornata["ultima_categoria"] = categoria_nuova
+        aggiornata["ultimo_stato"] = stato_nuovo
+        aggiornata["concetto_semantico"] = concetto_nuovo
+        if firma_concetto_nuova:
+            aggiornata["firma_concetto_semantico"] = firma_concetto_nuova
+
+        if (
+            concetto_nuovo == "supporto_informativo"
+            and _qualita_informativa_inferiore(
+                categoria_nuova,
+                stato_nuovo,
+                tipo_nuovo,
+                eventi_core_nuovi_norm
+            )
+        ):
+            aggiornata["osservazione_inconclusiva"] = True
+            return _esito(
+                True,
+                "confermata" if aggiornata["confermata"] else "incerta",
+                False,
+                "stesso concetto informativo, osservazione inconclusiva",
+                None,
+                aggiornata
+            )
+
+        genera = (
+            aggiornata["confermata"]
+            and (rilevanza >= 0.6 or confidenza >= 0.6)
+            and _evento_strutturato_puo_generare(nuovo_evento_strutturato)
+        )
+        return _esito(
+            True,
+            "confermata" if aggiornata["confermata"] else "incerta",
+            genera,
+            (
+                "ipotesi semantica confermata"
+                if aggiornata["confermata"]
+                else "stesso concetto semantico osservato di nuovo"
+            ),
             "genera_condizione" if genera else None,
             aggiornata
         )
