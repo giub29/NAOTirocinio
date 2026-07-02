@@ -133,11 +133,17 @@ except Exception:
 
 try:
     from behaviors.event_system.knowledge_memory import (
+        costruisci_ipotesi_multiple_da_evento,
         costruisci_ipotesi_da_evento,
+        aggiorna_ipotesi_da_osservazione,
+        recupera_conoscenze_stabili_rilevanti,
         salva_ipotesi_semantica
     )
 except Exception:
+    costruisci_ipotesi_multiple_da_evento = None
     costruisci_ipotesi_da_evento = None
+    aggiorna_ipotesi_da_osservazione = None
+    recupera_conoscenze_stabili_rilevanti = None
     salva_ipotesi_semantica = None
 
 from behaviors.event_system.unknown_generation_simulator import simula_condizione_sconosciuta
@@ -177,15 +183,10 @@ TESTO_INFORMAZIONE_OPERATIVA_COMPRESA = (
 )
 TERMINI_TROPPO_SPECIFICI_EVENTO_GENERALE = [
     "cosa ci",
-    "contenitore",
-    "scatola",
-    "cestino",
-    "bidone",
-    "cartello",
-    "lavagna",
-    "monitor",
-    "schermo",
-    "pulsante rosso"
+    "dentro questo",
+    "oggetto specifico",
+    "elemento specifico",
+    "supporto specifico"
 ]
 
 
@@ -1325,7 +1326,10 @@ def evento_generale_informativo_con_testo_specifico(stato_runtime, mondo):
     )
 
 def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
-    if costruisci_ipotesi_da_evento is None:
+    if (
+        costruisci_ipotesi_multiple_da_evento is None
+        and costruisci_ipotesi_da_evento is None
+    ):
         return None
 
     if salva_ipotesi_semantica is None:
@@ -1370,18 +1374,43 @@ def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
     ]
 
     salvate = []
+    gia_viste = {}
 
     for evento in eventi_utili:
         if not eventi.get(evento):
             continue
 
-        ipotesi = costruisci_ipotesi_da_evento(evento, mondo)
-        if not isinstance(ipotesi, dict):
+        if costruisci_ipotesi_multiple_da_evento is not None:
+            ipotesi_evento = costruisci_ipotesi_multiple_da_evento(
+                evento,
+                mondo
+            )
+        else:
+            ipotesi = costruisci_ipotesi_da_evento(evento, mondo)
+            ipotesi_evento = [ipotesi] if isinstance(ipotesi, dict) else []
+
+        if not isinstance(ipotesi_evento, list):
             continue
 
-        voce = salva_ipotesi_semantica(ipotesi, mondo)
-        if isinstance(voce, dict):
-            salvate.append(voce)
+        for ipotesi in ipotesi_evento:
+            if not isinstance(ipotesi, dict):
+                continue
+
+            chiave = (
+                str(ipotesi.get("concetto", "")),
+                "|".join([
+                    str(e)
+                    for e in ipotesi.get("evidenze", [])
+                    if e not in [None, False, "", [], {}]
+                ])
+            )
+            if chiave in gia_viste:
+                continue
+            gia_viste[chiave] = True
+
+            voce = salva_ipotesi_semantica(ipotesi, mondo)
+            if isinstance(voce, dict):
+                salvate.append(voce)
 
     if salvate:
         stato_runtime["conoscenze_semantiche_salvate"] = salvate[-5:]
@@ -1398,7 +1427,92 @@ def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
             )
         )
 
+        if aggiorna_ipotesi_da_osservazione is not None:
+            try:
+                evento_aggiornamento = None
+                for evento in eventi_utili:
+                    if eventi.get(evento):
+                        evento_aggiornamento = evento
+                        break
+
+                esito = aggiorna_ipotesi_da_osservazione(
+                    mondo,
+                    evento=evento_aggiornamento
+                )
+                stato_runtime["aggiornamento_conoscenza_semantica"] = esito
+            except Exception as e:
+                stato_runtime["aggiornamento_conoscenza_semantica"] = {
+                    "errore": str(e)
+                }
+                logger.warning(
+                    "[AUTONOMIA][KNOWLEDGE] Aggiornamento semantico "
+                    "saltato: {}".format(e)
+                )
+
     return salvate
+
+
+def recupera_conoscenze_semantiche_attive(mondo, stato_runtime, firma=None):
+    if recupera_conoscenze_stabili_rilevanti is None:
+        return []
+
+    if not isinstance(stato_runtime, dict):
+        return []
+
+    eventi = {}
+    sorgenti = []
+
+    if isinstance(firma, dict):
+        sorgenti.extend([
+            firma.get("eventi_attivi", {}),
+            firma.get("eventi", {})
+        ])
+
+    sorgenti.extend([
+        stato_runtime.get("eventi", {}),
+        stato_runtime.get("eventi_reali", {})
+    ])
+
+    evento_strutturato = stato_runtime.get("evento_strutturato", {})
+    if isinstance(evento_strutturato, dict):
+        for ev in evento_strutturato.get("eventi_core", []):
+            eventi[ev] = True
+
+    for sorgente in sorgenti:
+        if not isinstance(sorgente, dict):
+            continue
+
+        for nome, valore in sorgente.items():
+            if valore not in [False, None, "", [], {}]:
+                eventi[nome] = True
+
+    evento_ricerca = None
+    for evento in [
+        "contenuto_informativo_rilevante",
+        "informazione_operativa",
+        "supporto_informativo_potenziale",
+        "dettaglio_funzionale_osservabile"
+    ]:
+        if eventi.get(evento):
+            evento_ricerca = evento
+            break
+
+    try:
+        conoscenze = recupera_conoscenze_stabili_rilevanti(
+            mondo,
+            evento=evento_ricerca
+        )
+        stato_runtime["conoscenze_semantiche_attive"] = conoscenze
+        return conoscenze
+    except Exception as e:
+        stato_runtime["conoscenze_semantiche_attive"] = []
+        stato_runtime["errore_conoscenze_semantiche_attive"] = str(e)
+        logger.warning(
+            "[AUTONOMIA][KNOWLEDGE] Recupero conoscenze stabili saltato: "
+            "{}".format(e)
+        )
+        return []
+
 
 def gestisci_autonomia(mondo, stato_runtime=None):
     """
@@ -1505,6 +1619,12 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         "[AUTONOMIA] Firma situazione: {}".format(
             _maschera_dati_sensibili(firma)
         )
+    )
+
+    recupera_conoscenze_semantiche_attive(
+        mondo,
+        stato_runtime,
+        firma=firma
     )
 
     try:
