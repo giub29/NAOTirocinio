@@ -558,6 +558,43 @@ def _termini_presenti_non_negati(testo, termini):
     return _termine_presente_non_negato(testo, termini)
 
 
+def _negazione_globale_schermi(testo):
+    testo = _testo_sicuro(testo).lower()
+    if not testo:
+        return False
+
+    ind_mon = "moni" + "tor"
+    pattern = [
+        "non ci sono " + ind_mon,
+        "non ci sono schermi",
+        "non ci sono " + ind_mon + " o schermi",
+        "non ci sono schermi o " + ind_mon,
+        "nessun " + ind_mon,
+        "nessuno schermo",
+        "nessuno " + ind_mon,
+        "nessuno schermo o " + ind_mon,
+        "assenza di " + ind_mon,
+        "assenza di schermi"
+    ]
+    for indicatore in pattern:
+        if indicatore in testo:
+            return True
+    pattern_regex = [
+        r"non sono visibili[^.]{0,80}(schermi|" + ind_mon + r")",
+        r"non sono presenti[^.]{0,80}(schermi|" + ind_mon + r")",
+        r"non si vedono[^.]{0,80}(schermi|" + ind_mon + r")",
+        r"nessun elemento leggibile[^.]{0,80}(schermi|" + ind_mon + r")",
+        r"non mostra[^.]{0,100}(" + ind_mon + r"|schermi|dispositivi)",
+        r"non mostrano[^.]{0,100}(" + ind_mon + r"|schermi|dispositivi)",
+        r"non sono visibili[^.]{0,100}(" + ind_mon + r"|schermi|dispositivi)",
+        r"nessun[^.]{0,80}dispositivo[^.]{0,80}contenuti visibili"
+    ]
+    for pattern in pattern_regex:
+        if re.search(pattern, testo):
+            return True
+    return False
+
+
 def _solo_segnali_operativi_negati(testo):
     testo = _testo_sicuro(testo).lower()
     termini_negabili = [
@@ -710,6 +747,8 @@ def _firma_concetto_semantico(mondo, evento_strutturato, concetto):
             "scritte",
             "testo"
         ]:
+            continue
+        if valore == ind_mon and _negazione_globale_schermi(testo):
             continue
         if (
             _termini_presenti_non_negati(testo, termini)
@@ -2028,6 +2067,302 @@ def _estratto_breve_testo_leggibile(testo):
     return " ".join(parole_utili)
 
 
+def _testo_senza_marker_per_lettura(testo):
+    testo = _testo_sicuro(testo)
+    testo = re.sub(
+        r"\b(REPORT|VEDO|SONO FERMO|OSSERVAZIONE_AUTONOMA|NESSUNA_CONDIZIONE_ATTIVA)\b",
+        " ",
+        testo,
+        flags=re.IGNORECASE
+    )
+    return re.sub(r"\s+", " ", testo).strip()
+
+
+def contenuto_letto_esplicitamente_illeggibile(mondo):
+    testo = _testo_sicuro(mondo).lower()
+    testo = testo.replace(u"\xe8", "e")
+    testo = testo.replace(u"\u2019", "'")
+    testo = testo.replace(u"\u2018", "'")
+    testo = testo.replace(" e' ", " e ")
+    testo = re.sub(r"\s+", " ", testo)
+
+    indicatori = [
+        "non e possibile leggere i contenuti specifici",
+        "testo non leggibile",
+        "contenuti non leggibili",
+        "nessuna parola chiara",
+        "nessuna parola leggibile",
+        "nessun testo leggibile",
+        "non ci sono dettagli specifici leggibili",
+        "scritte non leggibili"
+    ]
+    for indicatore in indicatori:
+        if indicatore in testo:
+            return True
+    return False
+
+
+def testo_visivo_chiaramente_non_leggibile(mondo):
+    testo = _testo_sicuro(mondo).lower()
+    testo = testo.replace(u"\xe8", "e")
+    testo = testo.replace(u"\u2019", "'")
+    testo = testo.replace(u"\u2018", "'")
+    testo = testo.replace(" e' ", " e ")
+    testo = re.sub(r"\s+", " ", testo)
+
+    indicatori = [
+        "non e leggibile alcun testo chiaro",
+        "non e leggibile alcuna informazione utile",
+        "nessun testo chiaro",
+        "nessuna informazione utile leggibile",
+        "non leggo elementi utili",
+        "testo non chiaro",
+        "testo non leggibile",
+        "il testo non e leggibile",
+        "il testo non e' leggibile",
+        "testo non e leggibile",
+        "testo non e' leggibile",
+        "contenuti non leggibili",
+        "scritte non leggibili"
+    ]
+    for indicatore in indicatori:
+        if indicatore in testo:
+            return True
+    pattern = [
+        r"testo[^.]{0,40}non[^.]{0,25}leggibile",
+        r"scritte[^.]{0,60}testo[^.]{0,40}non[^.]{0,25}leggibile"
+    ]
+    for espressione in pattern:
+        if re.search(espressione, testo):
+            return True
+    return False
+
+
+def _elemento_letto_valido(elemento):
+    elemento = _testo_sicuro(elemento).strip(" \t\r\n.,;:!?()[]{}\"'")
+    if not elemento:
+        return ""
+
+    elemento = re.sub(r"\s+", " ", elemento)
+    elemento_norm = elemento.lower()
+    ind_lav = "lava" + "gna"
+    ind_mon = "moni" + "tor"
+    ind_oro = "orolo" + "gio"
+    ind_ini = "inizi" + "ativa"
+    generiche = [
+        "report", "vedo", "sono fermo", "osservazione autonoma",
+        "nessuna condizione attiva", ind_lav, ind_mon, "schermo",
+        "schermi", "computer", "visibile", "immagine", "testo",
+        "scritte", "scritta", "leggibile", "parzialmente", ind_oro,
+        "parete", "muro", "supporto", "informativo", "parole",
+        "alcune", "altre", "annotazioni", "disegni", "nessuna",
+        "nessun", "nessuno", "chiara", "chiare", "illeggibile",
+        "non leggibile", "qui", ind_ini
+    ]
+    descrittive = [
+        "immagine", ind_lav, "testo scritto", "non e possibile leggere",
+        "non e' possibile leggere", "contenuti specifici", ind_oro,
+        ind_mon, "schermo", "visibile", "scritte non leggibili",
+        "non leggibili", "non leggibile"
+    ]
+    if elemento_norm in generiche:
+        return ""
+    if "nessuna parola" in elemento_norm or "nessun testo" in elemento_norm:
+        return ""
+    if "non ci sono" in elemento_norm:
+        return ""
+    for descrittiva in descrittive:
+        if descrittiva in elemento_norm:
+            return ""
+
+    parole = [
+        p for p in re.split(r"\s+", elemento_norm)
+        if p.strip(".,;:!?()[]{}")
+    ]
+    if len(parole) > 6:
+        return ""
+    if len(parole) == 1:
+        parola = parole[0].strip(".,;:!?()[]{}")
+        if len(parola) < 3 and not re.search(r"\d", parola):
+            return ""
+        if parola in generiche:
+            return ""
+
+    return elemento
+
+
+def _aggiungi_elemento_letto(risultato, elemento):
+    elemento = _elemento_letto_valido(elemento)
+    if not elemento:
+        return
+
+    chiave = elemento.lower()
+    for esistente in risultato:
+        if esistente.lower() == chiave:
+            return
+
+    risultato.append(elemento)
+
+
+def _segmenti_da_lista_testuale(testo):
+    testo = _testo_sicuro(testo)
+    testo = testo.replace(" e ", ", ")
+    testo = testo.replace(" - ", ", ")
+    parti = re.split(r"[,;/\n]+", testo)
+    return [p.strip() for p in parti if p.strip()]
+
+
+def _testo_marker_lettura_pulito(mondo):
+    testo_visibile = _testo_visibile_da_mondo(mondo)
+    if testo_visibile:
+        return testo_visibile
+
+    testo = _testo_sicuro(mondo)
+    testo_lower = testo.lower()
+    indice = testo_lower.find("ocr:")
+    if indice < 0:
+        return ""
+
+    parte = testo[indice + len("ocr:"):]
+    for fine in [". sono fermo", " sono fermo", ". sono", " sono"]:
+        indice_fine = parte.lower().find(fine)
+        if indice_fine >= 0:
+            parte = parte[:indice_fine]
+            break
+    return parte.strip(" .,:;")
+
+
+def estrai_parole_o_frasi_lette(mondo):
+    testo_originale = _testo_senza_marker_per_lettura(mondo)
+    testo_lower = testo_originale.lower()
+
+    risultato = []
+
+    pattern_virgolette = [
+        u"[\u201c\"]([^\"\u201d]{1,80})[\u201d\"]",
+        u"[\u2018]([^\u2019]{1,80})[\u2019]",
+        r"(?<![A-Za-z0-9])'([^']{1,80})'(?![A-Za-z0-9])"
+    ]
+    for pattern in pattern_virgolette:
+        for match in re.finditer(pattern, testo_originale):
+            _aggiungi_elemento_letto(risultato, match.group(1))
+
+    indicatori_lista = [
+        "parole come",
+        "tra cui",
+        "inclusi",
+        "incluse",
+        "si leggono",
+        "indicazioni come",
+        "sono presenti parole come",
+        "parole leggibili"
+    ]
+    if not risultato:
+        for indicatore in indicatori_lista:
+            indice = testo_lower.find(indicatore)
+            if indice < 0:
+                continue
+            parte = testo_originale[indice + len(indicatore):]
+            parte = re.split(
+                r"\.|\bsono fermo\b|\bnon ci sono\b",
+                parte,
+                flags=re.IGNORECASE
+            )[0]
+            for segmento in _segmenti_da_lista_testuale(parte):
+                _aggiungi_elemento_letto(risultato, segmento)
+
+    marker_testo = _testo_marker_lettura_pulito(mondo)
+    if marker_testo:
+        for segmento in _segmenti_da_lista_testuale(marker_testo):
+            parole_segmento = [
+                p.strip(".,;:!?()[]{}\"'")
+                for p in re.split(r"\s+", segmento)
+                if p.strip(".,;:!?()[]{}\"'")
+            ]
+            if (
+                len(parole_segmento) <= 3
+                and not re.search(r"\d{1,2}[:.]\d{2}", segmento)
+                and "-" not in segmento
+            ):
+                _aggiungi_elemento_letto(risultato, " ".join(parole_segmento))
+            else:
+                for parola in parole_segmento:
+                    _aggiungi_elemento_letto(risultato, parola)
+
+    if not risultato and contenuto_letto_esplicitamente_illeggibile(mondo):
+        return []
+
+    return risultato[:5]
+
+
+def _testo_lista_naturale(elementi):
+    elementi = [e for e in elementi if e]
+    if not elementi:
+        return ""
+    if len(elementi) == 1:
+        return elementi[0]
+    if len(elementi) == 2:
+        return elementi[0] + " e " + elementi[1]
+    return ", ".join(elementi[:-1]) + " e " + elementi[-1]
+
+
+def inferisci_tipo_contenuto_letto(elementi):
+    testo = " ".join([_testo_sicuro(e) for e in elementi]).lower()
+    if not testo:
+        return ""
+
+    if any(
+        parola in testo
+        for parola in [
+            "bar", "caffe", u"caff\xe8", "menu", u"men\xf9",
+            "prezzo", "prezzi", "prodotto", "prodotti", "sapori",
+            "gusto", "gusti", "crema"
+        ]
+    ):
+        return "Potrebbero riferirsi a un elenco, un menu o informazioni su un servizio."
+
+    if (
+        re.search(r"\b\d{1,2}[:.]\d{2}\b", testo)
+        or any(
+            parola in testo
+            for parola in [
+                "orario", "orari", "aperto", "aperta", "lun", "ven",
+                "sab", "dom", "giorni", "data", "date"
+            ]
+        )
+    ):
+        return "Potrebbero indicare un orario o un'informazione temporale."
+
+    if any(
+        parola in testo
+        for parola in [
+            "vietato", "riservato", "obbligatorio", "pericolo",
+            "attenzione", "accesso", "area"
+        ]
+    ):
+        return "Potrebbero esprimere una regola, un vincolo o un limite di accesso."
+
+    if any(
+        parola in testo
+        for parola in [
+            "aula", "laboratorio", "segreteria", "dipartimento",
+            "ufficio", "reparto", "ingresso"
+        ]
+    ):
+        return "Potrebbero aiutarmi a identificare il luogo o la funzione dello spazio."
+
+    if any(
+        parola in testo
+        for parola in [
+            "premere", "seguire", "usare", "usa", "conferisci",
+            "conferire", "procedura", "istruzioni", "raccolta"
+        ]
+    ):
+        return "Potrebbero indicare un'istruzione operativa o cosa fare in questo punto."
+
+    return "Potrebbero essere un elenco o informazioni utili sul contesto."
+
+
 def _parole_significative_testo_operativo(testo):
     testo = _testo_sicuro(testo)
     parole = [
@@ -2257,6 +2592,7 @@ def _prima_conoscenza_semantica_utile(stato_runtime):
 
 def _indizi_osservati_da_mondo(mondo):
     testo = _testo_sicuro(mondo).lower()
+    testo_non_leggibile = testo_visivo_chiaramente_non_leggibile(mondo)
     ind_lav = "lava" + "gna"
     ind_car = "car" + "tello"
     ind_mon = "moni" + "tor"
@@ -2285,6 +2621,10 @@ def _indizi_osservati_da_mondo(mondo):
     indizi = []
 
     for nome, parole in catalogo:
+        if nome == ind_mon and _negazione_globale_schermi(testo):
+            continue
+        if nome == "scritte" and testo_non_leggibile:
+            continue
         if _termini_presenti_non_negati(testo, parole):
             indizi.append(nome)
 
@@ -2338,6 +2678,23 @@ def _descrivi_indizi_osservati(indizi):
         testo += " con " + " e ".join(dettagli[:2])
 
     return testo
+
+
+def _descrivi_supporto_non_leggibile(indizi):
+    ind_lav = "lava" + "gna"
+    ind_oro = "orolo" + "gio"
+    preferiti = []
+    for indizio in [ind_lav, "bacheca", "foglio", ind_oro]:
+        if indizio in indizi and indizio not in preferiti:
+            preferiti.append(indizio)
+
+    if not preferiti:
+        return ""
+
+    descrizioni = [_articolo_indizio(i) for i in preferiti[:2]]
+    if len(descrizioni) == 1:
+        return descrizioni[0]
+    return descrizioni[0] + " e " + descrizioni[1]
 
 
 def _inferenza_contesto_da_indizi(indizi, categoria, eventi_core, mondo):
@@ -2413,6 +2770,10 @@ def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
     eventi_core = _eventi_core_da_evento(evento)
     testo_leggibile = _testo_leggibile_da_mondo(mondo)
     estratto_testo = _estratto_breve_testo_leggibile(testo_leggibile)
+    parole_lette = estrai_parole_o_frasi_lette(mondo)
+    testo_parole_lette = _testo_lista_naturale(parole_lette)
+    inferenza_parole_lette = inferisci_tipo_contenuto_letto(parole_lette)
+    testo_non_leggibile = testo_visivo_chiaramente_non_leggibile(mondo)
     conoscenza = _prima_conoscenza_semantica_utile(stato_runtime)
     indizi = _indizi_osservati_da_mondo(mondo)
     descrizione_indizi = _descrivi_indizi_osservati(indizi)
@@ -2493,7 +2854,24 @@ def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
         )
     )
 
-    if informazione_non_disponibile:
+    if informativo and testo_non_leggibile and not testo_parole_lette:
+        descrizione_supporto = _descrivi_supporto_non_leggibile(indizi)
+        ind_lav = "lava" + "gna"
+        if descrizione_supporto:
+            frase_osservazione = (
+                "Vedo {}. Non leggo testo chiaro o informazioni utili sulla {}."
+                .format(descrizione_supporto, ind_lav)
+            )
+        else:
+            frase_osservazione = (
+                "Ho osservato un possibile supporto informativo, ma non leggo "
+                "testo chiaro o informazioni utili."
+            )
+        frase_utilita = (
+            "Lo considero un supporto informativo, ma non lo uso per decidere ora."
+        )
+
+    elif informazione_non_disponibile:
         if descrizione_indizi:
             frase_osservazione = (
                 "Vedo {}, ma non leggo elementi utili."
@@ -2508,17 +2886,35 @@ def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
 
     elif informativo and frase_operativa and utilita_operativa:
         frase_osservazione = frase_operativa
-        frase_utilita = utilita_operativa
+        if testo_parole_lette:
+            frase_osservazione = (
+                frase_osservazione + " Leggo alcune parole: {}."
+                .format(testo_parole_lette)
+            )
+        if inferenza_parole_lette:
+            frase_utilita = inferenza_parole_lette + " " + utilita_operativa
+        else:
+            frase_utilita = utilita_operativa
 
     elif descrizione_indizi and inferenza_indizi:
         frase_osservazione = "Vedo {}.".format(descrizione_indizi)
-        if informativo and estratto_testo:
+        if informativo and testo_parole_lette:
+            frase_osservazione = (
+                "Vedo {}. Leggo alcune parole: {}."
+                .format(descrizione_indizi, testo_parole_lette)
+            )
+        elif informativo and estratto_testo:
             frase_osservazione = (
                 "Vedo {}. Leggo alcune parole: {}."
                 .format(descrizione_indizi, estratto_testo)
             )
 
-        if ostacolo:
+        if informativo and inferenza_parole_lette:
+            frase_utilita = (
+                inferenza_parole_lette +
+                " Lo considero utile per capire il contesto."
+            )
+        elif ostacolo:
             frase_utilita = (
                 inferenza_indizi +
                 " Lo considero rilevante per muovermi con prudenza."
@@ -2549,7 +2945,12 @@ def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
         frase_utilita = "Serve osservarlo meglio prima di usarlo."
 
     elif informativo:
-        if estratto_testo:
+        if testo_parole_lette:
+            frase_osservazione = (
+                "Ho osservato un supporto informativo. Leggo alcune parole: "
+                "{}.".format(testo_parole_lette)
+            )
+        elif estratto_testo:
             frase_osservazione = (
                 "Ho osservato un supporto informativo con alcune parole "
                 "leggibili: {}.".format(estratto_testo)
@@ -2563,7 +2964,12 @@ def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
                 "Ho osservato un supporto informativo nell'ambiente."
             )
 
-        if vincolo or azione in ["osserva_e_memorizza", "usa_informazione"]:
+        if inferenza_parole_lette:
+            frase_utilita = (
+                inferenza_parole_lette +
+                " Lo considero utile per capire il contesto."
+            )
+        elif vincolo or azione in ["osserva_e_memorizza", "usa_informazione"]:
             frase_utilita = (
                 "Le interpreto come indicazioni utili per orientarmi o agire."
             )
