@@ -1014,6 +1014,28 @@ def _spiegazione_cognitiva_percezione(mondo, evento):
     if not isinstance(evento, dict):
         evento = {}
 
+    try:
+        if hasattr(
+            autonomy_supervisor,
+            "costruisci_sintesi_semantica_osservazione"
+        ):
+            stato_sintesi = dict(stato_runtime)
+            stato_sintesi["evento_strutturato"] = evento
+            frase_sintesi = (
+                autonomy_supervisor
+                .costruisci_sintesi_semantica_osservazione(
+                    mondo,
+                    stato_sintesi
+                )
+            )
+            if frase_sintesi:
+                stato_runtime["sintesi_semantica_osservazione"] = (
+                    frase_sintesi
+                )
+                return frase_sintesi
+    except Exception:
+        pass
+
     testo = _testo_norm_percezione(mondo)
     categoria = str(evento.get("categoria", "") or "").lower()
     stato = str(evento.get("stato", "") or "").lower()
@@ -2465,7 +2487,13 @@ def main():
 
                     if (
                         decisione_condizione is None
-                        and _idle_concluso_senza_evidenze(stato_runtime)
+                        and (
+                            _idle_concluso_senza_evidenze(stato_runtime)
+                            or stato_runtime.get(
+                                "sintesi_semantica_osservazione",
+                                ""
+                            )
+                        )
                     ):
                         _verbalizza_percezione_autonoma(voce, mondo)
                         _chiudi_routing_idle(

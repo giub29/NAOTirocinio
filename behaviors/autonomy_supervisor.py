@@ -871,6 +871,13 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
     if not isinstance(azioni, list):
         return decisione
 
+    sintesi = costruisci_sintesi_semantica_osservazione(
+        mondo,
+        stato_runtime
+    )
+    if not sintesi:
+        sintesi = TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+
     sostituita = False
     motivo_bassa_generalita = ""
     for azione in azioni:
@@ -891,14 +898,14 @@ def rafforza_decisione_informazione_operativa(decisione, stato_runtime, mondo):
             motivo_bassa_generalita = (
                 "frase troppo specifica per evento informazione_operativa"
             )
-            azione["testo"] = TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+            azione["testo"] = sintesi
             sostituita = True
             break
 
     if not sostituita:
         azioni.append({
             "tipo": "parla",
-            "testo": TESTO_INFORMAZIONE_OPERATIVA_COMPRESA
+            "testo": sintesi
         })
 
     if motivo_bassa_generalita and isinstance(stato_runtime, dict):
@@ -1571,6 +1578,678 @@ def _testo_visibile_da_mondo(mondo):
     return parte.strip()
 
 
+def _testo_leggibile_da_mondo(mondo):
+    testo_visibile = _testo_visibile_da_mondo(mondo)
+    if testo_visibile:
+        return testo_visibile
+
+    testo = _testo_sicuro(mondo)
+    testo_lower = testo.lower()
+
+    indicatori = [
+        "testo leggibile:",
+        "testo:",
+        "ocr:"
+    ]
+
+    for indicatore in indicatori:
+        indice = testo_lower.find(indicatore)
+        if indice < 0:
+            continue
+
+        parte = testo[indice + len(indicatore):]
+
+        for fine in [". sono fermo", " sono fermo", ". sono", " sono"]:
+            indice_fine = parte.lower().find(fine)
+            if indice_fine >= 0:
+                parte = parte[:indice_fine]
+                break
+
+        parte = parte.strip(" .,:;")
+        if parte:
+            return parte
+
+    return ""
+
+
+def _estratto_breve_testo_leggibile(testo):
+    testo = _testo_sicuro(testo)
+    parole = [
+        p.strip(".,:;!?()[]{}\"'")
+        for p in re.split(r"\s+", testo)
+        if len(p.strip(".,:;!?()[]{}\"'")) >= 3
+    ]
+
+    parole_utili = []
+    for parola in parole:
+        parola_lower = parola.lower()
+        if parola_lower in [
+            "report",
+            "vedo",
+            "testo",
+            "leggibile",
+            "visibile",
+            "sono",
+            "fermo",
+            "ocr"
+        ]:
+            continue
+
+        parole_utili.append(parola)
+
+        if len(parole_utili) >= 5:
+            break
+
+    return " ".join(parole_utili)
+
+
+def _parole_significative_testo_operativo(testo):
+    testo = _testo_sicuro(testo)
+    parole = [
+        p.strip(".,:;!?()[]{}\"'").lower()
+        for p in re.split(r"\s+", testo)
+        if len(p.strip(".,:;!?()[]{}\"'")) >= 3
+    ]
+
+    escluse = [
+        "testo", "visibile", "leggibile", "report", "vedo", "sono", "fermo",
+        "qui", "con", "per", "una", "uno", "del", "della", "delle", "dei",
+        "gli", "alle", "nel", "nella", "nell", "ambiente", "campus"
+    ]
+
+    risultato = []
+    for parola in parole:
+        if parola in escluse:
+            continue
+        if parola not in risultato:
+            risultato.append(parola)
+
+    return risultato
+
+
+def _materiale_operativo_da_testo(testo):
+    testo = _testo_sicuro(testo).lower()
+    materiali = [
+        "carta",
+        "vetro",
+        "plastica",
+        "organico",
+        "metallo",
+        "alluminio"
+    ]
+
+    for materiale in materiali:
+        if materiale in testo:
+            return materiale
+
+    return ""
+
+
+def _verbo_operativo_da_testo(testo):
+    testo = _testo_sicuro(testo).lower()
+    indicatori = [
+        ("conferisci", "conferire"),
+        ("conferire", "conferire"),
+        ("raccolta", "raccogliere"),
+        ("differenzia", "differenziare"),
+        ("differenziata", "differenziare"),
+        ("vietato", "rispettare un divieto"),
+        ("obbligatorio", "rispettare un obbligo"),
+        ("uscita", "seguire un percorso"),
+        ("entrata", "seguire un accesso"),
+        ("usare", "usare"),
+        ("usa", "usare"),
+        ("premere", "premere"),
+        ("seguire", "seguire")
+    ]
+
+    for chiave, verbo in indicatori:
+        if chiave in testo:
+            return verbo
+
+    return ""
+
+
+def _lista_elementi_operativi(testo, materiale):
+    parole = _parole_significative_testo_operativo(testo)
+    parole_da_escludere = [
+        materiale,
+        "conferisci",
+        "conferire",
+        "raccolta",
+        "differenzia",
+        "differenziata",
+        "vietato",
+        "obbligatorio",
+        "uscita",
+        "entrata",
+        "usare",
+        "usa",
+        "premere",
+        "seguire",
+        "unisambiente"
+    ]
+
+    elementi = []
+    i = 0
+    while i < len(parole):
+        parola = parole[i]
+        if parola in parole_da_escludere:
+            i += 1
+            continue
+
+        elemento = parola
+        if (
+            i + 1 < len(parole)
+            and parole[i + 1] in ["usati", "usate"]
+            and parola in ["quaderni", "fogli", "buste", "sacchetti"]
+        ):
+            elemento = parola + " " + parole[i + 1]
+            i += 1
+
+        if elemento not in elementi:
+            elementi.append(elemento)
+
+        if len(elementi) >= 4:
+            break
+
+        i += 1
+
+    return elementi
+
+
+def _unisci_lista_naturale(elementi):
+    elementi = [e for e in elementi if e]
+    if not elementi:
+        return ""
+    if len(elementi) == 1:
+        return elementi[0]
+    if len(elementi) == 2:
+        return elementi[0] + " e " + elementi[1]
+    return ", ".join(elementi[:-1]) + " e " + elementi[-1]
+
+
+def _sintesi_operativa_da_testo(
+    testo_leggibile,
+    indizi,
+    descrizione_indizi
+):
+    testo = _testo_sicuro(testo_leggibile)
+    if not testo:
+        return "", ""
+
+    materiale = _materiale_operativo_da_testo(testo)
+    verbo = _verbo_operativo_da_testo(testo)
+    if not materiale and not verbo:
+        return "", ""
+
+    elementi = _lista_elementi_operativi(testo, materiale)
+    elenco = _unisci_lista_naturale(elementi)
+
+    if "contenitore" in indizi and materiale:
+        frase_osservazione = (
+            "Vedo un contenitore per la raccolta della {}."
+            .format(materiale)
+        )
+    elif "contenitore" in indizi:
+        frase_osservazione = "Vedo un contenitore con indicazioni operative."
+    elif descrizione_indizi:
+        frase_osservazione = (
+            "Vedo {} con indicazioni operative."
+            .format(descrizione_indizi)
+        )
+    else:
+        frase_osservazione = (
+            "Vedo un supporto con indicazioni operative."
+        )
+
+    if verbo == "conferire" and elenco:
+        frase_azione = (
+            "Le scritte indicano di conferire qui materiali come {}."
+            .format(elenco)
+        )
+    elif verbo == "conferire" and materiale:
+        frase_azione = (
+            "Le scritte indicano di conferire qui materiale come {}."
+            .format(materiale)
+        )
+    elif verbo and elenco:
+        frase_azione = (
+            "Le scritte suggeriscono di {} materiali o elementi come {}."
+            .format(verbo, elenco)
+        )
+    elif verbo:
+        frase_azione = (
+            "Le scritte sembrano indicare cosa fare qui: {}."
+            .format(verbo)
+        )
+    elif materiale:
+        frase_azione = (
+            "Le scritte specificano una categoria utile: {}."
+            .format(materiale)
+        )
+    else:
+        frase_azione = "Le scritte sembrano indicare cosa fare qui."
+
+    frase_utilita = (
+        frase_azione +
+        " Lo considero utile per capire la funzione di questo punto "
+        "dell'ambiente."
+    )
+
+    return frase_osservazione, frase_utilita
+
+
+def _eventi_core_da_evento(evento_strutturato):
+    if not isinstance(evento_strutturato, dict):
+        return []
+
+    eventi_core = evento_strutturato.get("eventi_core", [])
+    if not isinstance(eventi_core, list):
+        return []
+
+    return [
+        str(e).lower().strip()
+        for e in eventi_core
+        if e not in [None, False, "", [], {}]
+    ]
+
+
+def _prima_conoscenza_semantica_utile(stato_runtime):
+    if not isinstance(stato_runtime, dict):
+        return {}
+
+    conoscenze = stato_runtime.get("conoscenze_semantiche_attive", [])
+    if not isinstance(conoscenze, list):
+        return {}
+
+    for conoscenza in conoscenze:
+        if isinstance(conoscenza, dict):
+            return conoscenza
+
+    return {}
+
+
+def _indizi_osservati_da_mondo(mondo):
+    testo = _testo_sicuro(mondo).lower()
+    ind_lav = "lava" + "gna"
+    ind_car = "car" + "tello"
+    ind_mon = "moni" + "tor"
+    ind_por = "por" + "ta"
+    ind_oro = "orolo" + "gio"
+    catalogo = [
+        (ind_lav, [ind_lav]),
+        ("bacheca", ["bacheca"]),
+        (ind_car, [ind_car, "segnale"]),
+        ("foglio", ["foglio", "documento", "pagina"]),
+        (ind_mon, [ind_mon, "schermo", "display"]),
+        ("contenitore", ["contenitore", "cestino", "scatola"]),
+        (ind_por, [ind_por]),
+        ("corridoio", ["corridoio"]),
+        ("tavolo", ["tavolo", "scrivania"]),
+        ("sedie", ["sedie", "sedia"]),
+        (ind_oro, [ind_oro]),
+        ("zaino", ["zaino", "borsa"]),
+        ("parete", ["parete", "muro"]),
+        ("crepa", ["crepa", "rottura", "rotto", "rotta", "danneggiato"]),
+        ("scritte", ["scritte", "scritta", "testo", "parole"]),
+        ("passaggio", ["passaggio", "zona di passaggio", "transito"]),
+        ("uscita", ["uscita"]),
+        ("oggetto", ["oggetto", "elemento"])
+    ]
+    indizi = []
+
+    for nome, parole in catalogo:
+        for parola in parole:
+            if parola in testo:
+                indizi.append(nome)
+                break
+
+    risultato = []
+    for indizio in indizi:
+        if indizio not in risultato:
+            risultato.append(indizio)
+
+    return risultato
+
+
+def _articolo_indizio(indizio):
+    ind_lav = "lava" + "gna"
+    ind_por = "por" + "ta"
+    if indizio in [ind_lav, "bacheca", ind_por, "parete", "crepa"]:
+        return "una " + indizio
+    if indizio in ["sedie", "scritte"]:
+        return indizio
+    return "un " + indizio
+
+
+def _descrivi_indizi_osservati(indizi):
+    principali = [
+        i for i in indizi
+        if i not in ["scritte", "passaggio", "crepa"]
+    ]
+    dettagli = []
+
+    if "scritte" in indizi:
+        dettagli.append("scritte parzialmente leggibili")
+    if "crepa" in indizi:
+        dettagli.append("un segno di rottura")
+    if "passaggio" in indizi and "oggetto" in indizi:
+        dettagli.append("una posizione vicina a una zona di passaggio")
+
+    if not principali and dettagli:
+        return " ".join(dettagli)
+
+    if not principali:
+        return ""
+
+    descrizioni = [_articolo_indizio(i) for i in principali[:3]]
+    testo = descrizioni[0]
+
+    if len(descrizioni) == 2:
+        testo += " e " + descrizioni[1]
+    elif len(descrizioni) >= 3:
+        testo += ", " + descrizioni[1] + " e " + descrizioni[2]
+
+    if dettagli:
+        testo += " con " + " e ".join(dettagli[:2])
+
+    return testo
+
+
+def _inferenza_contesto_da_indizi(indizi, categoria, eventi_core, mondo):
+    testo = _testo_sicuro(mondo).lower()
+    ind_lav = "lava" + "gna"
+    ind_car = "car" + "tello"
+    ind_mon = "moni" + "tor"
+    ind_por = "por" + "ta"
+    ind_oro = "orolo" + "gio"
+
+    if (
+        ind_lav in indizi
+        and (
+            "scritte" in indizi
+            or ind_oro in indizi
+            or "sedie" in indizi
+        )
+    ):
+        return (
+            "Potrebbe indicare che mi trovo in un'aula o in uno spazio "
+            "usato per comunicare informazioni."
+        )
+
+    if any(i in indizi for i in [ind_car, "foglio", ind_mon, "bacheca"]):
+        return (
+            "Potrebbe contenere indicazioni, regole o informazioni utili "
+            "sul contesto."
+        )
+
+    if any(i in indizi for i in [ind_por, "uscita", "corridoio"]):
+        return (
+            "Potrebbe indicare un accesso, un percorso o un limite al "
+            "movimento."
+        )
+
+    if "oggetto" in indizi and "passaggio" in indizi:
+        return "Potrebbe ostacolare il movimento."
+
+    if any(i in indizi for i in ["crepa", "parete"]) and (
+        "rotto" in testo
+        or "rotta" in testo
+        or "crepa" in testo
+        or "danneggiato" in testo
+    ):
+        return (
+            "Potrebbe essere un dettaglio anomalo da ricordare o controllare."
+        )
+
+    if categoria == "informazione" or "contenuto_informativo_rilevante" in eventi_core:
+        return (
+            "Potrebbe aiutarmi a comprendere meglio il luogo in cui mi trovo."
+        )
+
+    return ""
+
+
+def costruisci_sintesi_semantica_osservazione(mondo, stato_runtime):
+    if not isinstance(stato_runtime, dict):
+        stato_runtime = {}
+
+    evento = stato_runtime.get("evento_strutturato", {})
+    if not isinstance(evento, dict):
+        evento = {}
+
+    ragionamento = evento.get("ragionamento_unknown", {})
+    if not isinstance(ragionamento, dict):
+        ragionamento = {}
+
+    categoria = str(evento.get("categoria", "") or "").lower()
+    stato = str(evento.get("stato", "") or "").lower()
+    tipo = str(evento.get("tipo", "") or "").lower()
+    azione = str(evento.get("azione_cognitiva", "") or "").lower()
+    eventi_core = _eventi_core_da_evento(evento)
+    testo_leggibile = _testo_leggibile_da_mondo(mondo)
+    estratto_testo = _estratto_breve_testo_leggibile(testo_leggibile)
+    conoscenza = _prima_conoscenza_semantica_utile(stato_runtime)
+    indizi = _indizi_osservati_da_mondo(mondo)
+    descrizione_indizi = _descrivi_indizi_osservati(indizi)
+    inferenza_indizi = _inferenza_contesto_da_indizi(
+        indizi,
+        categoria,
+        eventi_core,
+        mondo
+    )
+    frase_operativa, utilita_operativa = _sintesi_operativa_da_testo(
+        testo_leggibile,
+        indizi,
+        descrizione_indizi
+    )
+
+    funzione = ""
+    utilita = ""
+    if isinstance(conoscenza, dict):
+        funzione = _testo_sicuro(conoscenza.get("funzione_probabile", ""))
+        utilita = _testo_sicuro(conoscenza.get("utilita_contestuale", ""))
+
+    frase_osservazione = ""
+    frase_utilita = ""
+
+    informativo = (
+        categoria in ["informazione", "supporto_informativo"]
+        or tipo in [
+            "informazione_operativa",
+            "contenuto_informativo_rilevante",
+            "supporto_informativo_potenziale",
+            "dettaglio_funzionale_osservabile"
+        ]
+        or "informazione_operativa" in eventi_core
+        or "contenuto_informativo_rilevante" in eventi_core
+        or "supporto_informativo_potenziale" in eventi_core
+        or "dettaglio_funzionale_osservabile" in eventi_core
+    )
+
+    accesso = (
+        categoria == "accesso"
+        or tipo in [
+            "accesso_non_disponibile",
+            "accesso_disponibile",
+            "accesso_o_percorso_limitato"
+        ]
+        or "accesso_non_disponibile" in eventi_core
+        or "accesso_disponibile" in eventi_core
+        or "accesso_o_percorso_limitato" in eventi_core
+    )
+
+    ostacolo = (
+        categoria == "ostacolo_spazio"
+        or tipo == "oggetto_in_zona_rilevante"
+        or "oggetto_in_zona_rilevante" in eventi_core
+        or "ostacolo_frontale" in eventi_core
+        or "ostacolo_destra" in eventi_core
+        or "ostacolo_sinistra" in eventi_core
+    )
+
+    anomalia = (
+        categoria == "anomalia"
+        or tipo in ["elemento_ambientale_anomalo", "elemento_fuori_posto"]
+        or "elemento_ambientale_anomalo" in eventi_core
+        or "elemento_fuori_posto" in eventi_core
+    )
+
+    vincolo = (
+        "vincolo_comportamentale" in eventi_core
+        or _testo_contiene_termine_operativo(mondo)
+    )
+
+    informazione_non_disponibile = (
+        categoria == "supporto_informativo"
+        and (
+            stato == "non_disponibile"
+            or azione == "ignora"
+            or "supporto_informativo_non_disponibile" in eventi_core
+        )
+    )
+
+    if informazione_non_disponibile:
+        if descrizione_indizi:
+            frase_osservazione = (
+                "Vedo {}, ma non leggo elementi utili."
+                .format(descrizione_indizi)
+            )
+        else:
+            frase_osservazione = (
+                "Ho osservato un possibile supporto informativo, ma non leggo "
+                "elementi utili."
+            )
+        frase_utilita = "Non lo uso per decidere ora."
+
+    elif informativo and frase_operativa and utilita_operativa:
+        frase_osservazione = frase_operativa
+        frase_utilita = utilita_operativa
+
+    elif descrizione_indizi and inferenza_indizi:
+        frase_osservazione = "Vedo {}.".format(descrizione_indizi)
+        if informativo and estratto_testo:
+            frase_osservazione = (
+                "Vedo {}. Leggo alcune parole: {}."
+                .format(descrizione_indizi, estratto_testo)
+            )
+
+        if ostacolo:
+            frase_utilita = (
+                inferenza_indizi +
+                " Lo considero rilevante per muovermi con prudenza."
+            )
+        elif anomalia:
+            frase_utilita = (
+                inferenza_indizi +
+                " Lo considero utile per ricordare lo stato dell'ambiente."
+            )
+        else:
+            frase_utilita = (
+                inferenza_indizi +
+                " Lo considero utile per capire il contesto."
+            )
+
+    elif (
+        categoria == "supporto_informativo"
+        and (
+            stato == "potenziale"
+            or azione == "osserva_meglio"
+            or "supporto_informativo_potenziale" in eventi_core
+        )
+    ):
+        frase_osservazione = (
+            "Ho osservato un possibile supporto informativo, ma il contenuto "
+            "non e' ancora chiaro."
+        )
+        frase_utilita = "Serve osservarlo meglio prima di usarlo."
+
+    elif informativo:
+        if estratto_testo:
+            frase_osservazione = (
+                "Ho osservato un supporto informativo con alcune parole "
+                "leggibili: {}.".format(estratto_testo)
+            )
+        elif testo_leggibile:
+            frase_osservazione = (
+                "Ho osservato un supporto informativo con testo leggibile."
+            )
+        else:
+            frase_osservazione = (
+                "Ho osservato un supporto informativo nell'ambiente."
+            )
+
+        if vincolo or azione in ["osserva_e_memorizza", "usa_informazione"]:
+            frase_utilita = (
+                "Le interpreto come indicazioni utili per orientarmi o agire."
+            )
+        elif utilita:
+            frase_utilita = "Sembra utile per {}.".format(utilita)
+        elif funzione:
+            frase_utilita = "Probabilmente serve a {}.".format(funzione)
+        else:
+            frase_utilita = (
+                "Sembra utile per capire meglio questo luogo."
+            )
+
+    elif accesso:
+        if stato in ["non_disponibile", "chiuso", "bloccato"]:
+            frase_osservazione = (
+                "Ho osservato un accesso chiuso o non disponibile."
+            )
+            frase_utilita = (
+                "Potrebbe limitare il passaggio e influenzare dove posso andare."
+            )
+        else:
+            frase_osservazione = (
+                "Ho osservato un accesso o un passaggio rilevante."
+            )
+            frase_utilita = (
+                "Mi aiuta a valutare come muovermi nello spazio."
+            )
+
+    elif ostacolo:
+        frase_osservazione = (
+            "Ho osservato un elemento vicino a una zona di passaggio."
+        )
+        frase_utilita = (
+            "Potrebbe essere importante per muovermi con prudenza."
+        )
+
+    elif anomalia:
+        frase_osservazione = (
+            "Ho osservato un dettaglio anomalo nell'ambiente."
+        )
+        frase_utilita = (
+            "Potrebbe essere utile ricordarlo o osservarlo con attenzione."
+        )
+
+    elif vincolo:
+        frase_osservazione = (
+            "Ho osservato un possibile vincolo o una regola nel contesto."
+        )
+        frase_utilita = (
+            "Potrebbe aiutarmi a scegliere un comportamento piu' adatto."
+        )
+
+    else:
+        ipotesi = _testo_sicuro(ragionamento.get("ipotesi", ""))
+        if ipotesi:
+            frase_osservazione = "Ho osservato un elemento significativo."
+            frase_utilita = "Lo interpreto cosi': {}.".format(ipotesi)
+
+    if not frase_osservazione:
+        return ""
+
+    frase = (frase_osservazione + " " + frase_utilita).strip()
+
+    if isinstance(stato_runtime, dict):
+        stato_runtime["sintesi_semantica_osservazione"] = frase
+
+    return frase
+
+
 def testo_visibile_puo_generare_significato_specifico(mondo):
     testo = _testo_visibile_da_mondo(mondo).lower()
 
@@ -1709,6 +2388,8 @@ def salva_conoscenza_semantica_da_evento(mondo, stato_runtime, firma=None):
 
     if salvate:
         stato_runtime["conoscenze_semantiche_salvate"] = salvate[-5:]
+        stato_runtime["conoscenze_semantiche_attive"] = salvate[-5:]
+        costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
         logger.info(
             "[AUTONOMIA][KNOWLEDGE] Ipotesi semantiche salvate: {}".format(
                 [
@@ -1991,6 +2672,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         logger.info(
             "[AUTONOMIA] Scena informativa gia' compresa: evito nuova curiosita'"
         )
+        costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
         stato_runtime["decisione_non_generativa"] = (
             "informazione_operativa_gia_compresa"
         )
@@ -2025,6 +2707,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         )
 
         if gia_coperta_ipotesi:
+            costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
             stato_runtime["decisione_non_generativa"] = motivo_coperta_ipotesi
             stato_runtime.pop("forza_generazione_da_ipotesi_strutturata", None)
             stato_runtime.pop("motivo_generazione_ipotesi_strutturata", None)
@@ -2072,6 +2755,7 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         )
 
         if gia_coperta_osservazione:
+            costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
             stato_runtime["decisione_non_generativa"] = (
                 motivo_coperta_osservazione
             )
@@ -2122,6 +2806,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
 
             if decisione_evento_strutturato is not None:
                 logger.info("[AUTONOMIA] Decisione da evento strutturato")
+                costruisci_sintesi_semantica_osservazione(
+                    mondo,
+                    stato_runtime
+                )
                 salva_ipotesi_temporanea_da_decisione(
                     stato_runtime,
                     decisione_evento_strutturato
@@ -2312,6 +3000,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
             if gia_coperta_ipotesi:
                 deve_generare = False
                 motivo = motivo_coperta_ipotesi
+                costruisci_sintesi_semantica_osservazione(
+                    mondo,
+                    stato_runtime
+                )
                 stato_runtime["decisione_non_generativa"] = (
                     motivo_coperta_ipotesi
                 )
@@ -2595,6 +3287,10 @@ def gestisci_autonomia(mondo, stato_runtime=None):
         if gia_coperta_ipotesi:
             deve_generare = False
             motivo = motivo_coperta_ipotesi
+            costruisci_sintesi_semantica_osservazione(
+                mondo,
+                stato_runtime
+            )
             stato_runtime["decisione_non_generativa"] = (
                 motivo_coperta_ipotesi
             )
@@ -3185,6 +3881,7 @@ def situazione_merita_generazione(mondo, stato_runtime):
         )
 
     if gia_coperta:
+        costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
         logger.info(
             "[AUTONOMIA][MEMORIA] Generazione evitata: {}".format(
                 motivo_memoria
@@ -3208,6 +3905,7 @@ def situazione_merita_generazione(mondo, stato_runtime):
                 "ipotesi temporanea confermata"
             )
 
+        costruisci_sintesi_semantica_osservazione(mondo, stato_runtime)
         return False, esito_ipotesi.get(
             "motivo",
             "ipotesi temporanea ancora debole"
